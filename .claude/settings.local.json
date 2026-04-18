@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(npx create-next-app@latest . --typescript --tailwind --app --no-src-dir --import-alias \"@/*\" --no-eslint --yes)",
+      "Bash(python3 -c ' *)",
+      "Bash(node -e ' *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(curl -s http://localhost:3000 -o /dev/null -w \"%{http_code}\")",
+      "Bash(curl -s http://localhost:3000/today -o /dev/null -w \"%{http_code}\")",
+      "Bash(curl -s http://localhost:3000/recovery/si-joint -o /dev/null -w \" %{http_code}\")",
+      "Bash(curl -s http://localhost:3000/recovery/si-joint)",
+      "Bash(curl -s http://localhost:3000/today -o /dev/null -w \"today: %{http_code}\\\\n\")",
+      "Bash(curl -s http://localhost:3000/plan -o /dev/null -w \"plan: %{http_code}\\\\n\")",
+      "Bash(curl -s http://localhost:3000/profile -o /dev/null -w \"profile: %{http_code}\\\\n\")",
+      "Bash(curl -s http://localhost:3000/recovery -o /dev/null -w \"recovery: %{http_code}\\\\n\")",
+      "Bash(curl -s http://localhost:3000/recovery/si-joint -o /dev/null -w \"si-joint: %{http_code}\\\\n\")",
+      "Bash(grep -o 'Heating Pad.\\\\{0,40\\\\}')",
+      "Bash(grep -o '\"meta\".\\\\{0,30\\\\}')",
+      "Bash(grep -o '10.\\\\{0,15\\\\}min')",
+      "Bash(git config *)",
+      "Bash(gh auth *)",
+      "Bash(git init *)",
+      "Bash(git add *)"
+    ]
+  }
+}

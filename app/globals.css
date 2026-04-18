@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0d0f12;
+  --surface: #161a20;
+  --surface2: #1c2128;
+  --surface3: #222832;
+  --border: #2a3040;
+  --text: #e4e8ef;
+  --text-dim: #7a8494;
+  --text-mid: #a8b2c0;
+  --red: #ff4d4d;
+  --red-bg: rgba(255,77,77,0.08);
+  --red-border: rgba(255,77,77,0.25);
+  --orange: #ff9f43;
+  --orange-bg: rgba(255,159,67,0.08);
+  --orange-border: rgba(255,159,67,0.25);
+  --yellow: #ffd32a;
+  --yellow-bg: rgba(255,211,42,0.08);
+  --yellow-border: rgba(255,211,42,0.25);
+  --green: #26de81;
+  --green-bg: rgba(38,222,129,0.08);
+  --green-border: rgba(38,222,129,0.25);
+  --accent: #5e9fff;
+  --accent-bg: rgba(94,159,255,0.08);
+  --accent-border: rgba(94,159,255,0.2);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.grain {
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+}
+
+@keyframes fadeIn  { from{opacity:0} to{opacity:1} }
+@keyframes slideUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+@keyframes modalPop{ from{opacity:0;transform:scale(0.94) translateY(8px)} to{opacity:1;transform:scale(1) translateY(0)} }
+
+.animate-fadeIn   { animation: fadeIn   0.35s ease both; }
+.animate-slideUp  { animation: slideUp  0.45s ease both; }
+.animate-modalPop { animation: modalPop 0.28s ease both; }
+
+.mono { font-family: var(--font-space-mono, 'Space Mono'), monospace; }
+
+/* block icon colors */
+.block-icon-morning  { background: rgba(255,159,67,0.12);  color: var(--orange); }
+.block-icon-warmup   { background: rgba(94,159,255,0.12);  color: var(--accent); }
+.block-icon-workout  { background: rgba(38,222,129,0.12);  color: var(--green); }
+.block-icon-abs      { background: rgba(255,159,67,0.12);  color: var(--orange); }
+.block-icon-cooldown { background: rgba(168,114,255,0.12); color: #a872ff; }
+.block-icon-evening  { background: rgba(138,125,255,0.15); color: #8a7dff; }
+.block-icon-rest     { background: rgba(122,132,148,0.12); color: var(--text-dim); }
+
+/* set tracking */
+.set-circle {
+  width:28px;height:28px;border-radius:50%;
+  background:var(--bg);border:1.5px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;color:var(--text-dim);
+  cursor:pointer;transition:all 0.18s;user-select:none;flex-shrink:0;
+}
+.set-circle:hover{border-color:var(--green);color:var(--text);}
+.set-circle.done{background:var(--green);border-color:var(--green);color:var(--bg);}
+
+.weight-input {
+  width:80px;padding:6px 10px;
+  background:var(--bg);border:1.5px solid var(--border);
+  border-radius:6px;color:var(--text);font-size:12px;
+  text-align:center;transition:border-color 0.2s;outline:none;
+}
+.weight-input:focus{border-color:var(--accent);}
+.weight-input::placeholder{color:var(--text-dim);font-style:italic;}
+
+.cue-box {
+  background:var(--accent-bg);border-left:3px solid var(--accent);
+  padding:10px 12px;border-radius:0 8px 8px 0;
+  font-size:13px;color:var(--text);font-style:italic;
+}
+
+.modal-backdrop {
+  position:fixed;inset:0;
+  background:rgba(0,0,0,0.75);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  z-index:10000;
+  display:flex;align-items:flex-start;justify-content:center;
+  padding:20px;overflow-y:auto;
+}
+.modal-box {
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:16px;max-width:520px;width:100%;
+  margin:auto;padding:24px;position:relative;
+}
+
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
