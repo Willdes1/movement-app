@@ -3,6 +3,7 @@ import { DM_Sans, Space_Mono } from 'next/font/google'
 import './globals.css'
 import BottomNav from '@/components/ui/BottomNav'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { ThemeProvider } from '@/contexts/ThemeContext'
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -41,11 +42,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${dmSans.variable} ${spaceMono.variable}`}>
       <body style={{ fontFamily: 'var(--font-dm-sans, DM Sans), sans-serif' }} suppressHydrationWarning>
         <AuthProvider>
-          <div className="grain" />
-          <main style={{ paddingBottom: '72px', minHeight: '100vh' }}>
-            {children}
-          </main>
-          <BottomNav />
+          <ThemeProvider>
+            <div className="grain" />
+            <main style={{ paddingBottom: '80px', minHeight: '100vh' }}>
+              {children}
+            </main>
+            <BottomNav />
+          </ThemeProvider>
         </AuthProvider>
       </body>
     </html>

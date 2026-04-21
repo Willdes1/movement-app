@@ -52,3 +52,17 @@ export function getGateChecks(): boolean[] {
 export function setGateChecks(checks: boolean[]) {
   safeSet('mv_gate', JSON.stringify(checks))
 }
+
+// Active recovery tracking
+export type ActiveRecovery = { playbook: string; phase: number }
+export function getActiveRecovery(): ActiveRecovery | null {
+  const raw = safeGet('mv_active_recovery')
+  if (!raw) return null
+  try { return JSON.parse(raw) } catch { return null }
+}
+export function setActiveRecovery(recovery: ActiveRecovery) {
+  safeSet('mv_active_recovery', JSON.stringify(recovery))
+}
+export function clearActiveRecovery() {
+  safeRemove('mv_active_recovery')
+}
