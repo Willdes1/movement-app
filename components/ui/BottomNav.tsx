@@ -48,12 +48,12 @@ const tabs = [
     ),
   },
   {
-    href: '/browse',
-    label: 'Browse',
+    href: '/account',
+    label: 'Account',
     icon: (active: boolean) => (
       <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-        <circle cx="11" cy="11" r="8" fill={active ? 'currentColor' : 'none'} fillOpacity={active ? 0.12 : 0}/>
-        <path d="m21 21-4.35-4.35"/>
+        <circle cx="12" cy="8" r="4" fill={active ? 'currentColor' : 'none'} fillOpacity={active ? 0.2 : 0}/>
+        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" strokeLinecap="round"/>
       </svg>
     ),
   },
@@ -87,7 +87,7 @@ export default function BottomNav() {
       )}
 
       {tabs.map(tab => {
-        const active = pathname.startsWith(tab.href)
+        const active = pathname.startsWith(tab.href) || (tab.href === '/account' && pathname.startsWith('/profile'))
         const isRecoveryTab = tab.href === '/plan' && !!activeRecovery
 
         if (tab.center) {

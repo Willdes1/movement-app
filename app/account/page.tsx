@@ -1,0 +1,148 @@
+'use client'
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
+import { loadProfile } from '@/lib/storage'
+import type { UserProfile } from '@/lib/types'
+import { useState } from 'react'
+
+export default function AccountPage() {
+  const { user, isAdmin, signOut, loading } = useAuth()
+  const router = useRouter()
+  const [profile, setProfile] = useState<UserProfile>({})
+
+  useEffect(() => {
+    if (!loading && !user) router.replace('/auth')
+  }, [user, loading, router])
+
+  useEffect(() => {
+    const p = loadProfile() as UserProfile | null
+    if (p) setProfile(p)
+  }, [])
+
+  async function handleSignOut() {
+    await signOut()
+    router.push('/auth')
+  }
+
+  if (loading || !user) return null
+
+  const firstName = profile?.name?.split(' ')[0]
+  const initials = profile?.name
+    ? profile.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+    : user.email?.[0]?.toUpperCase() ?? '?'
+
+  const sports = profile?.sport ? profile.sport.split(', ') : []
+  const goals = profile?.goal ? profile.goal.split(', ') : []
+  const profileComplete = !!(profile?.name && profile?.sport && profile?.goal)
+
+  return (
+    <div style={{ padding: '24px 16px 100px', maxWidth: 480, margin: '0 auto' }}>
+
+      {/* Avatar + greeting */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 28 }}>
+        <div style={{
+          width: 60, height: 60, borderRadius: '50%',
+          background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 22, fontWeight: 900, color: '#fff', flexShrink: 0,
+          boxShadow: '0 4px 16px var(--accent-shadow)',
+        }}>
+          {initials}
+        </div>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em', marginBottom: 2 }}>
+            {firstName ? `Hey, ${firstName}` : 'Your Account'}
+          </h1>
+          <p style={{ fontSize: 13, color: 'var(--text-dim)' }}>{user.email}</p>
+        </div>
+      </div>
+
+      {/* Plan tier badge */}
+      <div style={{ marginBottom: 20 }}>
+        <span style={{
+          padding: '5px 12px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+          background: 'var(--accent-bg)', border: '1px solid var(--accent-border)',
+          color: 'var(--accent)', letterSpacing: '0.06em', textTransform: 'uppercase',
+        }}>
+          Free Plan
+        </span>
+      </div>
+
+      {/* Profile summary card */}
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, marginBottom: 16, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-mid)' }}>Athlete Profile</span>
+          {profileComplete
+            ? <span style={{ fontSize: 11, fontWeight: 700, color: '#4ec97a' }}>✓ Complete</span>
+            : <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)' }}>Incomplete</span>}
+        </div>
+        <SummaryRow label="Name" value={profile?.name ?? 'Not set'} dim={!profile?.name} />
+        <SummaryRow label="Sport(s)" value={sports.length ? sports.join(', ') : 'Not set'} dim={!sports.length} />
+        <SummaryRow label="Goal(s)" value={goals.length ? goals.slice(0,2).join(', ') + (goals.length > 2 ? '…' : '') : 'Not set'} dim={!goals.length} />
+        <SummaryRow label="Days/week" value={profile?.daysPerWeek ? `${profile.daysPerWeek} days` : 'Not set'} dim={!profile?.daysPerWeek} last />
+      </div>
+
+      {/* Actions */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <ActionButton
+          label={profileComplete ? 'Edit Profile' : 'Set Up Profile'}
+          sub={profileComplete ? 'Update your sport, goals, and preferences' : 'Complete your profile to get a personalized plan'}
+          icon="✏️"
+          onClick={() => router.push('/profile')}
+          primary={!profileComplete}
+        />
+
+        {isAdmin && (
+          <ActionButton
+            label="Admin Panel"
+            sub="Manage todos, ideas, promo codes, and users"
+            icon="⚙️"
+            onClick={() => router.push('/admin')}
+          />
+        )}
+
+        <ActionButton
+          label="Sign Out"
+          sub={`Signed in as ${user.email}`}
+          icon="→"
+          onClick={handleSignOut}
+          danger
+        />
+      </div>
+    </div>
+  )
+}
+
+function SummaryRow({ label, value, dim = false, last = false }: { label: string; value: string; dim?: boolean; last?: boolean }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '11px 16px', borderBottom: last ? 'none' : '1px solid var(--border)' }}>
+      <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>{label}</span>
+      <span style={{ fontSize: 13, fontWeight: 500, color: dim ? 'var(--text-dim)' : 'var(--text)', textAlign: 'right', maxWidth: 220 }}>{value}</span>
+    </div>
+  )
+}
+
+function ActionButton({ label, sub, icon, onClick, primary = false, danger = false }: {
+  label: string; sub: string; icon: string; onClick: () => void; primary?: boolean; danger?: boolean
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width: '100%', padding: '14px 16px', borderRadius: 14,
+        border: `1px solid ${danger ? 'rgba(255,77,77,0.2)' : primary ? 'var(--accent-border)' : 'var(--border)'}`,
+        background: primary ? 'var(--accent-bg)' : 'var(--surface)',
+        display: 'flex', alignItems: 'center', gap: 14,
+        cursor: 'pointer', textAlign: 'left',
+      }}
+    >
+      <span style={{ fontSize: 20 }}>{icon}</span>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: danger ? 'rgba(255,100,100,0.9)' : primary ? 'var(--accent)' : 'var(--text)', marginBottom: 2 }}>{label}</div>
+        <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{sub}</div>
+      </div>
+      <span style={{ color: 'var(--text-dim)', fontSize: 16 }}>›</span>
+    </button>
+  )
+}

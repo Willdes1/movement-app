@@ -48,6 +48,7 @@ export default function TodayPage() {
 
   const firstName = profile?.name?.split(' ')[0] ?? null
   const isRecovering = !!activeRecovery
+  const profileComplete = !!(profile?.name && profile?.sport && profile?.goal)
 
   return (
     <div style={{ maxWidth: 480, margin: '0 auto' }}>
@@ -96,11 +97,13 @@ export default function TodayPage() {
           letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 10,
         }}>● Today&apos;s Session</div>
         <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: '-0.02em', marginBottom: 4 }}>
-          {isRecovering ? 'SI Joint Recovery' : 'No Active Session'}
+          {isRecovering ? 'SI Joint Recovery' : profileComplete ? 'Your Plan' : 'No Active Session'}
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-mid)', lineHeight: 1.5, marginBottom: 14 }}>
           {isRecovering
             ? `Phase ${activeRecovery.phase} · 4 exercises ready · Continue where you left off`
+            : profileComplete
+            ? 'Your personalized plan is ready — pick up where you left off'
             : 'Set up your profile to receive a personalized plan'}
         </div>
         {isRecovering && (
@@ -113,14 +116,14 @@ export default function TodayPage() {
             </div>
           </div>
         )}
-        <Link href={isRecovering ? '/recovery/si-joint' : '/profile'} style={{
+        <Link href={isRecovering ? '/recovery/si-joint' : profileComplete ? '/plan' : '/profile'} style={{
           display: 'block', width: '100%', padding: '14px',
           borderRadius: 12, background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%)',
           color: '#fff', fontWeight: 900, fontSize: 14, textAlign: 'center',
           textDecoration: 'none', letterSpacing: '0.03em', textTransform: 'uppercase',
           boxShadow: '0 6px 24px var(--accent-shadow)',
         }}>
-          {isRecovering ? '▶ Resume Session' : 'Set Up Profile →'}
+          {isRecovering ? '▶ Resume Session' : profileComplete ? 'View My Plan →' : 'Set Up Profile →'}
         </Link>
       </div>
 
