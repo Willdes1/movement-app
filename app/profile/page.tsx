@@ -96,12 +96,12 @@ export default function ProfilePage() {
     const sports = parseList(p.sport)
     setSelectedSports(sports)
     const customS = sports.find(isCustomSport)
-    if (customS) { setCustomSport(customS); setShowCustomSport(true); setSportSaved(true) }
+    if (customS) { setShowCustomSport(true) }  // show input area so chip is visible
 
     const goals = parseList(p.goal)
     setSelectedGoals(goals)
     const customG = goals.find(isCustomGoal)
-    if (customG) { setCustomGoal(customG); setShowCustomGoal(true); setGoalSaved(true) }
+    if (customG) { setShowCustomGoal(true) }
   }
 
   const [workoutTime, setWorkoutTime] = useState<string | undefined>(undefined)
@@ -161,11 +161,18 @@ export default function ProfilePage() {
     if (!customSport.trim()) return
     const trimmed = customSport.trim()
     setSelectedSports(prev => [...prev.filter(x => !isCustomSport(x)), trimmed])
+    setCustomSport('')
     setSportSaved(true)
-    // Input stays open so user can see what they saved — scrolls to next section
     setTimeout(() => {
+      setSportSaved(false)
       goalRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 400)
+    }, 2000)
+  }
+
+  function removeCustomSport() {
+    setSelectedSports(prev => prev.filter(x => !isCustomSport(x)))
+    setCustomSport('')
+    setSportSaved(false)
   }
 
   // ── Goals ────────────────────────────────────────────────────────────────────
@@ -186,10 +193,18 @@ export default function ProfilePage() {
     if (!customGoal.trim()) return
     const trimmed = customGoal.trim()
     setSelectedGoals(prev => [...prev.filter(x => !isCustomGoal(x)), trimmed])
+    setCustomGoal('')
     setGoalSaved(true)
     setTimeout(() => {
+      setGoalSaved(false)
       daysRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 400)
+    }, 2000)
+  }
+
+  function removeCustomGoal() {
+    setSelectedGoals(prev => prev.filter(x => !isCustomGoal(x)))
+    setCustomGoal('')
+    setGoalSaved(false)
   }
 
   // ── Restrictions ─────────────────────────────────────────────────────────────
@@ -326,17 +341,21 @@ export default function ProfilePage() {
           </div>
           {showCustomSport && (
             <div style={{ marginTop: 10 }}>
+              {/* Show saved custom sport as a removable chip */}
+              {selectedSports.filter(isCustomSport).map(s => (
+                <div key={s} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 16, background: 'var(--accent-bg)', border: '1px solid var(--accent)', fontSize: 12, color: 'var(--accent)', marginBottom: 8 }}>
+                  <span>{s}</span>
+                  <button onClick={removeCustomSport} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', padding: '0 0 0 4px', fontSize: 13, lineHeight: 1 }}>×</button>
+                </div>
+              ))}
               <input
                 type="text" value={customSport}
-                onChange={e => { setCustomSport(e.target.value); if (sportSaved) setSportSaved(false) }}
+                onChange={e => { setCustomSport(e.target.value); setSportSaved(false) }}
                 onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), confirmCustomSport())}
                 placeholder="Type your sport and press Enter…"
-                autoFocus style={inputStyle}
+                style={inputStyle}
               />
-              <ConfirmRow
-                value={customSport} saved={sportSaved}
-                label="sport" onConfirm={confirmCustomSport}
-              />
+              <ConfirmRow value={customSport} saved={sportSaved} label="sport" onConfirm={confirmCustomSport} />
             </div>
           )}
         </Field>
@@ -353,17 +372,21 @@ export default function ProfilePage() {
             </div>
             {showCustomGoal && (
               <div style={{ marginTop: 10 }}>
+                {/* Show saved custom goal as a removable chip */}
+                {selectedGoals.filter(isCustomGoal).map(g => (
+                  <div key={g} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 16, background: 'var(--accent-bg)', border: '1px solid var(--accent)', fontSize: 12, color: 'var(--accent)', marginBottom: 8 }}>
+                    <span>{g}</span>
+                    <button onClick={removeCustomGoal} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', padding: '0 0 0 4px', fontSize: 13, lineHeight: 1 }}>×</button>
+                  </div>
+                ))}
                 <input
                   type="text" value={customGoal}
-                  onChange={e => { setCustomGoal(e.target.value); if (goalSaved) setGoalSaved(false) }}
+                  onChange={e => { setCustomGoal(e.target.value); setGoalSaved(false) }}
                   onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), confirmCustomGoal())}
                   placeholder="Describe your goal and press Enter…"
-                  autoFocus style={inputStyle}
+                  style={inputStyle}
                 />
-                <ConfirmRow
-                  value={customGoal} saved={goalSaved}
-                  label="goal" onConfirm={confirmCustomGoal}
-                />
+                <ConfirmRow value={customGoal} saved={goalSaved} label="goal" onConfirm={confirmCustomGoal} />
               </div>
             )}
           </Field>
