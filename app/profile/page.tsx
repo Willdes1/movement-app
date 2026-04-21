@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { loadProfile, saveProfile } from '@/lib/storage'
 import { useAuth } from '@/contexts/AuthContext'
+import { supabase } from '@/lib/supabase'
 import type { UserProfile } from '@/lib/types'
 
 const SPORTS = ['Hockey', 'Soccer', 'Basketball', 'Baseball', 'Football', 'Lacrosse', 'Tennis', 'Swimming', 'Track & Field', 'CrossFit', 'Weightlifting', 'Cycling', 'Golf', 'Other']
@@ -21,9 +22,37 @@ export default function ProfilePage() {
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
-    const p = loadProfile() as UserProfile | null
-    if (p) setProfile(p)
-  }, [])
+    if (user) {
+      supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            const p: UserProfile = {
+              name: data.name ?? undefined,
+              sport: data.sport ?? undefined,
+              goal: data.goal ?? undefined,
+              daysPerWeek: data.days_per_week ?? undefined,
+              sessionLength: data.session_length ?? undefined,
+              wantsMorning: data.wants_morning ?? undefined,
+              wantsEvening: data.wants_evening ?? undefined,
+              hasRestrictions: data.has_restrictions ?? undefined,
+              restrictionAreas: data.restriction_areas ?? undefined,
+            }
+            setProfile(p)
+            saveProfile(p)
+          } else {
+            const local = loadProfile() as UserProfile | null
+            if (local) setProfile(local)
+          }
+        })
+    } else {
+      const p = loadProfile() as UserProfile | null
+      if (p) setProfile(p)
+    }
+  }, [user])
 
   async function handleSignOut() {
     await signOut()
@@ -40,8 +69,23 @@ export default function ProfilePage() {
     update('restrictionAreas', next)
   }
 
-  function handleSave() {
+  async function handleSave() {
     saveProfile(profile)
+    if (user) {
+      await supabase.from('profiles').upsert({
+        id: user.id,
+        name: profile.name ?? null,
+        sport: profile.sport ?? null,
+        goal: profile.goal ?? null,
+        days_per_week: profile.daysPerWeek ?? null,
+        session_length: profile.sessionLength ?? null,
+        wants_morning: profile.wantsMorning ?? null,
+        wants_evening: profile.wantsEvening ?? null,
+        has_restrictions: profile.hasRestrictions ?? null,
+        restriction_areas: profile.restrictionAreas ?? null,
+        updated_at: new Date().toISOString(),
+      })
+    }
     setSaved(true)
     setTimeout(() => {
       setSaved(false)
