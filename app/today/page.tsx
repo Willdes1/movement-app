@@ -1,8 +1,10 @@
 'use client'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { loadProfile } from '@/lib/storage'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useAuth } from '@/contexts/AuthContext'
 import type { UserProfile } from '@/lib/types'
 
 const TIPS = [
@@ -29,7 +31,15 @@ function getGreeting() {
 export default function TodayPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const { activeRecovery } = useTheme()
+  const { user, loading } = useAuth()
+  const router = useRouter()
   const tip = TIPS[new Date().getDate() % TIPS.length]
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace('/auth')
+    }
+  }, [user, loading, router])
 
   useEffect(() => {
     const p = loadProfile() as UserProfile | null
