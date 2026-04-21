@@ -1,6 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { loadProfile, saveProfile } from '@/lib/storage'
+import { useAuth } from '@/contexts/AuthContext'
 import type { UserProfile } from '@/lib/types'
 
 const SPORTS = ['Hockey', 'Soccer', 'Basketball', 'Baseball', 'Football', 'Lacrosse', 'Tennis', 'Swimming', 'Track & Field', 'CrossFit', 'Weightlifting', 'Cycling', 'Golf', 'Other']
@@ -12,6 +14,8 @@ const RESTRICTION_AREAS = ['Lower back', 'SI joint / hip', 'Knee', 'Shoulder', '
 type Screen = 'overview' | 'edit'
 
 export default function ProfilePage() {
+  const router = useRouter()
+  const { user, signOut } = useAuth()
   const [screen, setScreen] = useState<Screen>('overview')
   const [profile, setProfile] = useState<UserProfile>({})
   const [saved, setSaved] = useState(false)
@@ -20,6 +24,11 @@ export default function ProfilePage() {
     const p = loadProfile() as UserProfile | null
     if (p) setProfile(p)
   }, [])
+
+  async function handleSignOut() {
+    await signOut()
+    router.push('/auth')
+  }
 
   function update(key: keyof UserProfile, val: unknown) {
     setProfile(prev => ({ ...prev, [key]: val }))
@@ -75,6 +84,18 @@ export default function ProfilePage() {
         >
           {Object.keys(profile).length === 0 ? 'Set up profile' : 'Edit profile'}
         </button>
+
+        {user && (
+          <div style={{ marginTop: 12, padding: '12px 16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>Signed in as {user.email}</div>
+            <button
+              onClick={handleSignOut}
+              style={{ fontSize: 13, color: 'var(--text-dim)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+            >
+              Sign out →
+            </button>
+          </div>
+        )}
       </div>
     )
   }
