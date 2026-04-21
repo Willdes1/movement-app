@@ -50,8 +50,13 @@ function workoutTimeFromBooleans(morning?: boolean, evening?: boolean): string |
   return undefined
 }
 
-function isCustomSport(sport: string | undefined) {
-  return !!sport && !SPORTS.slice(0, -1).includes(sport)
+function isCustomSport(sport: string) {
+  return !SPORTS.slice(0, -1).includes(sport)
+}
+
+function parseSports(raw: string | undefined): string[] {
+  if (!raw) return []
+  return raw.split(', ').filter(Boolean)
 }
 
 type Screen = 'overview' | 'edit'
@@ -63,7 +68,8 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile>({})
   const [saved, setSaved] = useState(false)
 
-  // Sport "Other" state
+  // Multi-sport state
+  const [selectedSports, setSelectedSports] = useState<string[]>([])
   const [customSport, setCustomSport] = useState('')
   const [showCustomSport, setShowCustomSport] = useState(false)
   const [sportSaved, setSportSaved] = useState(false)
@@ -98,19 +104,19 @@ export default function ProfilePage() {
             setProfile(p)
             saveProfile(p)
             setWorkoutTime(workoutTimeFromBooleans(p.wantsMorning, p.wantsEvening))
-            if (isCustomSport(p.sport)) {
-              setCustomSport(p.sport!)
-              setShowCustomSport(true)
-            }
+            const sports = parseSports(p.sport)
+            setSelectedSports(sports)
+            const custom = sports.find(isCustomSport)
+            if (custom) { setCustomSport(custom); setShowCustomSport(true) }
           } else {
             const local = loadProfile() as UserProfile | null
             if (local) {
               setProfile(local)
               setWorkoutTime(workoutTimeFromBooleans(local.wantsMorning, local.wantsEvening))
-              if (isCustomSport(local.sport)) {
-                setCustomSport(local.sport!)
-                setShowCustomSport(true)
-              }
+              const sports = parseSports(local.sport)
+              setSelectedSports(sports)
+              const custom = sports.find(isCustomSport)
+              if (custom) { setCustomSport(custom); setShowCustomSport(true) }
             }
           }
         })
@@ -119,10 +125,10 @@ export default function ProfilePage() {
       if (p) {
         setProfile(p)
         setWorkoutTime(workoutTimeFromBooleans(p.wantsMorning, p.wantsEvening))
-        if (isCustomSport(p.sport)) {
-          setCustomSport(p.sport!)
-          setShowCustomSport(true)
-        }
+        const sports = parseSports(p.sport)
+        setSelectedSports(sports)
+        const custom = sports.find(isCustomSport)
+        if (custom) { setCustomSport(custom); setShowCustomSport(true) }
       }
     }
   }, [user])
@@ -136,29 +142,38 @@ export default function ProfilePage() {
     setProfile(prev => ({ ...prev, [key]: val }))
   }
 
-  function selectSport(s: string) {
+  function toggleSport(s: string) {
     if (s === 'Other') {
-      setShowCustomSport(true)
-      setCustomSport('')
-      update('sport', '')
-      setSportSaved(false)
-    } else {
-      setShowCustomSport(false)
-      setCustomSport('')
-      setSportSaved(false)
-      update('sport', s)
+      if (showCustomSport) {
+        // Hide the input and remove any custom sport from the list
+        setShowCustomSport(false)
+        setCustomSport('')
+        setSportSaved(false)
+        setSelectedSports(prev => prev.filter(x => !isCustomSport(x)))
+      } else {
+        setShowCustomSport(true)
+        setCustomSport('')
+        setSportSaved(false)
+      }
+      return
     }
+    setSelectedSports(prev =>
+      prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]
+    )
   }
 
   function handleCustomSportChange(val: string) {
     setCustomSport(val)
-    update('sport', val)
     setSportSaved(false)
   }
 
   function handleCustomSportEnter() {
     if (!customSport.trim()) return
-    update('sport', customSport.trim())
+    const trimmed = customSport.trim()
+    setSelectedSports(prev => {
+      const withoutOld = prev.filter(x => !isCustomSport(x))
+      return [...withoutOld, trimmed]
+    })
     setSportSaved(true)
     setTimeout(() => {
       setSportSaved(false)
@@ -202,12 +217,14 @@ export default function ProfilePage() {
   }
 
   async function handleSave() {
-    saveProfile(profile)
+    const sportString = selectedSports.join(', ') || undefined
+    const profileToSave = { ...profile, sport: sportString }
+    saveProfile(profileToSave)
     if (user) {
       await supabase.from('profiles').upsert({
         id: user.id,
-        name: profile.name ?? null,
-        sport: profile.sport ?? null,
+        name: profileToSave.name ?? null,
+        sport: profileToSave.sport ?? null,
         goal: profile.goal ?? null,
         days_per_week: profile.daysPerWeek ?? null,
         session_length: profile.sessionLength ?? null,
@@ -234,7 +251,7 @@ export default function ProfilePage() {
 
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden', marginBottom: 16 }}>
           <ProfileRow label="Name" value={profile.name ?? 'Not set'} dim={!profile.name} onClick={() => setScreen('edit')} />
-          <ProfileRow label="Sport" value={profile.sport ?? 'Not set'} dim={!profile.sport} onClick={() => setScreen('edit')} />
+          <ProfileRow label="Sport(s)" value={selectedSports.length ? selectedSports.join(', ') : 'Not set'} dim={!selectedSports.length} onClick={() => setScreen('edit')} />
           <ProfileRow label="Goal" value={profile.goal ?? 'Not set'} dim={!profile.goal} onClick={() => setScreen('edit')} />
           <ProfileRow label="Days/week" value={profile.daysPerWeek ? `${profile.daysPerWeek} days` : 'Not set'} dim={!profile.daysPerWeek} onClick={() => setScreen('edit')} />
           <ProfileRow label="Session length" value={profile.sessionLength ?? 'Not set'} dim={!profile.sessionLength} onClick={() => setScreen('edit')} />
@@ -267,7 +284,7 @@ export default function ProfilePage() {
   }
 
   // ── Edit screen ──────────────────────────────────────────────────────────────
-  const sportIsCustom = showCustomSport || isCustomSport(profile.sport)
+  const sportIsCustom = showCustomSport || selectedSports.some(isCustomSport)
 
   return (
     <div style={{ padding: '24px 16px', maxWidth: 480, margin: '0 auto' }}>
@@ -284,10 +301,10 @@ export default function ProfilePage() {
         </Field>
 
         {/* Sport */}
-        <Field label="Primary sport">
+        <Field label="Your sport(s) — select all that apply">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {SPORTS.map(s => (
-              <Chip key={s} label={s} active={s === 'Other' ? sportIsCustom : profile.sport === s} onClick={() => selectSport(s)} />
+              <Chip key={s} label={s} active={s === 'Other' ? sportIsCustom : selectedSports.includes(s)} onClick={() => toggleSport(s)} />
             ))}
           </div>
           {sportIsCustom && (
