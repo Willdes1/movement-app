@@ -50,6 +50,11 @@ const STANDARD_GOALS = GOALS.slice(0, -1)
 
 function isCustomSport(s: string) { return !STANDARD_SPORTS.includes(s) }
 function isCustomGoal(g: string) { return !STANDARD_GOALS.includes(g) }
+function isCustomRestrictionNote(entry: string) {
+  if (SINGLE_AREAS.includes(entry)) return false
+  if (BILATERAL_AREAS.some(a => entry.toLowerCase().includes(a.toLowerCase()))) return false
+  return true
+}
 function parseList(raw: string | undefined): string[] {
   return raw ? raw.split(', ').filter(Boolean) : []
 }
@@ -91,12 +96,12 @@ export default function ProfilePage() {
     const sports = parseList(p.sport)
     setSelectedSports(sports)
     const customS = sports.find(isCustomSport)
-    if (customS) { setCustomSport(customS); setShowCustomSport(true) }
+    if (customS) { setCustomSport(customS); setShowCustomSport(true); setSportSaved(true) }
 
     const goals = parseList(p.goal)
     setSelectedGoals(goals)
     const customG = goals.find(isCustomGoal)
-    if (customG) { setCustomGoal(customG); setShowCustomGoal(true) }
+    if (customG) { setCustomGoal(customG); setShowCustomGoal(true); setGoalSaved(true) }
   }
 
   const [workoutTime, setWorkoutTime] = useState<string | undefined>(undefined)
@@ -157,11 +162,10 @@ export default function ProfilePage() {
     const trimmed = customSport.trim()
     setSelectedSports(prev => [...prev.filter(x => !isCustomSport(x)), trimmed])
     setSportSaved(true)
+    // Input stays open so user can see what they saved — scrolls to next section
     setTimeout(() => {
-      setSportSaved(false)
-      setShowCustomSport(false)  // hide input — sport is saved in the list
       goalRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 1600)
+    }, 400)
   }
 
   // ── Goals ────────────────────────────────────────────────────────────────────
@@ -184,10 +188,8 @@ export default function ProfilePage() {
     setSelectedGoals(prev => [...prev.filter(x => !isCustomGoal(x)), trimmed])
     setGoalSaved(true)
     setTimeout(() => {
-      setGoalSaved(false)
-      setShowCustomGoal(false)
       daysRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 1600)
+    }, 400)
   }
 
   // ── Restrictions ─────────────────────────────────────────────────────────────
@@ -220,7 +222,12 @@ export default function ProfilePage() {
     update('restrictionAreas', [...(profile.restrictionAreas ?? []), trimmed])
     setRestrictionSaved(true)
     setCustomRestriction('')
-    setTimeout(() => setRestrictionSaved(false), 1600)
+    // Green message stays briefly, then clears so they can add another note
+    setTimeout(() => setRestrictionSaved(false), 2000)
+  }
+
+  function removeCustomRestriction(note: string) {
+    update('restrictionAreas', (profile.restrictionAreas ?? []).filter(e => e !== note))
   }
 
   // ── Workout time ─────────────────────────────────────────────────────────────
@@ -321,7 +328,7 @@ export default function ProfilePage() {
             <div style={{ marginTop: 10 }}>
               <input
                 type="text" value={customSport}
-                onChange={e => { setCustomSport(e.target.value); setSportSaved(false) }}
+                onChange={e => { setCustomSport(e.target.value); if (sportSaved) setSportSaved(false) }}
                 onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), confirmCustomSport())}
                 placeholder="Type your sport and press Enter…"
                 autoFocus style={inputStyle}
@@ -348,7 +355,7 @@ export default function ProfilePage() {
               <div style={{ marginTop: 10 }}>
                 <input
                   type="text" value={customGoal}
-                  onChange={e => { setCustomGoal(e.target.value); setGoalSaved(false) }}
+                  onChange={e => { setCustomGoal(e.target.value); if (goalSaved) setGoalSaved(false) }}
                   onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), confirmCustomGoal())}
                   placeholder="Describe your goal and press Enter…"
                   autoFocus style={inputStyle}
@@ -434,9 +441,20 @@ export default function ProfilePage() {
                 )
               })}
 
-              {/* Custom restriction note */}
+              {/* Custom restriction notes */}
               <div style={{ marginTop: 4 }}>
-                <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 6 }}>Anything else? Describe it below:</p>
+                <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Anything else? Describe it below:</p>
+                {/* Show saved custom notes as removable chips */}
+                {(profile.restrictionAreas ?? []).filter(isCustomRestrictionNote).length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                    {(profile.restrictionAreas ?? []).filter(isCustomRestrictionNote).map(note => (
+                      <div key={note} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 16, background: 'var(--accent-bg)', border: '1px solid var(--accent)', fontSize: 12, color: 'var(--accent)' }}>
+                        <span>{note}</span>
+                        <button onClick={() => removeCustomRestriction(note)} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', padding: '0 0 0 4px', fontSize: 13, lineHeight: 1 }}>×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <input
                   type="text"
                   value={customRestriction}
