@@ -10,6 +10,7 @@ export default function AuthPage() {
   const [mode, setMode] = useState<Mode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [promoCode, setPromoCode] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [confirmSent, setConfirmSent] = useState(false)
@@ -20,12 +21,48 @@ export default function AuthPage() {
     setLoading(true)
 
     if (mode === 'signup') {
-      const { error } = await supabase.auth.signUp({ email, password })
-      if (error) {
-        setError(error.message)
-      } else {
-        setConfirmSent(true)
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password })
+      if (signUpError) {
+        setError(signUpError.message)
+        setLoading(false)
+        return
       }
+
+      // Validate and apply promo code if provided
+      if (promoCode.trim() && signUpData.user) {
+        const code = promoCode.trim().toUpperCase()
+        const { data: promo } = await supabase
+          .from('promo_codes')
+          .select('*')
+          .eq('code', code)
+          .eq('active', true)
+          .single()
+
+        if (promo) {
+          const usageOk = !promo.max_uses || promo.uses_count < promo.max_uses
+          if (usageOk) {
+            // Apply the plan tier from the promo code
+            await supabase
+              .from('profiles')
+              .upsert({ id: signUpData.user.id, plan_tier: promo.grants_tier })
+
+            await supabase
+              .from('promo_codes')
+              .update({ uses_count: promo.uses_count + 1 })
+              .eq('id', promo.id)
+          } else {
+            setError('That promo code has reached its usage limit.')
+            setLoading(false)
+            return
+          }
+        } else {
+          setError('Invalid or expired promo code.')
+          setLoading(false)
+          return
+        }
+      }
+
+      setConfirmSent(true)
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) {
@@ -97,6 +134,21 @@ export default function AuthPage() {
             style={inputStyle}
           />
         </div>
+
+        {mode === 'signup' && (
+          <div>
+            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-mid)', display: 'block', marginBottom: 6 }}>
+              Promo Code <span style={{ fontWeight: 400, color: 'var(--text-dim)' }}>(optional)</span>
+            </label>
+            <input
+              type="text"
+              value={promoCode}
+              onChange={e => setPromoCode(e.target.value)}
+              placeholder="e.g. BETA2026"
+              style={{ ...inputStyle, textTransform: 'uppercase', letterSpacing: '0.08em' }}
+            />
+          </div>
+        )}
 
         {error && (
           <div style={{ fontSize: 13, color: 'var(--red)', padding: '10px 14px', background: 'rgba(255,77,77,0.08)', borderRadius: 8, border: '1px solid rgba(255,77,77,0.2)' }}>

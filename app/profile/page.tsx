@@ -16,7 +16,7 @@ type Screen = 'overview' | 'edit'
 
 export default function ProfilePage() {
   const router = useRouter()
-  const { user, signOut } = useAuth()
+  const { user, signOut, isAdmin } = useAuth()
   const [screen, setScreen] = useState<Screen>('overview')
   const [profile, setProfile] = useState<UserProfile>({})
   const [saved, setSaved] = useState(false)
@@ -132,6 +132,14 @@ export default function ProfilePage() {
         {user && (
           <div style={{ marginTop: 12, padding: '12px 16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12 }}>
             <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>Signed in as {user.email}</div>
+            {isAdmin && (
+              <button
+                onClick={() => router.push('/admin')}
+                style={{ fontSize: 13, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'block', marginBottom: 8, fontWeight: 700 }}
+              >
+                Admin Panel →
+              </button>
+            )}
             <button
               onClick={handleSignOut}
               style={{ fontSize: 13, color: 'var(--text-dim)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
