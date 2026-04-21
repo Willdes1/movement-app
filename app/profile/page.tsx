@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { loadProfile, saveProfile } from '@/lib/storage'
 import { useAuth } from '@/contexts/AuthContext'
@@ -14,13 +14,47 @@ const SPORTS = [
 const GOALS = ['Recover from injury', 'Reduce chronic pain', 'Improve mobility', 'Performance enhancement', 'General fitness']
 const SESSION_LENGTHS = ['20 min', '30 min', '45 min', '60 min', '75+ min']
 const DAYS = [3, 4, 5, 6, 7]
-const RESTRICTION_AREAS = ['Lower back', 'SI joint / hip', 'Knee', 'Shoulder', 'Neck', 'Ankle', 'Hamstring', 'Hip flexor']
+const WORKOUT_TIMES = ['Morning', 'Evening', 'Both', 'No preference']
 
-type Screen = 'overview' | 'edit'
+// Areas that need a left/right/both selection
+const BILATERAL_AREAS = ['Knee', 'Shoulder', 'Hip', 'Ankle', 'Hamstring', 'Hip flexor']
+const SINGLE_AREAS = ['Lower back', 'Neck']
+const ALL_RESTRICTION_AREAS = [...SINGLE_AREAS, ...BILATERAL_AREAS]
+
+const SIDES = ['Left', 'Right', 'Both']
+
+function getSideLabel(area: string, side: string) {
+  const plural: Record<string, string> = {
+    'Knee': 'knees', 'Shoulder': 'shoulders', 'Hip': 'hips',
+    'Ankle': 'ankles', 'Hamstring': 'hamstrings', 'Hip flexor': 'hip flexors',
+  }
+  return side === 'Both' ? `Both ${plural[area]}` : `${side} ${area.toLowerCase()}`
+}
+
+function getBaseArea(entry: string): string {
+  for (const a of BILATERAL_AREAS) {
+    if (entry.toLowerCase().includes(a.toLowerCase())) return a
+  }
+  return entry
+}
+
+function isBilateral(area: string) {
+  return BILATERAL_AREAS.includes(area)
+}
+
+function workoutTimeFromBooleans(morning?: boolean, evening?: boolean): string | undefined {
+  if (morning && evening) return 'Both'
+  if (morning) return 'Morning'
+  if (evening) return 'Evening'
+  if (morning === false && evening === false) return 'No preference'
+  return undefined
+}
 
 function isCustomSport(sport: string | undefined) {
   return !!sport && !SPORTS.slice(0, -1).includes(sport)
 }
+
+type Screen = 'overview' | 'edit'
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -28,8 +62,18 @@ export default function ProfilePage() {
   const [screen, setScreen] = useState<Screen>('overview')
   const [profile, setProfile] = useState<UserProfile>({})
   const [saved, setSaved] = useState(false)
+
+  // Sport "Other" state
   const [customSport, setCustomSport] = useState('')
   const [showCustomSport, setShowCustomSport] = useState(false)
+  const [sportSaved, setSportSaved] = useState(false)
+  const goalRef = useRef<HTMLDivElement>(null)
+
+  // Workout time (derived from wantsMorning/wantsEvening)
+  const [workoutTime, setWorkoutTime] = useState<string | undefined>(undefined)
+
+  // Pending bilateral area waiting for side selection
+  const [pendingArea, setPendingArea] = useState<string | null>(null)
 
   useEffect(() => {
     if (user) {
@@ -53,6 +97,7 @@ export default function ProfilePage() {
             }
             setProfile(p)
             saveProfile(p)
+            setWorkoutTime(workoutTimeFromBooleans(p.wantsMorning, p.wantsEvening))
             if (isCustomSport(p.sport)) {
               setCustomSport(p.sport!)
               setShowCustomSport(true)
@@ -61,6 +106,7 @@ export default function ProfilePage() {
             const local = loadProfile() as UserProfile | null
             if (local) {
               setProfile(local)
+              setWorkoutTime(workoutTimeFromBooleans(local.wantsMorning, local.wantsEvening))
               if (isCustomSport(local.sport)) {
                 setCustomSport(local.sport!)
                 setShowCustomSport(true)
@@ -72,6 +118,7 @@ export default function ProfilePage() {
       const p = loadProfile() as UserProfile | null
       if (p) {
         setProfile(p)
+        setWorkoutTime(workoutTimeFromBooleans(p.wantsMorning, p.wantsEvening))
         if (isCustomSport(p.sport)) {
           setCustomSport(p.sport!)
           setShowCustomSport(true)
@@ -94,9 +141,11 @@ export default function ProfilePage() {
       setShowCustomSport(true)
       setCustomSport('')
       update('sport', '')
+      setSportSaved(false)
     } else {
       setShowCustomSport(false)
       setCustomSport('')
+      setSportSaved(false)
       update('sport', s)
     }
   }
@@ -104,12 +153,52 @@ export default function ProfilePage() {
   function handleCustomSportChange(val: string) {
     setCustomSport(val)
     update('sport', val)
+    setSportSaved(false)
   }
 
-  function toggleRestrictionArea(area: string) {
+  function handleCustomSportEnter() {
+    if (!customSport.trim()) return
+    update('sport', customSport.trim())
+    setSportSaved(true)
+    setTimeout(() => {
+      setSportSaved(false)
+      goalRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 1800)
+  }
+
+  function selectWorkoutTime(t: string) {
+    setWorkoutTime(t)
+    update('wantsMorning', t === 'Morning' || t === 'Both')
+    update('wantsEvening', t === 'Evening' || t === 'Both')
+  }
+
+  // Restriction area handling
+  function getSelectedEntriesForArea(area: string): string[] {
+    return (profile.restrictionAreas ?? []).filter(e => getBaseArea(e) === area || e === area)
+  }
+
+  function toggleSingleArea(area: string) {
     const current = profile.restrictionAreas ?? []
-    const next = current.includes(area) ? current.filter(a => a !== area) : [...current, area]
-    update('restrictionAreas', next)
+    const has = current.includes(area)
+    update('restrictionAreas', has ? current.filter(e => e !== area) : [...current, area])
+  }
+
+  function clickBilateralArea(area: string) {
+    const entries = getSelectedEntriesForArea(area)
+    if (entries.length > 0) {
+      // Already selected — clear it
+      update('restrictionAreas', (profile.restrictionAreas ?? []).filter(e => getBaseArea(e) !== area))
+      setPendingArea(null)
+    } else {
+      setPendingArea(area)
+    }
+  }
+
+  function selectSide(area: string, side: string) {
+    const label = getSideLabel(area, side)
+    const current = (profile.restrictionAreas ?? []).filter(e => getBaseArea(e) !== area)
+    update('restrictionAreas', [...current, label])
+    setPendingArea(null)
   }
 
   async function handleSave() {
@@ -136,6 +225,7 @@ export default function ProfilePage() {
     }, 800)
   }
 
+  // ── Overview screen ──────────────────────────────────────────────────────────
   if (screen === 'overview') {
     return (
       <div style={{ padding: '24px 16px', maxWidth: 480, margin: '0 auto' }}>
@@ -148,22 +238,13 @@ export default function ProfilePage() {
           <ProfileRow label="Goal" value={profile.goal ?? 'Not set'} dim={!profile.goal} onClick={() => setScreen('edit')} />
           <ProfileRow label="Days/week" value={profile.daysPerWeek ? `${profile.daysPerWeek} days` : 'Not set'} dim={!profile.daysPerWeek} onClick={() => setScreen('edit')} />
           <ProfileRow label="Session length" value={profile.sessionLength ?? 'Not set'} dim={!profile.sessionLength} onClick={() => setScreen('edit')} />
+          <ProfileRow label="Workout time" value={workoutTime ?? 'Not set'} dim={!workoutTime} onClick={() => setScreen('edit')} />
           <ProfileRow label="Restrictions" value={profile.hasRestrictions ? (profile.restrictionAreas?.join(', ') || 'Yes') : 'None'} dim={!profile.hasRestrictions} onClick={() => setScreen('edit')} last />
         </div>
 
         <button
           onClick={() => setScreen('edit')}
-          style={{
-            width: '100%',
-            padding: '13px',
-            borderRadius: 10,
-            border: 'none',
-            background: 'var(--accent)',
-            color: '#fff',
-            fontWeight: 700,
-            fontSize: 15,
-            cursor: 'pointer',
-          }}
+          style={{ width: '100%', padding: '13px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}
         >
           {Object.keys(profile).length === 0 ? 'Set up profile' : 'Edit profile'}
         </button>
@@ -172,17 +253,11 @@ export default function ProfilePage() {
           <div style={{ marginTop: 12, padding: '12px 16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12 }}>
             <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>Signed in as {user.email}</div>
             {isAdmin && (
-              <button
-                onClick={() => router.push('/admin')}
-                style={{ fontSize: 13, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'block', marginBottom: 8, fontWeight: 700 }}
-              >
+              <button onClick={() => router.push('/admin')} style={{ fontSize: 13, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'block', marginBottom: 8, fontWeight: 700 }}>
                 Admin Panel →
               </button>
             )}
-            <button
-              onClick={handleSignOut}
-              style={{ fontSize: 13, color: 'var(--text-dim)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-            >
+            <button onClick={handleSignOut} style={{ fontSize: 13, color: 'var(--text-dim)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
               Sign out →
             </button>
           </div>
@@ -191,7 +266,7 @@ export default function ProfilePage() {
     )
   }
 
-  // Edit screen
+  // ── Edit screen ──────────────────────────────────────────────────────────────
   const sportIsCustom = showCustomSport || isCustomSport(profile.sport)
 
   return (
@@ -202,47 +277,58 @@ export default function ProfilePage() {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+        {/* Name */}
         <Field label="Name">
-          <input
-            type="text"
-            value={profile.name ?? ''}
-            onChange={e => update('name', e.target.value)}
-            placeholder="Your name"
-            style={inputStyle}
-          />
+          <input type="text" value={profile.name ?? ''} onChange={e => update('name', e.target.value)} placeholder="Your name" style={inputStyle} />
         </Field>
 
+        {/* Sport */}
         <Field label="Primary sport">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {SPORTS.map(s => (
-              <Chip
-                key={s}
-                label={s}
-                active={s === 'Other' ? sportIsCustom : profile.sport === s}
-                onClick={() => selectSport(s)}
-              />
+              <Chip key={s} label={s} active={s === 'Other' ? sportIsCustom : profile.sport === s} onClick={() => selectSport(s)} />
             ))}
           </div>
           {sportIsCustom && (
-            <input
-              type="text"
-              value={customSport}
-              onChange={e => handleCustomSportChange(e.target.value)}
-              placeholder="Type your sport…"
-              autoFocus
-              style={{ ...inputStyle, marginTop: 10 }}
-            />
+            <div style={{ marginTop: 10 }}>
+              <input
+                type="text"
+                value={customSport}
+                onChange={e => handleCustomSportChange(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleCustomSportEnter() } }}
+                placeholder="Type your sport and press Enter…"
+                autoFocus
+                style={inputStyle}
+              />
+              {sportSaved ? (
+                <div style={{ marginTop: 8, fontSize: 13, fontWeight: 600, color: '#4ec97a', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>✓</span> Saved, thank you!
+                </div>
+              ) : customSport.trim() ? (
+                <button
+                  onClick={handleCustomSportEnter}
+                  style={{ marginTop: 8, fontSize: 13, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 600 }}
+                >
+                  Save "{customSport}" →
+                </button>
+              ) : null}
+            </div>
           )}
         </Field>
 
-        <Field label="Main goal">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {GOALS.map(g => (
-              <Chip key={g} label={g} active={profile.goal === g} onClick={() => update('goal', g)} block />
-            ))}
-          </div>
-        </Field>
+        {/* Goal */}
+        <div ref={goalRef}>
+          <Field label="Main goal">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {GOALS.map(g => (
+                <Chip key={g} label={g} active={profile.goal === g} onClick={() => update('goal', g)} block />
+              ))}
+            </div>
+          </Field>
+        </div>
 
+        {/* Days */}
         <Field label="Training days per week">
           <div style={{ display: 'flex', gap: 8 }}>
             {DAYS.map(d => (
@@ -251,6 +337,7 @@ export default function ProfilePage() {
           </div>
         </Field>
 
+        {/* Session length */}
         <Field label="Session length">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {SESSION_LENGTHS.map(l => (
@@ -259,52 +346,88 @@ export default function ProfilePage() {
           </div>
         </Field>
 
-        <Field label="Morning routine?">
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Chip label="Yes" active={profile.wantsMorning === true} onClick={() => update('wantsMorning', true)} />
-            <Chip label="No" active={profile.wantsMorning === false} onClick={() => update('wantsMorning', false)} />
+        {/* Workout time */}
+        <Field label="When do you work out?">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {WORKOUT_TIMES.map(t => (
+              <Chip key={t} label={t} active={workoutTime === t} onClick={() => selectWorkoutTime(t)} />
+            ))}
           </div>
         </Field>
 
-        <Field label="Evening routine?">
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Chip label="Yes" active={profile.wantsEvening === true} onClick={() => update('wantsEvening', true)} />
-            <Chip label="No" active={profile.wantsEvening === false} onClick={() => update('wantsEvening', false)} />
-          </div>
-        </Field>
-
+        {/* Restrictions */}
         <Field label="Any injuries or restrictions?">
-          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
             <Chip label="Yes" active={profile.hasRestrictions === true} onClick={() => update('hasRestrictions', true)} />
-            <Chip label="No" active={profile.hasRestrictions === false} onClick={() => { update('hasRestrictions', false); update('restrictionAreas', []) }} />
+            <Chip label="No" active={profile.hasRestrictions === false} onClick={() => { update('hasRestrictions', false); update('restrictionAreas', []); setPendingArea(null) }} />
           </div>
+
           {profile.hasRestrictions && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {RESTRICTION_AREAS.map(area => (
-                <Chip
-                  key={area}
-                  label={area}
-                  active={(profile.restrictionAreas ?? []).includes(area)}
-                  onClick={() => toggleRestrictionArea(area)}
-                />
-              ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* Single areas */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {SINGLE_AREAS.map(area => (
+                  <Chip
+                    key={area}
+                    label={area}
+                    active={(profile.restrictionAreas ?? []).includes(area)}
+                    onClick={() => toggleSingleArea(area)}
+                  />
+                ))}
+              </div>
+
+              {/* Bilateral areas */}
+              {BILATERAL_AREAS.map(area => {
+                const selectedEntries = getSelectedEntriesForArea(area)
+                const isSelected = selectedEntries.length > 0
+                const isPending = pendingArea === area
+
+                return (
+                  <div key={area}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <Chip
+                        label={isSelected ? selectedEntries.join(', ') : area}
+                        active={isSelected || isPending}
+                        onClick={() => clickBilateralArea(area)}
+                      />
+                      {isPending && (
+                        <>
+                          <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>Which side?</span>
+                          {SIDES.map(side => (
+                            <button
+                              key={side}
+                              onClick={() => selectSide(area, side)}
+                              style={{
+                                padding: '5px 12px',
+                                borderRadius: 16,
+                                border: '1px solid var(--accent)',
+                                background: 'var(--accent-bg)',
+                                color: 'var(--accent)',
+                                fontSize: 12,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              {side}
+                            </button>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
         </Field>
 
+        {/* Save */}
         <button
           onClick={handleSave}
           style={{
-            width: '100%',
-            padding: '14px',
-            borderRadius: 10,
-            border: 'none',
+            width: '100%', padding: '14px', borderRadius: 10, border: 'none',
             background: saved ? 'var(--green)' : 'var(--accent)',
-            color: '#fff',
-            fontWeight: 700,
-            fontSize: 16,
-            cursor: 'pointer',
-            transition: 'background 0.2s',
+            color: '#fff', fontWeight: 700, fontSize: 16, cursor: 'pointer', transition: 'background 0.2s',
           }}
         >
           {saved ? '✓ Saved' : 'Save Profile'}
@@ -321,16 +444,10 @@ function ProfileRow({ label, value, dim = false, last = false, onClick }: {
     <button
       onClick={onClick}
       style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        width: '100%',
-        padding: '13px 16px',
-        background: 'none',
-        border: 'none',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        width: '100%', padding: '13px 16px', background: 'none', border: 'none',
         borderBottom: last ? 'none' : '1px solid var(--border)',
-        cursor: 'pointer',
-        textAlign: 'left',
+        cursor: 'pointer', textAlign: 'left',
       }}
     >
       <span style={{ fontSize: 14, color: 'var(--text-dim)' }}>{label}</span>
@@ -356,16 +473,12 @@ function Chip({ label, active, onClick, block = false }: { label: string; active
     <button
       onClick={onClick}
       style={{
-        padding: '7px 14px',
-        borderRadius: 20,
+        padding: '7px 14px', borderRadius: 20,
         border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
         background: active ? 'var(--accent-bg)' : 'var(--surface2)',
         color: active ? 'var(--accent)' : 'var(--text-mid)',
-        fontSize: 13,
-        fontWeight: active ? 600 : 400,
-        cursor: 'pointer',
-        width: block ? '100%' : 'auto',
-        textAlign: block ? 'left' : 'center',
+        fontSize: 13, fontWeight: active ? 600 : 400, cursor: 'pointer',
+        width: block ? '100%' : 'auto', textAlign: block ? 'left' : 'center',
         transition: 'all 0.15s',
       }}
     >
@@ -375,13 +488,7 @@ function Chip({ label, active, onClick, block = false }: { label: string; active
 }
 
 const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '11px 14px',
-  borderRadius: 10,
-  border: '1px solid var(--border)',
-  background: 'var(--surface2)',
-  color: 'var(--text)',
-  fontSize: 14,
-  outline: 'none',
-  boxSizing: 'border-box',
+  width: '100%', padding: '11px 14px', borderRadius: 10,
+  border: '1px solid var(--border)', background: 'var(--surface2)',
+  color: 'var(--text)', fontSize: 14, outline: 'none', boxSizing: 'border-box',
 }
