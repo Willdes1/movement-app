@@ -30,12 +30,6 @@ function SIJointContent() {
 
   return (
     <div style={{ maxWidth: 480, margin: '0 auto' }}>
-      <div className="recovery-mode-banner">
-        <span>⚡</span>
-        <span>Recovery Mode Active</span>
-        <span style={{ marginLeft: 'auto', opacity: 0.7 }}>SI Joint Protocol</span>
-      </div>
-
       <div style={{ padding: '20px 16px 0' }}>
         <div style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>Recovery Protocol</div>
         <h1 style={{ fontSize: 24, fontWeight: 900, letterSpacing: '-0.02em', marginBottom: 4 }}>SI Joint Playbook</h1>

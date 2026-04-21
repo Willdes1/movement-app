@@ -13,8 +13,6 @@ const TIPS = [
   'The best workout is the one you actually complete. Show up, then push.',
 ]
 
-const PHASE_LABELS = ['Pain Control', 'Load Foundation', 'Strengthen', 'Return to Sport']
-
 function getDayLabel() {
   return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()]
 }
@@ -43,16 +41,6 @@ export default function TodayPage() {
 
   return (
     <div style={{ maxWidth: 480, margin: '0 auto' }}>
-
-      {isRecovering && (
-        <div className="recovery-mode-banner">
-          <span>⚡</span>
-          <span>Recovery Mode — Phase {activeRecovery.phase} of 4</span>
-          <span style={{ marginLeft: 'auto', opacity: 0.6 }}>
-            {PHASE_LABELS[activeRecovery.phase - 1]}
-          </span>
-        </div>
-      )}
 
       <div style={{ padding: '24px 16px 16px' }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 4 }}>
