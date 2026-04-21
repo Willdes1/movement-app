@@ -28,6 +28,13 @@ export interface PhaseBlock {
   variants?: PhaseVariant[]
 }
 
+export type SportScheduleEntry = {
+  days: string[]
+  duration: string
+}
+
+export type SportSchedule = Record<string, SportScheduleEntry>
+
 export interface UserProfile {
   name?: string
   age?: string
@@ -42,4 +49,5 @@ export interface UserProfile {
   wantsMorning?: boolean
   wantsEvening?: boolean
   mobilityTime?: string
+  sportSchedule?: SportSchedule
 }

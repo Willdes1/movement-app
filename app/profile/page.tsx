@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { loadProfile, saveProfile } from '@/lib/storage'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
-import type { UserProfile } from '@/lib/types'
+import type { UserProfile, SportSchedule } from '@/lib/types'
 
 const SPORTS = [
   'Hockey', 'Soccer', 'Basketball', 'Baseball', 'Football', 'Lacrosse',
@@ -80,6 +80,9 @@ export default function ProfilePage() {
   const [showCustomGoal, setShowCustomGoal] = useState(false)
   const [goalSaved, setGoalSaved] = useState(false)
 
+  // Sport schedule
+  const [sportSchedule, setSportSchedule] = useState<SportSchedule>({})
+
   // Restrictions
   const [pendingArea, setPendingArea] = useState<string | null>(null)
   const [customRestriction, setCustomRestriction] = useState('')
@@ -102,6 +105,8 @@ export default function ProfilePage() {
     setSelectedGoals(goals)
     const customG = goals.find(isCustomGoal)
     if (customG) { setShowCustomGoal(true) }
+
+    if (p.sportSchedule) setSportSchedule(p.sportSchedule)
   }
 
   const [workoutTime, setWorkoutTime] = useState<string | undefined>(undefined)
@@ -123,6 +128,7 @@ export default function ProfilePage() {
             wantsEvening: data.wants_evening ?? undefined,
             hasRestrictions: data.has_restrictions ?? undefined,
             restrictionAreas: data.restriction_areas ?? undefined,
+            sportSchedule: data.sport_schedule ?? undefined,
           }
           loadProfileData(p)
           saveProfile(p)
@@ -256,7 +262,7 @@ export default function ProfilePage() {
   async function handleSave() {
     const sportString = selectedSports.join(', ') || undefined
     const goalString = selectedGoals.join(', ') || undefined
-    const profileToSave = { ...profile, sport: sportString, goal: goalString }
+    const profileToSave = { ...profile, sport: sportString, goal: goalString, sportSchedule }
     saveProfile(profileToSave)
     if (user) {
       await supabase.from('profiles').upsert({
@@ -270,6 +276,7 @@ export default function ProfilePage() {
         wants_evening: profileToSave.wantsEvening ?? null,
         has_restrictions: profileToSave.hasRestrictions ?? null,
         restriction_areas: profileToSave.restrictionAreas ?? null,
+        sport_schedule: Object.keys(sportSchedule).length ? sportSchedule : null,
         updated_at: new Date().toISOString(),
       })
     }
@@ -359,6 +366,25 @@ export default function ProfilePage() {
             </div>
           )}
         </Field>
+
+        {/* Sport schedule */}
+        {selectedSports.filter(s => s !== 'Other' && s !== '').length > 0 && (
+          <Field label="When do you play or perform?">
+            <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12, lineHeight: 1.5 }}>
+              Pick your typical days for each sport. We&apos;ll schedule warm-ups and prep on those days so you&apos;re ready to perform — not worn out.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {selectedSports.filter(s => s !== 'Other' && s !== '').map(sport => (
+                <SportScheduleRow
+                  key={sport}
+                  sport={sport}
+                  entry={sportSchedule[sport] ?? { days: [], duration: '' }}
+                  onChange={entry => setSportSchedule(prev => ({ ...prev, [sport]: entry }))}
+                />
+              ))}
+            </div>
+          </Field>
+        )}
 
         {/* Goals */}
         <div ref={goalRef}>
@@ -521,6 +547,75 @@ function ConfirmRow({ value, saved, label, onConfirm }: { value: string; saved: 
     <button onClick={onConfirm} style={{ marginTop: 8, fontSize: 13, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 600 }}>
       Save {label} →
     </button>
+  )
+}
+
+// ── Sport schedule row ────────────────────────────────────────────────────────
+const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const DURATIONS = ['Under 1 hr', '1–2 hrs', '2–3 hrs', '3+ hrs']
+
+function SportScheduleRow({ sport, entry, onChange }: {
+  sport: string
+  entry: { days: string[]; duration: string }
+  onChange: (e: { days: string[]; duration: string }) => void
+}) {
+  function toggleDay(day: string) {
+    const next = entry.days.includes(day)
+      ? entry.days.filter(d => d !== day)
+      : [...entry.days, day]
+    onChange({ ...entry, days: next })
+  }
+
+  return (
+    <div style={{ padding: '14px', background: 'var(--surface2)', borderRadius: 12, border: '1px solid var(--border)' }}>
+      <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        {sport}
+      </p>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+        {DAYS_OF_WEEK.map(day => {
+          const active = entry.days.includes(day)
+          return (
+            <button
+              key={day}
+              onClick={() => toggleDay(day)}
+              style={{
+                width: 38, height: 38, borderRadius: 10,
+                border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                background: active ? 'var(--accent)' : 'var(--surface)',
+                color: active ? '#fff' : 'var(--text-dim)',
+                fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
+            >
+              {day}
+            </button>
+          )
+        })}
+      </div>
+      {entry.days.length > 0 && (
+        <div>
+          <p style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>How long per session?</p>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {DURATIONS.map(d => (
+              <button
+                key={d}
+                onClick={() => onChange({ ...entry, duration: entry.duration === d ? '' : d })}
+                style={{
+                  padding: '5px 12px', borderRadius: 16,
+                  border: `1px solid ${entry.duration === d ? 'var(--accent)' : 'var(--border)'}`,
+                  background: entry.duration === d ? 'var(--accent-bg)' : 'var(--surface)',
+                  color: entry.duration === d ? 'var(--accent)' : 'var(--text-dim)',
+                  fontSize: 12, fontWeight: entry.duration === d ? 700 : 400, cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
