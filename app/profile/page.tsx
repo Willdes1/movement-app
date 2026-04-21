@@ -554,10 +554,21 @@ function ConfirmRow({ value, saved, label, onConfirm }: { value: string; saved: 
 const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const DURATIONS = ['Under 1 hr', '1–2 hrs', '2–3 hrs', '3+ hrs']
 
+function getSchedulePlaceholder(sport: string): string {
+  const examples: Record<string, string> = {
+    'Golf': 'e.g. I golf whenever the weather is nice — usually once or twice a month, no set day.',
+    'Skiing': 'e.g. I ski a few weekends a season when conditions are good.',
+    'Snowboarding': 'e.g. I snowboard a few weekends a season — whenever there\'s fresh snow.',
+    'Surfing': 'e.g. I surf whenever the swell is right, usually early mornings.',
+    'Skateboarding': 'e.g. I skate a few times a week when the weather is good, no fixed days.',
+  }
+  return examples[sport] ?? `e.g. I ${sport.toLowerCase()} occasionally — whenever my schedule or conditions allow.`
+}
+
 function SportScheduleRow({ sport, entry, onChange }: {
   sport: string
-  entry: { days: string[]; duration: string }
-  onChange: (e: { days: string[]; duration: string }) => void
+  entry: { days: string[]; duration: string; noSchedule?: boolean; description?: string }
+  onChange: (e: typeof entry) => void
 }) {
   function toggleDay(day: string) {
     const next = entry.days.includes(day)
@@ -566,54 +577,99 @@ function SportScheduleRow({ sport, entry, onChange }: {
     onChange({ ...entry, days: next })
   }
 
+  function toggleNoSchedule() {
+    onChange({ ...entry, noSchedule: !entry.noSchedule, days: [], duration: '', description: entry.description ?? '' })
+  }
+
   return (
     <div style={{ padding: '14px', background: 'var(--surface2)', borderRadius: 12, border: '1px solid var(--border)' }}>
-      <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-        {sport}
-      </p>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-        {DAYS_OF_WEEK.map(day => {
-          const active = entry.days.includes(day)
-          return (
-            <button
-              key={day}
-              onClick={() => toggleDay(day)}
-              style={{
-                width: 38, height: 38, borderRadius: 10,
-                border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-                background: active ? 'var(--accent)' : 'var(--surface)',
-                color: active ? '#fff' : 'var(--text-dim)',
-                fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                transition: 'all 0.15s',
-              }}
-            >
-              {day}
-            </button>
-          )
-        })}
+      {/* Sport label + toggle */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          {sport}
+        </p>
+        <button
+          onClick={toggleNoSchedule}
+          style={{
+            padding: '4px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+            border: `1px solid ${entry.noSchedule ? 'var(--accent)' : 'var(--border)'}`,
+            background: entry.noSchedule ? 'var(--accent-bg)' : 'var(--surface)',
+            color: entry.noSchedule ? 'var(--accent)' : 'var(--text-dim)',
+            transition: 'all 0.15s',
+          }}
+        >
+          No specific schedule
+        </button>
       </div>
-      {entry.days.length > 0 && (
+
+      {entry.noSchedule ? (
+        /* Free-text description for spontaneous sports */
         <div>
-          <p style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>How long per session?</p>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {DURATIONS.map(d => (
-              <button
-                key={d}
-                onClick={() => onChange({ ...entry, duration: entry.duration === d ? '' : d })}
-                style={{
-                  padding: '5px 12px', borderRadius: 16,
-                  border: `1px solid ${entry.duration === d ? 'var(--accent)' : 'var(--border)'}`,
-                  background: entry.duration === d ? 'var(--accent-bg)' : 'var(--surface)',
-                  color: entry.duration === d ? 'var(--accent)' : 'var(--text-dim)',
-                  fontSize: 12, fontWeight: entry.duration === d ? 700 : 400, cursor: 'pointer',
-                  transition: 'all 0.15s',
-                }}
-              >
-                {d}
-              </button>
-            ))}
-          </div>
+          <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8, lineHeight: 1.5 }}>
+            Describe when you typically do this. We&apos;ll still build strength and mobility into your plan, and you can log a session manually from the Calendar anytime.
+          </p>
+          <textarea
+            value={entry.description ?? ''}
+            onChange={e => onChange({ ...entry, description: e.target.value })}
+            placeholder={getSchedulePlaceholder(sport)}
+            rows={3}
+            style={{
+              width: '100%', padding: '11px 14px', borderRadius: 10,
+              border: '1px solid var(--border)', background: 'var(--surface)',
+              color: 'var(--text)', fontSize: 13, outline: 'none',
+              resize: 'none', lineHeight: 1.6, boxSizing: 'border-box',
+              fontFamily: 'inherit',
+            }}
+          />
         </div>
+      ) : (
+        /* Day picker + duration */
+        <>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+            {DAYS_OF_WEEK.map(day => {
+              const active = entry.days.includes(day)
+              return (
+                <button
+                  key={day}
+                  onClick={() => toggleDay(day)}
+                  style={{
+                    width: 38, height: 38, borderRadius: 10,
+                    border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                    background: active ? 'var(--accent)' : 'var(--surface)',
+                    color: active ? '#fff' : 'var(--text-dim)',
+                    fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {day}
+                </button>
+              )
+            })}
+          </div>
+          {entry.days.length > 0 && (
+            <div>
+              <p style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>How long per session?</p>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {DURATIONS.map(d => (
+                  <button
+                    key={d}
+                    onClick={() => onChange({ ...entry, duration: entry.duration === d ? '' : d })}
+                    style={{
+                      padding: '5px 12px', borderRadius: 16,
+                      border: `1px solid ${entry.duration === d ? 'var(--accent)' : 'var(--border)'}`,
+                      background: entry.duration === d ? 'var(--accent-bg)' : 'var(--surface)',
+                      color: entry.duration === d ? 'var(--accent)' : 'var(--text-dim)',
+                      fontSize: 12, fontWeight: entry.duration === d ? 700 : 400, cursor: 'pointer',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

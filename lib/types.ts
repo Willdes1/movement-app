@@ -31,6 +31,8 @@ export interface PhaseBlock {
 export type SportScheduleEntry = {
   days: string[]
   duration: string
+  noSchedule?: boolean
+  description?: string
 }
 
 export type SportSchedule = Record<string, SportScheduleEntry>
