@@ -35,25 +35,25 @@ export default function AuthPage() {
           .from('promo_codes')
           .select('*')
           .eq('code', code)
-          .eq('active', true)
           .single()
 
         if (promo) {
-          const usageOk = !promo.max_uses || promo.uses_count < promo.max_uses
-          if (usageOk) {
-            // Apply the plan tier from the promo code
-            await supabase
-              .from('profiles')
-              .upsert({ id: signUpData.user.id, plan_tier: promo.grants_tier })
-
-            await supabase
-              .from('promo_codes')
-              .update({ uses_count: promo.uses_count + 1 })
-              .eq('id', promo.id)
-          } else {
+          // uses_remaining: -1 = unlimited, 0 = exhausted, >0 = remaining
+          if (promo.uses_remaining === 0) {
             setError('That promo code has reached its usage limit.')
             setLoading(false)
             return
+          }
+
+          await supabase
+            .from('profiles')
+            .upsert({ id: signUpData.user.id, plan_tier: 'pro' })
+
+          if (promo.uses_remaining > 0) {
+            await supabase
+              .from('promo_codes')
+              .update({ uses_remaining: promo.uses_remaining - 1 })
+              .eq('id', promo.id)
           }
         } else {
           setError('Invalid or expired promo code.')

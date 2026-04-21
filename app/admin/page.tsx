@@ -6,9 +6,9 @@ import { useAuth } from '@/contexts/AuthContext'
 
 type Tab = 'overview' | 'todos' | 'ideas' | 'promos' | 'users'
 
-type TodoRow = { id: string; text: string; status: string; created_at: string; updated_at: string }
-type IdeaRow = { id: string; text: string; category: string; created_at: string }
-type PromoRow = { id: string; code: string; grants_tier: string; max_uses: number | null; uses_count: number; active: boolean; created_at: string }
+type TodoRow = { id: string; content: string; category: string; status: string; priority: string; created_at: string; updated_at: string }
+type IdeaRow = { id: string; content: string; category: string; created_at: string }
+type PromoRow = { id: string; code: string; description: string | null; uses_remaining: number; created_at: string }
 type UserRow = { id: string; email: string; full_name: string | null; plan_tier: string; is_admin: boolean; created_at: string }
 
 export default function AdminPage() {
@@ -22,11 +22,13 @@ export default function AdminPage() {
   const [users, setUsers] = useState<UserRow[]>([])
 
   const [newTodo, setNewTodo] = useState('')
+  const [newTodoPriority, setNewTodoPriority] = useState('medium')
+  const [newTodoCategory, setNewTodoCategory] = useState('general')
   const [newIdea, setNewIdea] = useState('')
   const [newIdeaCategory, setNewIdeaCategory] = useState('General')
   const [newPromoCode, setNewPromoCode] = useState('')
-  const [newPromoTier, setNewPromoTier] = useState('pro')
-  const [newPromoMax, setNewPromoMax] = useState('')
+  const [newPromoDesc, setNewPromoDesc] = useState('')
+  const [newPromoUses, setNewPromoUses] = useState('')
 
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
@@ -38,9 +40,7 @@ export default function AdminPage() {
   }, [loading, user, isAdmin, router])
 
   useEffect(() => {
-    if (isAdmin) {
-      fetchAll()
-    }
+    if (isAdmin) fetchAll()
   }, [isAdmin])
 
   async function fetchAll() {
@@ -64,7 +64,7 @@ export default function AdminPage() {
   async function addTodo() {
     if (!newTodo.trim()) return
     setSaving(true)
-    await supabase.from('todos').insert({ text: newTodo.trim(), status: 'active' })
+    await supabase.from('todos').insert({ content: newTodo.trim(), status: 'pending', priority: newTodoPriority, category: newTodoCategory })
     setNewTodo('')
     await fetchAll()
     flash('Todo added')
@@ -72,7 +72,7 @@ export default function AdminPage() {
   }
 
   async function toggleTodo(todo: TodoRow) {
-    const next = todo.status === 'active' ? 'done' : 'active'
+    const next = todo.status === 'pending' ? 'done' : 'pending'
     await supabase.from('todos').update({ status: next, updated_at: new Date().toISOString() }).eq('id', todo.id)
     await fetchAll()
   }
@@ -85,7 +85,7 @@ export default function AdminPage() {
   async function addIdea() {
     if (!newIdea.trim()) return
     setSaving(true)
-    await supabase.from('ideas').insert({ text: newIdea.trim(), category: newIdeaCategory })
+    await supabase.from('ideas').insert({ content: newIdea.trim(), category: newIdeaCategory })
     setNewIdea('')
     await fetchAll()
     flash('Idea saved')
@@ -102,20 +102,19 @@ export default function AdminPage() {
     setSaving(true)
     await supabase.from('promo_codes').insert({
       code: newPromoCode.trim().toUpperCase(),
-      grants_tier: newPromoTier,
-      max_uses: newPromoMax ? parseInt(newPromoMax) : null,
-      uses_count: 0,
-      active: true,
+      description: newPromoDesc.trim() || null,
+      uses_remaining: newPromoUses ? parseInt(newPromoUses) : -1,
     })
     setNewPromoCode('')
-    setNewPromoMax('')
+    setNewPromoDesc('')
+    setNewPromoUses('')
     await fetchAll()
     flash('Promo code created')
     setSaving(false)
   }
 
-  async function togglePromo(promo: PromoRow) {
-    await supabase.from('promo_codes').update({ active: !promo.active }).eq('id', promo.id)
+  async function deletePromo(id: string) {
+    await supabase.from('promo_codes').delete().eq('id', id)
     await fetchAll()
   }
 
@@ -127,11 +126,10 @@ export default function AdminPage() {
     )
   }
 
-  const activeTodos = todos.filter(t => t.status === 'active')
+  const activeTodos = todos.filter(t => t.status === 'pending')
   const doneTodos = todos.filter(t => t.status === 'done')
   const totalUsers = users.length
   const proUsers = users.filter(u => u.plan_tier === 'pro').length
-  const activePromos = promos.filter(p => p.active).length
 
   return (
     <div style={{ padding: '24px 20px 100px', maxWidth: 700, margin: '0 auto' }}>
@@ -176,7 +174,7 @@ export default function AdminPage() {
           >
             {t === 'todos' ? `Todos (${activeTodos.length})` :
              t === 'ideas' ? `Ideas (${ideas.length})` :
-             t === 'promos' ? `Promos (${activePromos})` :
+             t === 'promos' ? `Promos (${promos.length})` :
              t === 'users' ? `Users (${totalUsers})` :
              'Overview'}
           </button>
@@ -190,7 +188,7 @@ export default function AdminPage() {
             { label: 'Total Users', value: totalUsers, sub: `${proUsers} pro` },
             { label: 'Active Todos', value: activeTodos.length, sub: `${doneTodos.length} done` },
             { label: 'Ideas Logged', value: ideas.length, sub: 'in backlog' },
-            { label: 'Active Promos', value: activePromos, sub: `${promos.length} total` },
+            { label: 'Promo Codes', value: promos.length, sub: 'created' },
           ].map(card => (
             <div key={card.label} style={{ padding: '20px 18px', background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)' }}>
               <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 8 }}>{card.label}</p>
@@ -204,23 +202,32 @@ export default function AdminPage() {
       {/* TODOS */}
       {tab === 'todos' && (
         <div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
             <input
               value={newTodo}
               onChange={e => setNewTodo(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && addTodo()}
               placeholder="Add a new todo…"
-              style={inputStyle}
+              style={{ ...inputStyle, flex: 1 }}
             />
+            <select value={newTodoPriority} onChange={e => setNewTodoPriority(e.target.value)} style={{ ...inputStyle, width: 100 }}>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
             <button onClick={addTodo} disabled={saving} style={addBtnStyle}>Add</button>
           </div>
+          <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>Press Enter or tap Add.</p>
 
           <p style={sectionLabel}>Active ({activeTodos.length})</p>
           {activeTodos.length === 0 && <p style={emptyStyle}>No active todos</p>}
           {activeTodos.map(todo => (
             <div key={todo.id} style={rowStyle}>
               <button onClick={() => toggleTodo(todo)} style={checkStyle(false)}>○</button>
-              <span style={{ flex: 1, fontSize: 14 }}>{todo.text}</span>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 14 }}>{todo.content}</span>
+                {todo.priority === 'high' && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase' }}>High</span>}
+              </div>
               <span style={{ fontSize: 11, color: 'var(--text-dim)', marginRight: 8 }}>{fmtDate(todo.created_at)}</span>
               <button onClick={() => deleteTodo(todo.id)} style={deleteBtn}>✕</button>
             </div>
@@ -232,7 +239,7 @@ export default function AdminPage() {
               {doneTodos.map(todo => (
                 <div key={todo.id} style={{ ...rowStyle, opacity: 0.5 }}>
                   <button onClick={() => toggleTodo(todo)} style={checkStyle(true)}>✓</button>
-                  <span style={{ flex: 1, fontSize: 14, textDecoration: 'line-through' }}>{todo.text}</span>
+                  <span style={{ flex: 1, fontSize: 14, textDecoration: 'line-through' }}>{todo.content}</span>
                   <button onClick={() => deleteTodo(todo.id)} style={deleteBtn}>✕</button>
                 </div>
               ))}
@@ -244,33 +251,27 @@ export default function AdminPage() {
       {/* IDEAS */}
       {tab === 'ideas' && (
         <div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input
-                value={newIdea}
-                onChange={e => setNewIdea(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addIdea()}
-                placeholder="Capture an idea…"
-                style={{ ...inputStyle, flex: 1 }}
-              />
-              <select
-                value={newIdeaCategory}
-                onChange={e => setNewIdeaCategory(e.target.value)}
-                style={{ ...inputStyle, width: 120 }}
-              >
-                {['General', 'Billing', 'UI/UX', 'Features', 'Marketing', 'Analytics'].map(c => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
-              <button onClick={addIdea} disabled={saving} style={addBtnStyle}>Add</button>
-            </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+            <input
+              value={newIdea}
+              onChange={e => setNewIdea(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addIdea()}
+              placeholder="Capture an idea…"
+              style={{ ...inputStyle, flex: 1 }}
+            />
+            <select value={newIdeaCategory} onChange={e => setNewIdeaCategory(e.target.value)} style={{ ...inputStyle, width: 120 }}>
+              {['General', 'Billing', 'UI/UX', 'Features', 'Marketing', 'Analytics'].map(c => (
+                <option key={c}>{c}</option>
+              ))}
+            </select>
+            <button onClick={addIdea} disabled={saving} style={addBtnStyle}>Save</button>
           </div>
 
           {ideas.length === 0 && <p style={emptyStyle}>No ideas yet</p>}
           {ideas.map(idea => (
             <div key={idea.id} style={rowStyle}>
               <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.06em', textTransform: 'uppercase', minWidth: 72 }}>{idea.category}</span>
-              <span style={{ flex: 1, fontSize: 14, marginLeft: 10 }}>{idea.text}</span>
+              <span style={{ flex: 1, fontSize: 14, marginLeft: 10 }}>{idea.content}</span>
               <span style={{ fontSize: 11, color: 'var(--text-dim)', marginRight: 8 }}>{fmtDate(idea.created_at)}</span>
               <button onClick={() => deleteIdea(idea.id)} style={deleteBtn}>✕</button>
             </div>
@@ -288,39 +289,34 @@ export default function AdminPage() {
               placeholder="CODE"
               style={{ ...inputStyle, width: 120, letterSpacing: '0.08em' }}
             />
-            <select value={newPromoTier} onChange={e => setNewPromoTier(e.target.value)} style={{ ...inputStyle, width: 100 }}>
-              <option value="pro">Pro</option>
-              <option value="free">Free</option>
-            </select>
             <input
-              value={newPromoMax}
-              onChange={e => setNewPromoMax(e.target.value)}
+              value={newPromoDesc}
+              onChange={e => setNewPromoDesc(e.target.value)}
+              placeholder="Description (optional)"
+              style={{ ...inputStyle, flex: 1 }}
+            />
+            <input
+              value={newPromoUses}
+              onChange={e => setNewPromoUses(e.target.value)}
               placeholder="Max uses (blank = ∞)"
               type="number"
-              style={{ ...inputStyle, width: 160 }}
+              style={{ ...inputStyle, width: 150 }}
             />
             <button onClick={addPromo} disabled={saving} style={addBtnStyle}>Create</button>
           </div>
-          <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 20 }}>Leave max uses blank for unlimited.</p>
+          <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 20 }}>
+            Leave max uses blank for unlimited. BETA2026 is already active.
+          </p>
 
           {promos.length === 0 && <p style={emptyStyle}>No promo codes yet</p>}
           {promos.map(promo => (
-            <div key={promo.id} style={{ ...rowStyle, flexWrap: 'wrap', gap: 8 }}>
+            <div key={promo.id} style={rowStyle}>
               <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.06em', minWidth: 100 }}>{promo.code}</span>
-              <span style={{ fontSize: 12, color: 'var(--text-dim)', minWidth: 40 }}>{promo.grants_tier}</span>
-              <span style={{ fontSize: 12, color: 'var(--text-dim)', flex: 1 }}>
-                {promo.uses_count}{promo.max_uses ? `/${promo.max_uses}` : ''} uses
+              <span style={{ flex: 1, fontSize: 13, color: 'var(--text-dim)' }}>{promo.description ?? '—'}</span>
+              <span style={{ fontSize: 12, color: 'var(--text-dim)', marginRight: 8 }}>
+                {promo.uses_remaining === -1 ? '∞ uses' : `${promo.uses_remaining} left`}
               </span>
-              <button
-                onClick={() => togglePromo(promo)}
-                style={{
-                  padding: '4px 10px', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                  background: promo.active ? 'rgba(80,200,120,0.12)' : 'var(--surface2)',
-                  color: promo.active ? '#4ec97a' : 'var(--text-dim)',
-                }}
-              >
-                {promo.active ? 'Active' : 'Disabled'}
-              </button>
+              <button onClick={() => deletePromo(promo.id)} style={deleteBtn}>✕</button>
             </div>
           ))}
         </div>
