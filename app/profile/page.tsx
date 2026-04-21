@@ -6,7 +6,11 @@ import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import type { UserProfile } from '@/lib/types'
 
-const SPORTS = ['Hockey', 'Soccer', 'Basketball', 'Baseball', 'Football', 'Lacrosse', 'Tennis', 'Swimming', 'Track & Field', 'CrossFit', 'Weightlifting', 'Cycling', 'Golf', 'Other']
+const SPORTS = [
+  'Hockey', 'Soccer', 'Basketball', 'Baseball', 'Football', 'Lacrosse',
+  'Tennis', 'Swimming', 'Track & Field', 'CrossFit', 'Weightlifting',
+  'Cycling', 'Golf', 'Skateboarding', 'Snowboarding', 'Other',
+]
 const GOALS = ['Recover from injury', 'Reduce chronic pain', 'Improve mobility', 'Performance enhancement', 'General fitness']
 const SESSION_LENGTHS = ['20 min', '30 min', '45 min', '60 min', '75+ min']
 const DAYS = [3, 4, 5, 6, 7]
@@ -14,12 +18,18 @@ const RESTRICTION_AREAS = ['Lower back', 'SI joint / hip', 'Knee', 'Shoulder', '
 
 type Screen = 'overview' | 'edit'
 
+function isCustomSport(sport: string | undefined) {
+  return !!sport && !SPORTS.slice(0, -1).includes(sport)
+}
+
 export default function ProfilePage() {
   const router = useRouter()
   const { user, signOut, isAdmin } = useAuth()
   const [screen, setScreen] = useState<Screen>('overview')
   const [profile, setProfile] = useState<UserProfile>({})
   const [saved, setSaved] = useState(false)
+  const [customSport, setCustomSport] = useState('')
+  const [showCustomSport, setShowCustomSport] = useState(false)
 
   useEffect(() => {
     if (user) {
@@ -43,14 +53,30 @@ export default function ProfilePage() {
             }
             setProfile(p)
             saveProfile(p)
+            if (isCustomSport(p.sport)) {
+              setCustomSport(p.sport!)
+              setShowCustomSport(true)
+            }
           } else {
             const local = loadProfile() as UserProfile | null
-            if (local) setProfile(local)
+            if (local) {
+              setProfile(local)
+              if (isCustomSport(local.sport)) {
+                setCustomSport(local.sport!)
+                setShowCustomSport(true)
+              }
+            }
           }
         })
     } else {
       const p = loadProfile() as UserProfile | null
-      if (p) setProfile(p)
+      if (p) {
+        setProfile(p)
+        if (isCustomSport(p.sport)) {
+          setCustomSport(p.sport!)
+          setShowCustomSport(true)
+        }
+      }
     }
   }, [user])
 
@@ -61,6 +87,23 @@ export default function ProfilePage() {
 
   function update(key: keyof UserProfile, val: unknown) {
     setProfile(prev => ({ ...prev, [key]: val }))
+  }
+
+  function selectSport(s: string) {
+    if (s === 'Other') {
+      setShowCustomSport(true)
+      setCustomSport('')
+      update('sport', '')
+    } else {
+      setShowCustomSport(false)
+      setCustomSport('')
+      update('sport', s)
+    }
+  }
+
+  function handleCustomSportChange(val: string) {
+    setCustomSport(val)
+    update('sport', val)
   }
 
   function toggleRestrictionArea(area: string) {
@@ -100,16 +143,12 @@ export default function ProfilePage() {
         <p style={{ color: 'var(--text-dim)', fontSize: 13, marginBottom: 24 }}>Your athlete profile powers your personalized plan</p>
 
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden', marginBottom: 16 }}>
-          {profile.name ? (
-            <ProfileRow label="Name" value={profile.name} />
-          ) : (
-            <ProfileRow label="Name" value="Not set" dim />
-          )}
-          <ProfileRow label="Sport" value={profile.sport ?? 'Not set'} dim={!profile.sport} />
-          <ProfileRow label="Goal" value={profile.goal ?? 'Not set'} dim={!profile.goal} />
-          <ProfileRow label="Days/week" value={profile.daysPerWeek ? `${profile.daysPerWeek} days` : 'Not set'} dim={!profile.daysPerWeek} />
-          <ProfileRow label="Session length" value={profile.sessionLength ?? 'Not set'} dim={!profile.sessionLength} />
-          <ProfileRow label="Restrictions" value={profile.hasRestrictions ? (profile.restrictionAreas?.join(', ') || 'Yes') : 'None'} dim={!profile.hasRestrictions} last />
+          <ProfileRow label="Name" value={profile.name ?? 'Not set'} dim={!profile.name} onClick={() => setScreen('edit')} />
+          <ProfileRow label="Sport" value={profile.sport ?? 'Not set'} dim={!profile.sport} onClick={() => setScreen('edit')} />
+          <ProfileRow label="Goal" value={profile.goal ?? 'Not set'} dim={!profile.goal} onClick={() => setScreen('edit')} />
+          <ProfileRow label="Days/week" value={profile.daysPerWeek ? `${profile.daysPerWeek} days` : 'Not set'} dim={!profile.daysPerWeek} onClick={() => setScreen('edit')} />
+          <ProfileRow label="Session length" value={profile.sessionLength ?? 'Not set'} dim={!profile.sessionLength} onClick={() => setScreen('edit')} />
+          <ProfileRow label="Restrictions" value={profile.hasRestrictions ? (profile.restrictionAreas?.join(', ') || 'Yes') : 'None'} dim={!profile.hasRestrictions} onClick={() => setScreen('edit')} last />
         </div>
 
         <button
@@ -153,6 +192,8 @@ export default function ProfilePage() {
   }
 
   // Edit screen
+  const sportIsCustom = showCustomSport || isCustomSport(profile.sport)
+
   return (
     <div style={{ padding: '24px 16px', maxWidth: 480, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
@@ -174,9 +215,24 @@ export default function ProfilePage() {
         <Field label="Primary sport">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {SPORTS.map(s => (
-              <Chip key={s} label={s} active={profile.sport === s} onClick={() => update('sport', s)} />
+              <Chip
+                key={s}
+                label={s}
+                active={s === 'Other' ? sportIsCustom : profile.sport === s}
+                onClick={() => selectSport(s)}
+              />
             ))}
           </div>
+          {sportIsCustom && (
+            <input
+              type="text"
+              value={customSport}
+              onChange={e => handleCustomSportChange(e.target.value)}
+              placeholder="Type your sport…"
+              autoFocus
+              style={{ ...inputStyle, marginTop: 10 }}
+            />
+          )}
         </Field>
 
         <Field label="Main goal">
@@ -258,17 +314,31 @@ export default function ProfilePage() {
   )
 }
 
-function ProfileRow({ label, value, dim = false, last = false }: { label: string; value: string; dim?: boolean; last?: boolean }) {
+function ProfileRow({ label, value, dim = false, last = false, onClick }: {
+  label: string; value: string; dim?: boolean; last?: boolean; onClick?: () => void
+}) {
   return (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      padding: '13px 16px',
-      borderBottom: last ? 'none' : '1px solid var(--border)',
-    }}>
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        width: '100%',
+        padding: '13px 16px',
+        background: 'none',
+        border: 'none',
+        borderBottom: last ? 'none' : '1px solid var(--border)',
+        cursor: 'pointer',
+        textAlign: 'left',
+      }}
+    >
       <span style={{ fontSize: 14, color: 'var(--text-dim)' }}>{label}</span>
-      <span style={{ fontSize: 14, fontWeight: 500, color: dim ? 'var(--text-dim)' : 'var(--text)' }}>{value}</span>
-    </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 14, fontWeight: 500, color: dim ? 'var(--text-dim)' : 'var(--text)' }}>{value}</span>
+        <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>›</span>
+      </div>
+    </button>
   )
 }
 
@@ -313,4 +383,5 @@ const inputStyle: React.CSSProperties = {
   color: 'var(--text)',
   fontSize: 14,
   outline: 'none',
+  boxSizing: 'border-box',
 }
