@@ -67,10 +67,9 @@ export default function ProfilePage() {
   const [screen, setScreen] = useState<Screen>('overview')
   const [profile, setProfile] = useState<UserProfile>({})
   const [saved, setSaved] = useState(false)
+  const [fieldsSaved, setFieldsSaved] = useState(false)
   const [goalNotes, setGoalNotes] = useState('')
-  const [goalNotesSaved, setGoalNotesSaved] = useState(false)
   const [priorPrograms, setPriorPrograms] = useState('')
-  const [priorProgramsSaved, setPriorProgramsSaved] = useState(false)
 
   // Sports multi-select
   const [selectedSports, setSelectedSports] = useState<string[]>([])
@@ -293,9 +292,8 @@ export default function ProfilePage() {
       })
     }
     setSaved(true)
-    if (goalNotes.trim()) setGoalNotesSaved(true)
-    if (priorPrograms.trim()) setPriorProgramsSaved(true)
-    setTimeout(() => { setSaved(false); setGoalNotesSaved(false); setPriorProgramsSaved(false); setScreen('overview') }, 1200)
+    setFieldsSaved(true)
+    setTimeout(() => { setSaved(false); setFieldsSaved(false); setScreen('overview') }, 1400)
   }
 
   // ── Overview ─────────────────────────────────────────────────────────────────
@@ -349,6 +347,7 @@ export default function ProfilePage() {
         {/* Name */}
         <Field label="Name">
           <input type="text" value={profile.name ?? ''} onChange={e => update('name', e.target.value)} placeholder="Your name" style={inputStyle} />
+          <SavedHint value={profile.name} saved={fieldsSaved} />
         </Field>
 
         {/* Gender */}
@@ -403,6 +402,7 @@ export default function ProfilePage() {
                   sport={sport}
                   entry={sportSchedule[sport] ?? { days: [], duration: '' }}
                   onChange={entry => setSportSchedule(prev => ({ ...prev, [sport]: entry }))}
+                  showSaved={fieldsSaved}
                 />
               ))}
             </div>
@@ -417,16 +417,11 @@ export default function ProfilePage() {
           <input
             type="text"
             value={priorPrograms}
-            onChange={e => { setPriorPrograms(e.target.value); setPriorProgramsSaved(false) }}
+            onChange={e => setPriorPrograms(e.target.value)}
             placeholder="e.g. Athlean-X, 5/3/1, P90X, Starting Strength…"
             style={inputStyle}
           />
-          {priorProgramsSaved && (
-            <div style={{ marginTop: 6, fontSize: 12, color: '#4ec97a', fontWeight: 600 }}>✓ Your description has been saved</div>
-          )}
-          {!priorProgramsSaved && priorPrograms.trim() && (
-            <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-dim)' }}>Saved when you tap Save Profile below</div>
-          )}
+          <SavedHint value={priorPrograms} saved={fieldsSaved} />
         </Field>
 
         {/* Goals */}
@@ -465,8 +460,7 @@ export default function ProfilePage() {
         <Field label="Describe your goals (optional)">
           <textarea
             value={goalNotes}
-            onChange={e => { setGoalNotes(e.target.value); setGoalNotesSaved(false) }}
-
+            onChange={e => setGoalNotes(e.target.value)}
             placeholder="e.g. I want to build upper body muscle since my sports are lower-body dominant. I also want to stay snowboard-ready year round…"
             rows={3}
             style={{
@@ -477,12 +471,7 @@ export default function ProfilePage() {
               fontFamily: 'inherit',
             }}
           />
-          {goalNotesSaved && (
-            <div style={{ marginTop: 6, fontSize: 12, color: '#4ec97a', fontWeight: 600 }}>✓ Your description has been saved</div>
-          )}
-          {!goalNotesSaved && goalNotes.trim() && (
-            <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-dim)' }}>Saved when you tap Save Profile below</div>
-          )}
+          <SavedHint value={goalNotes} saved={fieldsSaved} />
         </Field>
 
         {/* Days */}
@@ -632,10 +621,11 @@ function getSchedulePlaceholder(sport: string): string {
   return examples[sport] ?? `e.g. I ${sport.toLowerCase()} occasionally — whenever my schedule or conditions allow.`
 }
 
-function SportScheduleRow({ sport, entry, onChange }: {
+function SportScheduleRow({ sport, entry, onChange, showSaved = false }: {
   sport: string
   entry: { days: string[]; duration: string; noSchedule?: boolean; description?: string }
   onChange: (e: typeof entry) => void
+  showSaved?: boolean
 }) {
   function toggleDay(day: string) {
     const next = entry.days.includes(day)
@@ -688,6 +678,7 @@ function SportScheduleRow({ sport, entry, onChange }: {
               fontFamily: 'inherit',
             }}
           />
+          <SavedHint value={entry.description} saved={showSaved} />
         </div>
       ) : (
         /* Day picker + duration */
@@ -770,6 +761,13 @@ function Chip({ label, active, onClick, block = false }: { label: string; active
       {label}
     </button>
   )
+}
+
+function SavedHint({ value, saved }: { value: string | undefined; saved: boolean }) {
+  const hasValue = !!(value?.trim())
+  if (!hasValue) return null
+  if (saved) return <div style={{ marginTop: 6, fontSize: 12, color: '#4ec97a', fontWeight: 600 }}>✓ Your description has been saved</div>
+  return <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-dim)' }}>Saved when you tap Save Profile below</div>
 }
 
 const inputStyle: React.CSSProperties = {
