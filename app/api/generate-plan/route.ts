@@ -37,6 +37,7 @@ function buildPrompt(profile: Record<string, unknown>, weekNumber: number, phase
   if (profile.sport) lines.push(`Primary sport(s): ${profile.sport}`)
   if (profile.goal) lines.push(`Goal(s): ${profile.goal}`)
   if (profile.goal_notes) lines.push(`Goal description: ${profile.goal_notes}`)
+  if (profile.prior_programs) lines.push(`Prior training programs/styles they enjoyed: ${profile.prior_programs}`)
   if (profile.days_per_week) lines.push(`Training days per week: ${profile.days_per_week}`)
   if (profile.session_length) lines.push(`Session length: ${profile.session_length}`)
   if (profile.wants_morning) lines.push(`Prefers morning workouts: yes`)

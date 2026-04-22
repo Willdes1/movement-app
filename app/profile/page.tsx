@@ -69,6 +69,7 @@ export default function ProfilePage() {
   const [saved, setSaved] = useState(false)
   const [goalNotes, setGoalNotes] = useState('')
   const [goalNotesSaved, setGoalNotesSaved] = useState(false)
+  const [priorPrograms, setPriorPrograms] = useState('')
 
   // Sports multi-select
   const [selectedSports, setSelectedSports] = useState<string[]>([])
@@ -110,6 +111,7 @@ export default function ProfilePage() {
 
     if (p.sportSchedule) setSportSchedule(p.sportSchedule)
     if (p.goalNotes) setGoalNotes(p.goalNotes)
+    if (p.priorPrograms) setPriorPrograms(p.priorPrograms)
   }
 
   const [workoutTime, setWorkoutTime] = useState<string | undefined>(undefined)
@@ -127,6 +129,7 @@ export default function ProfilePage() {
             sport: data.sport ?? undefined,
             goal: data.goal ?? undefined,
             goalNotes: data.goal_notes ?? undefined,
+            priorPrograms: data.prior_programs ?? undefined,
             daysPerWeek: data.days_per_week ?? undefined,
             sessionLength: data.session_length ?? undefined,
             wantsMorning: data.wants_morning ?? undefined,
@@ -277,6 +280,7 @@ export default function ProfilePage() {
         sport: profileToSave.sport ?? null,
         goal: profileToSave.goal ?? null,
         goal_notes: goalNotes || null,
+        prior_programs: priorPrograms || null,
         days_per_week: profileToSave.daysPerWeek ?? null,
         session_length: profileToSave.sessionLength ?? null,
         wants_morning: profileToSave.wantsMorning ?? null,
@@ -402,6 +406,20 @@ export default function ProfilePage() {
             </div>
           </Field>
         )}
+
+        {/* Prior programs */}
+        <Field label="Programs you've tried or enjoyed (optional)">
+          <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8, lineHeight: 1.5 }}>
+            Helps your AI coach match your training style and build on what you already know.
+          </p>
+          <input
+            type="text"
+            value={priorPrograms}
+            onChange={e => setPriorPrograms(e.target.value)}
+            placeholder="e.g. Athlean-X, 5/3/1, P90X, Starting Strength…"
+            style={inputStyle}
+          />
+        </Field>
 
         {/* Goals */}
         <div ref={goalRef}>

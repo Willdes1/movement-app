@@ -47,6 +47,7 @@ export interface UserProfile {
   sessionLength?: string
   goal?: string
   goalNotes?: string
+  priorPrograms?: string
   hasRestrictions?: boolean
   restrictionAreas?: string[]
   restrictionNotes?: string
