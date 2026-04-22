@@ -39,12 +39,14 @@ export type SportSchedule = Record<string, SportScheduleEntry>
 
 export interface UserProfile {
   name?: string
+  gender?: string
   age?: string
   sport?: string
   secondarySports?: string[]
   daysPerWeek?: number
   sessionLength?: string
   goal?: string
+  goalNotes?: string
   hasRestrictions?: boolean
   restrictionAreas?: string[]
   restrictionNotes?: string

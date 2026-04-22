@@ -67,6 +67,8 @@ export default function ProfilePage() {
   const [screen, setScreen] = useState<Screen>('overview')
   const [profile, setProfile] = useState<UserProfile>({})
   const [saved, setSaved] = useState(false)
+  const [goalNotes, setGoalNotes] = useState('')
+  const [goalNotesSaved, setGoalNotesSaved] = useState(false)
 
   // Sports multi-select
   const [selectedSports, setSelectedSports] = useState<string[]>([])
@@ -99,7 +101,7 @@ export default function ProfilePage() {
     const sports = parseList(p.sport)
     setSelectedSports(sports)
     const customS = sports.find(isCustomSport)
-    if (customS) { setShowCustomSport(true) }  // show input area so chip is visible
+    if (customS) { setShowCustomSport(true) }
 
     const goals = parseList(p.goal)
     setSelectedGoals(goals)
@@ -107,6 +109,7 @@ export default function ProfilePage() {
     if (customG) { setShowCustomGoal(true) }
 
     if (p.sportSchedule) setSportSchedule(p.sportSchedule)
+    if (p.goalNotes) setGoalNotes(p.goalNotes)
   }
 
   const [workoutTime, setWorkoutTime] = useState<string | undefined>(undefined)
@@ -120,8 +123,10 @@ export default function ProfilePage() {
         if (data) {
           const p: UserProfile = {
             name: data.name ?? undefined,
+            gender: data.gender ?? undefined,
             sport: data.sport ?? undefined,
             goal: data.goal ?? undefined,
+            goalNotes: data.goal_notes ?? undefined,
             daysPerWeek: data.days_per_week ?? undefined,
             sessionLength: data.session_length ?? undefined,
             wantsMorning: data.wants_morning ?? undefined,
@@ -262,14 +267,16 @@ export default function ProfilePage() {
   async function handleSave() {
     const sportString = selectedSports.join(', ') || undefined
     const goalString = selectedGoals.join(', ') || undefined
-    const profileToSave = { ...profile, sport: sportString, goal: goalString, sportSchedule }
+    const profileToSave = { ...profile, sport: sportString, goal: goalString, goalNotes: goalNotes || undefined, sportSchedule }
     saveProfile(profileToSave)
     if (user) {
       await supabase.from('profiles').upsert({
         id: user.id,
         name: profileToSave.name ?? null,
+        gender: profileToSave.gender ?? null,
         sport: profileToSave.sport ?? null,
         goal: profileToSave.goal ?? null,
+        goal_notes: goalNotes || null,
         days_per_week: profileToSave.daysPerWeek ?? null,
         session_length: profileToSave.sessionLength ?? null,
         wants_morning: profileToSave.wantsMorning ?? null,
@@ -281,7 +288,8 @@ export default function ProfilePage() {
       })
     }
     setSaved(true)
-    setTimeout(() => { setSaved(false); setScreen('overview') }, 800)
+    if (goalNotes.trim()) setGoalNotesSaved(true)
+    setTimeout(() => { setSaved(false); setGoalNotesSaved(false); setScreen('overview') }, 1200)
   }
 
   // ── Overview ─────────────────────────────────────────────────────────────────
@@ -335,6 +343,15 @@ export default function ProfilePage() {
         {/* Name */}
         <Field label="Name">
           <input type="text" value={profile.name ?? ''} onChange={e => update('name', e.target.value)} placeholder="Your name" style={inputStyle} />
+        </Field>
+
+        {/* Gender */}
+        <Field label="Gender">
+          <div style={{ display: 'flex', gap: 8 }}>
+            {['Male', 'Female'].map(g => (
+              <Chip key={g} label={g} active={profile.gender === g} onClick={() => update('gender', profile.gender === g ? undefined : g)} />
+            ))}
+          </div>
         </Field>
 
         {/* Sports */}
@@ -417,6 +434,29 @@ export default function ProfilePage() {
             )}
           </Field>
         </div>
+
+        {/* Goal notes */}
+        <Field label="Describe your goals (optional)">
+          <textarea
+            value={goalNotes}
+            onChange={e => { setGoalNotes(e.target.value); setGoalNotesSaved(false) }}
+            placeholder="e.g. I want to build upper body muscle since my sports are lower-body dominant. I also want to stay snowboard-ready year round…"
+            rows={3}
+            style={{
+              width: '100%', padding: '11px 14px', borderRadius: 10,
+              border: '1px solid var(--border)', background: 'var(--surface2)',
+              color: 'var(--text)', fontSize: 13, outline: 'none',
+              resize: 'none', lineHeight: 1.6, boxSizing: 'border-box',
+              fontFamily: 'inherit',
+            }}
+          />
+          {goalNotesSaved && (
+            <div style={{ marginTop: 6, fontSize: 12, color: '#4ec97a', fontWeight: 600 }}>✓ Your description has been saved</div>
+          )}
+          {!goalNotesSaved && goalNotes.trim() && (
+            <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-dim)' }}>Saved when you tap Save Profile below</div>
+          )}
+        </Field>
 
         {/* Days */}
         <div ref={daysRef}>
