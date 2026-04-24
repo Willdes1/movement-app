@@ -55,4 +55,6 @@ export interface UserProfile {
   wantsEvening?: boolean
   mobilityTime?: string
   sportSchedule?: SportSchedule
+  workoutLocation?: string
+  homeEquipment?: string[]
 }

@@ -47,6 +47,11 @@ function buildPrompt(profile: Record<string, unknown>, weekNumber: number, phase
     if (profile.restriction_areas) lines.push(`Injury/restriction areas: ${JSON.stringify(profile.restriction_areas)}`)
   }
   if (profile.sport_schedule) lines.push(`Sport schedule: ${JSON.stringify(profile.sport_schedule)}`)
+  if (profile.workout_location) lines.push(`Workout location: ${profile.workout_location}`)
+  if (profile.home_equipment && Array.isArray(profile.home_equipment) && (profile.home_equipment as string[]).length > 0) {
+    lines.push(`Available home equipment: ${(profile.home_equipment as string[]).join(', ')}`)
+    lines.push(`IMPORTANT: Only program exercises that use the equipment listed above. Do not program exercises requiring equipment not on this list.`)
+  }
 
   if (instructions?.trim()) {
     lines.push('')

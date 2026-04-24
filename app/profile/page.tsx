@@ -21,6 +21,8 @@ const WORKOUT_TIMES = ['Morning', 'Evening', 'Both', 'No preference']
 const BILATERAL_AREAS = ['Knee', 'Shoulder', 'Hip', 'Ankle', 'Hamstring', 'Hip flexor']
 const SINGLE_AREAS = ['Lower back', 'Neck']
 const SIDES = ['Left', 'Right', 'Both']
+const WORKOUT_LOCATIONS = ['Home', 'Gym', 'Both']
+const HOME_EQUIPMENT = ['Treadmill', 'Pull-up bar', 'Bench', 'Dumbbells', 'Barbells', 'Resistance bands', 'Kettlebells', 'Jump rope']
 
 function getSideLabel(area: string, side: string) {
   const plural: Record<string, string> = {
@@ -89,6 +91,12 @@ export default function ProfilePage() {
   // Sport schedule
   const [sportSchedule, setSportSchedule] = useState<SportSchedule>({})
 
+  // Workout location + equipment
+  const [workoutLocation, setWorkoutLocation] = useState<string | undefined>(undefined)
+  const [selectedEquipment, setSelectedEquipment] = useState<string[]>([])
+  const [customEquipment, setCustomEquipment] = useState('')
+  const [equipmentSaved, setEquipmentSaved] = useState(false)
+
   // Restrictions
   const [pendingArea, setPendingArea] = useState<string | null>(null)
   const [customRestriction, setCustomRestriction] = useState('')
@@ -109,6 +117,8 @@ export default function ProfilePage() {
     if (p.goalNotes) { setGoalNotes(p.goalNotes); setShowGoalNotes(true) }
     if (p.priorPrograms) setPriorPrograms(p.priorPrograms)
     if (p.sportSchedule) setSportSchedule(p.sportSchedule)
+    if (p.workoutLocation) setWorkoutLocation(p.workoutLocation)
+    if (p.homeEquipment) setSelectedEquipment(p.homeEquipment)
   }
 
   const [workoutTime, setWorkoutTime] = useState<string | undefined>(undefined)
@@ -134,6 +144,8 @@ export default function ProfilePage() {
             hasRestrictions: data.has_restrictions ?? undefined,
             restrictionAreas: data.restriction_areas ?? undefined,
             sportSchedule: data.sport_schedule ?? undefined,
+            workoutLocation: data.workout_location ?? undefined,
+            homeEquipment: data.home_equipment ?? undefined,
           }
           loadProfileData(p)
           saveProfile(p)
@@ -240,6 +252,18 @@ export default function ProfilePage() {
     update('restrictionAreas', (profile.restrictionAreas ?? []).filter(e => e !== note))
   }
 
+  // ── Equipment ─────────────────────────────────────────────────────────────────
+  function toggleEquipment(item: string) {
+    setSelectedEquipment(prev => prev.includes(item) ? prev.filter(x => x !== item) : [...prev, item])
+  }
+  function addCustomEquipment() {
+    if (!customEquipment.trim()) return
+    setSelectedEquipment(prev => [...prev, customEquipment.trim()])
+    setCustomEquipment('')
+    setEquipmentSaved(true)
+    setTimeout(() => setEquipmentSaved(false), 2000)
+  }
+
   // ── Workout time ─────────────────────────────────────────────────────────────
   function selectWorkoutTime(t: string) {
     setWorkoutTime(t)
@@ -251,7 +275,7 @@ export default function ProfilePage() {
   async function handleSave() {
     const sportString = selectedSports.join(', ') || undefined
     const goalString = selectedGoals.join(', ') || undefined
-    const profileToSave = { ...profile, sport: sportString, goal: goalString, goalNotes: goalNotes || undefined, sportSchedule }
+    const profileToSave = { ...profile, sport: sportString, goal: goalString, goalNotes: goalNotes || undefined, sportSchedule, workoutLocation, homeEquipment: selectedEquipment.length ? selectedEquipment : undefined }
     saveProfile(profileToSave)
     if (user) {
       await supabase.from('profiles').upsert({
@@ -269,6 +293,8 @@ export default function ProfilePage() {
         has_restrictions: profileToSave.hasRestrictions ?? null,
         restriction_areas: profileToSave.restrictionAreas ?? null,
         sport_schedule: Object.keys(sportSchedule).length ? sportSchedule : null,
+        workout_location: workoutLocation ?? null,
+        home_equipment: selectedEquipment.length ? selectedEquipment : null,
         updated_at: new Date().toISOString(),
       })
     }
@@ -289,6 +315,7 @@ export default function ProfilePage() {
           <ProfileRow label="Days/week" value={profile.daysPerWeek ? `${profile.daysPerWeek} days` : 'Not set'} dim={!profile.daysPerWeek} onClick={() => setScreen('edit')} />
           <ProfileRow label="Session length" value={profile.sessionLength ?? 'Not set'} dim={!profile.sessionLength} onClick={() => setScreen('edit')} />
           <ProfileRow label="Workout time" value={workoutTime ?? 'Not set'} dim={!workoutTime} onClick={() => setScreen('edit')} />
+          <ProfileRow label="Workout location" value={workoutLocation ?? 'Not set'} dim={!workoutLocation} onClick={() => setScreen('edit')} />
           <ProfileRow label="Restrictions" value={profile.hasRestrictions ? (profile.restrictionAreas?.join(', ') || 'Yes') : 'None'} dim={!profile.hasRestrictions} onClick={() => setScreen('edit')} last />
         </div>
         <button onClick={() => setScreen('edit')} style={{ width: '100%', padding: '13px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
@@ -466,6 +493,48 @@ export default function ProfilePage() {
             ))}
           </div>
         </Field>
+
+        {/* Workout location */}
+        <Field label="Where do you work out?">
+          <div style={{ display: 'flex', gap: 8 }}>
+            {WORKOUT_LOCATIONS.map(loc => (
+              <Chip key={loc} label={loc} active={workoutLocation === loc} onClick={() => setWorkoutLocation(workoutLocation === loc ? undefined : loc)} />
+            ))}
+          </div>
+        </Field>
+
+        {/* Home equipment — only shown when Home or Both */}
+        {(workoutLocation === 'Home' || workoutLocation === 'Both') && (
+          <Field label="What equipment do you have at home?">
+            <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10, lineHeight: 1.5 }}>
+              Your AI coach will only program exercises you can actually do.
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+              {HOME_EQUIPMENT.map(item => (
+                <Chip key={item} label={item} active={selectedEquipment.includes(item)} onClick={() => toggleEquipment(item)} />
+              ))}
+            </div>
+            {selectedEquipment.filter(e => !HOME_EQUIPMENT.includes(e)).length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                {selectedEquipment.filter(e => !HOME_EQUIPMENT.includes(e)).map(e => (
+                  <div key={e} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 16, background: 'var(--accent-bg)', border: '1px solid var(--accent)', fontSize: 12, color: 'var(--accent)' }}>
+                    <span>{e}</span>
+                    <button onClick={() => setSelectedEquipment(prev => prev.filter(x => x !== e))} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', padding: '0 0 0 4px', fontSize: 13, lineHeight: 1 }}>×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <input
+              type="text"
+              value={customEquipment}
+              onChange={e => { setCustomEquipment(e.target.value); setEquipmentSaved(false) }}
+              onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCustomEquipment())}
+              placeholder="Anything else? e.g. Cable machine, TRX…"
+              style={inputStyle}
+            />
+            <ConfirmRow value={customEquipment} saved={equipmentSaved} label="equipment" onConfirm={addCustomEquipment} />
+          </Field>
+        )}
 
         {/* Restrictions */}
         <Field label="Any injuries or restrictions?">
