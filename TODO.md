@@ -4,21 +4,49 @@
 ---
 
 ## 🔥 Active / Up Next
-- [ ] Build personalized plan generator (reads profile → generates weekly plan)
 - [ ] Add more recovery playbooks (Shoulder Impingement, Knee Rehab)
 - [ ] Build out For You page (personalized feed)
 - [ ] Build out Calendar page (monthly training view)
 - [ ] Build out Browse & Learn page (exercise library + articles)
 
+## 🏋️ Profile — Workout Environment (added 2026-04-22)
+- [ ] **Workout location** — Add "Where do you work out?" to profile questionnaire: Home / Gym / Both
+- [ ] **Home equipment selector** — If Home or Both selected, show equipment checklist: Treadmill, Pull-up bar, Bench, Dumbbells, Barbells, Resistance bands, Kettlebells, Jump rope + free-text field for anything else. AI uses this to ensure every exercise is doable with what they actually have.
+- [ ] **Travel adjustment button** — Add a "Need modifications?" button on the calendar for each day. User taps it and describes their situation (e.g. "I'm traveling, only have a hotel gym with dumbbells"). AI regenerates that day only with equipment-appropriate alternatives, leaving the rest of the week untouched.
+
+## 🧠 Plan Generation UX
+- [ ] **Pre-generation instructions box** — Before regenerating a plan, show a prompt: "Do you have any specific instructions?" (e.g. "I don't work out Saturdays", "Wednesday I skate in the afternoon so morning only"). AI incorporates these into the generated week.
+
 ## 🤖 AI Agent System — Core Vision (added 2026-04-21)
 > Full prompt saved for reference. Build in this order:
 
-- [ ] **AI Plan Generator v1** — AI agent trained on ISSA CFT, PT textbooks, kinesiology materials generates a fully customized daily workout plan from profile data (sport schedule, goals, restrictions, session length, workout time)
 - [ ] **Injury → Recovery handoff** — When user starts a recovery playbook, AI modifies remaining training plan to keep them active with safe, injury-appropriate workouts. No full stop.
 - [ ] **Post-recovery re-entry plan** — After completing recovery, AI does NOT revert to old plan. It rebuilds around the healed area: targeted protective exercises + gradual intensity ramp for that body part over a set period
 - [ ] **Missed session / schedule conflict button** — "I couldn't make it today" button on each day. AI restructures remaining week to maintain balance and progression without losing momentum
 - [ ] **Progress persistence** — All phases (training, recovery, rest, transition) saved and tracked. Seamless handoffs between states; user can always resume exactly where they left off
 - [ ] **Multi-platform delivery** — Ensure full feature parity on iPhone, Android (PWA), and desktop browser
+
+## 🧪 Testing & Dev Safety (added 2026-04-23)
+- [ ] **Test account isolation** — When testing new features, keep main account progress (SI joint recovery progress, 3-month workout plan) fully preserved. Ability to switch to a test account and jump back to main account without losing any data.
+
+## 💰 Billing & Monetization (added 2026-04-23)
+- [ ] **Billing structure brainstorm** — Free tier: basic workouts only. Paid tier: full plan customization and AI generation. Options: (1) per-plan token cost, (2) monthly subscription with a token allowance. Beta tester promo codes grant limited or full protocol access for a set period. Finalize model before public launch.
+
+## 🔊 Audio & Accessibility (added 2026-04-23)
+- [ ] **Read-aloud workout instructions** — Speaker button on each exercise reads instructions aloud using text-to-speech. Default: American male voice, with option to switch to female. Audio ducks (lowers) background music while reading, then restores — does not pause it. Designed for eyes-free use mid-workout on both iPhone and Android.
+
+## 📊 Stats & Tracking (added 2026-04-23)
+- [ ] **Auto-save stats on every workout** — In the background, log sets/reps/weight per exercise per session. On the exercise screen, show "Last time: 25 lb × 3×10" so the user always knows where they left off. No manual input required — auto-captures from the workout flow.
+- [ ] **Cross-plan stat persistence with timestamps** — If a user lifts 45 lb on hang cleans in one plan, that stat appears when the same exercise shows up in any future plan, with date context ("Last done: Apr 10"). Persists across program restarts, plan switches, and recovery periods.
+
+## 🎬 Exercise Demos (added 2026-04-23)
+- [ ] **Exercise demo solution** — Evaluate two options: (1) YouTube links that open in-app via embedded player — quick to implement, no hosting cost, but dependent on third-party links staying live. (2) Custom GIFs or muscle-highlight animations — higher quality, fully controlled, bigger production effort. Brainstorm what's realistic for beta vs. what to build for launch.
+
+## 🧹 Content Management Rules (added 2026-04-23)
+- [ ] **Deduplication enforcement** — When adding items to TODO or IDEAS, always check for existing related entries first. If overlap found: merge into the existing entry rather than creating a duplicate. If a task is done, mark it [x] immediately — never leave completed work in the active list.
+
+## 🗂️ Admin Tools (added 2026-04-23)
+- [ ] **PDF workout plan upload (admin only)** — Admin can upload a PDF of any existing workout program (e.g. Athlean-X Dragon). AI reads and analyzes the plan, then offers to: (1) replace the user's current generated plan with it, or (2) blend it in. If replacing, AI intelligently reschedules any missed days and adjusts the remaining weeks to fit the user's timeline.
 
 ## 🏗️ Infrastructure
 - [ ] Stripe billing integration (freemium → paid tier)
@@ -27,6 +55,8 @@
 - [ ] Admin analytics dashboard (user activity, completion rates)
 
 ## ✅ Completed
+- [x] AI Plan Generator v1 — 3-month (13-week) personalized program with phase progression (Foundation → Build → Peak → Maintenance), lazy week generation, 1-week pre-generation, week navigation
+- [x] Claude mobile dispatch system — add ideas/todos from phone via Claude Projects
 - [x] Initial app build (Today, Plan, Recovery, Profile, Auth)
 - [x] SI Joint 4-phase recovery playbook (82 exercises)
 - [x] Supabase auth + profiles table
@@ -40,4 +70,4 @@
 - [x] Account tab with sign out, edit profile, admin link
 
 ---
-*Last updated: 2026-04-21*
+*Last updated: 2026-04-23*

@@ -63,6 +63,8 @@ export default function PlanPage() {
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [programComplete, setProgramComplete] = useState(false)
+  const [showRegenModal, setShowRegenModal] = useState(false)
+  const [regenInstructions, setRegenInstructions] = useState('')
   const pregenRef = useRef<Set<number>>(new Set())
 
   useEffect(() => {
@@ -77,7 +79,8 @@ export default function PlanPage() {
   const generateWeek = useCallback(async (
     prog: Program,
     weekNum: number,
-    silent = false
+    silent = false,
+    instructions = ''
   ) => {
     if (!silent) { setGenerating(true); setError(null) }
 
@@ -95,7 +98,7 @@ export default function PlanPage() {
       const res = await fetch('/api/generate-plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile, weekNumber: weekNum, phaseLabel: label, intensity }),
+        body: JSON.stringify({ profile, weekNumber: weekNum, phaseLabel: label, intensity, instructions }),
       })
       if (!res.ok) throw new Error('Generation failed')
       const { plan } = await res.json()
@@ -183,10 +186,12 @@ export default function PlanPage() {
 
   async function regenerate() {
     if (!program) return
+    setShowRegenModal(false)
     await supabase.from('weekly_plans').delete()
       .eq('program_id', program.id).eq('week_number', viewingWeek)
     setWeekPlans(prev => { const n = { ...prev }; delete n[viewingWeek]; return n })
-    generateWeek(program, viewingWeek)
+    generateWeek(program, viewingWeek, false, regenInstructions)
+    setRegenInstructions('')
   }
 
   async function restartProgram() {
@@ -261,7 +266,7 @@ export default function PlanPage() {
           <p style={{ fontSize: 12, color: phaseColor, fontWeight: 700, letterSpacing: '0.04em' }}>{phaseLabel}</p>
         </div>
         <button
-          onClick={regenerate}
+          onClick={() => setShowRegenModal(true)}
           style={{ fontSize: 12, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent-border)', borderRadius: 20, padding: '5px 14px', cursor: 'pointer', fontWeight: 600, marginTop: 4 }}
         >
           Regenerate
@@ -370,6 +375,51 @@ export default function PlanPage() {
             <button onClick={restartProgram} style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
               Fresh Start
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Regenerate confirmation modal */}
+      {showRegenModal && (
+        <div
+          onClick={() => { setShowRegenModal(false); setRegenInstructions('') }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24 }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: 'var(--surface)', borderRadius: 18, padding: 24, width: '100%', maxWidth: 420, border: '1px solid var(--border)' }}
+          >
+            <p style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>Regenerate Week {viewingWeek}?</p>
+            <p style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 18, lineHeight: 1.6 }}>
+              Your current plan for this week will be replaced. Add any specific instructions below, or leave blank to let the AI decide.
+            </p>
+            <textarea
+              value={regenInstructions}
+              onChange={e => setRegenInstructions(e.target.value)}
+              placeholder={'e.g. "No workouts on Saturday" or "Wednesday I skate in the afternoon, keep it light"'}
+              rows={3}
+              style={{
+                width: '100%', borderRadius: 10, border: '1px solid var(--border)',
+                background: 'var(--surface2)', color: 'var(--text)', fontSize: 13,
+                padding: '10px 12px', resize: 'none', fontFamily: 'inherit',
+                marginBottom: 18, boxSizing: 'border-box', lineHeight: 1.5,
+              }}
+            />
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => { setShowRegenModal(false); setRegenInstructions('') }}
+                style={{ flex: 1, padding: '13px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={regenerate}
+                style={{ flex: 1, padding: '13px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
+              >
+                Confirm →
+              </button>
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--text-dim)', textAlign: 'center', marginTop: 12 }}>Uses AI tokens</p>
           </div>
         </div>
       )}

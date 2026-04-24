@@ -23,7 +23,7 @@ Rules:
 - Rest days: type "rest", movements ["Full rest", "Light walk optional", "Sleep 8+ hours"], duration "—"
 - Return nothing except the raw JSON array`
 
-function buildPrompt(profile: Record<string, unknown>, weekNumber: number, phaseLabel: string, intensity: string): string {
+function buildPrompt(profile: Record<string, unknown>, weekNumber: number, phaseLabel: string, intensity: string, instructions = ''): string {
   const lines: string[] = [
     `PROGRAM CONTEXT: Week ${weekNumber} of 13 — ${phaseLabel}`,
     `INTENSITY GUIDANCE: ${intensity}`,
@@ -48,6 +48,12 @@ function buildPrompt(profile: Record<string, unknown>, weekNumber: number, phase
   }
   if (profile.sport_schedule) lines.push(`Sport schedule: ${JSON.stringify(profile.sport_schedule)}`)
 
+  if (instructions?.trim()) {
+    lines.push('')
+    lines.push(`SPECIFIC INSTRUCTIONS FROM USER: ${instructions.trim()}`)
+    lines.push('Apply these instructions precisely — they override general defaults.')
+  }
+
   lines.push(`\nGenerate the 7-day plan for Week ${weekNumber} now.`)
   return lines.join('\n')
 }
@@ -55,9 +61,9 @@ function buildPrompt(profile: Record<string, unknown>, weekNumber: number, phase
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { profile, weekNumber = 1, phaseLabel = 'Foundation Phase', intensity = 'RPE 6-7. Build base fitness and movement quality.' } = body
+    const { profile, weekNumber = 1, phaseLabel = 'Foundation Phase', intensity = 'RPE 6-7. Build base fitness and movement quality.', instructions = '' } = body
 
-    const prompt = buildPrompt(profile, weekNumber, phaseLabel, intensity)
+    const prompt = buildPrompt(profile, weekNumber, phaseLabel, intensity, instructions)
 
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',

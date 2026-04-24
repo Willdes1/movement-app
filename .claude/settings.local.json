@@ -27,7 +27,8 @@
       "Bash(gh repo *)",
       "Bash(npm install *)",
       "Bash(git push *)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(git commit *)"
     ]
   }
 }
