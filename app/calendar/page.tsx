@@ -17,6 +17,26 @@ type Program = {
   startDate: string
 }
 
+type ExerciseDetail = {
+  name_normalized: string
+  name_display: string
+  how: string
+  breathing: string
+  core: string
+  tip: string
+}
+
+function parseExerciseName(movement: string): string {
+  return movement
+    .replace(/\s+\d+[×x]\d+.*$/i, '')
+    .replace(/\s+\d+\s+sets?.*$/i, '')
+    .trim()
+}
+
+function normalizeExerciseName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '_')
+}
+
 const TOTAL_WEEKS = 13
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -58,6 +78,8 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true)
   const [viewMonth, setViewMonth] = useState(new Date())
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
+  const [exerciseLibrary, setExerciseLibrary] = useState<Record<string, ExerciseDetail>>({})
+  const [selectedExercise, setSelectedExercise] = useState<ExerciseDetail | null>(null)
 
   useEffect(() => {
     if (!authLoading && !user) router.replace('/auth')
@@ -86,6 +108,28 @@ export default function CalendarPage() {
     const map: Record<number, DayPlan[]> = {}
     plans?.forEach(p => { map[p.week_number] = p.plan as DayPlan[] })
     setWeekPlans(map)
+
+    // Load exercise library for all movements across all generated weeks
+    const allMovements = Object.values(map).flat()
+    const normalizedNames = [...new Set(
+      allMovements
+        .filter(d => d.type !== 'rest')
+        .flatMap(d => d.movements)
+        .map(m => normalizeExerciseName(parseExerciseName(m)))
+        .filter(Boolean)
+    )]
+    if (normalizedNames.length > 0) {
+      const { data: libData } = await supabase
+        .from('exercise_library')
+        .select('name_normalized, name_display, how, breathing, core, tip')
+        .in('name_normalized', normalizedNames)
+      if (libData) {
+        const libMap: Record<string, ExerciseDetail> = {}
+        libData.forEach(e => { libMap[e.name_normalized] = e as ExerciseDetail })
+        setExerciseLibrary(libMap)
+      }
+    }
+
     setLoading(false)
   }, [user])
 
@@ -273,11 +317,23 @@ export default function CalendarPage() {
             >×</button>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {selectedEntry.day.movements.map((m, i) => (
-              <span key={i} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-mid)' }}>
-                {m}
-              </span>
-            ))}
+            {selectedEntry.day.movements.map((m, i) => {
+              const detail = exerciseLibrary[normalizeExerciseName(parseExerciseName(m))]
+              return (
+                <button
+                  key={i}
+                  onClick={() => detail && setSelectedExercise(detail)}
+                  style={{
+                    fontSize: 11, padding: '4px 10px', borderRadius: 20,
+                    background: 'var(--surface)', border: '1px solid var(--border)',
+                    color: 'var(--text-mid)', cursor: detail ? 'pointer' : 'default',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {m}
+                </button>
+              )
+            })}
           </div>
         </div>
       )}
@@ -286,6 +342,37 @@ export default function CalendarPage() {
       {Object.keys(weekPlans).length < TOTAL_WEEKS && (
         <div style={{ marginTop: 20, padding: '12px 16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12, color: 'var(--text-dim)', textAlign: 'center' }}>
           Weeks generate automatically as you progress. Navigate to <span style={{ color: 'var(--accent)', fontWeight: 700, cursor: 'pointer' }} onClick={() => router.push('/plan')}>Your Plan</span> to view or generate any week.
+        </div>
+      )}
+
+      {/* Exercise detail modal */}
+      {selectedExercise && (
+        <div
+          onClick={() => setSelectedExercise(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000 }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: 'var(--surface)', borderRadius: '20px 20px 0 0', padding: '24px 24px 40px', width: '100%', maxWidth: 480, border: '1px solid var(--border)', borderBottom: 'none' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
+              <p style={{ fontWeight: 800, fontSize: 17, lineHeight: 1.3, paddingRight: 12 }}>{selectedExercise.name_display}</p>
+              <button onClick={() => setSelectedExercise(null)} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--text-dim)', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}>×</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {[
+                { label: 'HOW TO DO IT', text: selectedExercise.how, color: 'var(--text)' },
+                { label: 'BREATHING', text: selectedExercise.breathing, color: 'var(--text-mid)' },
+                { label: 'CORE ENGAGEMENT', text: selectedExercise.core, color: 'var(--text-mid)' },
+                { label: 'COACHING TIP', text: selectedExercise.tip, color: 'var(--accent)' },
+              ].map(({ label, text, color }) => (
+                <div key={label} style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)' }}>
+                  <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--text-dim)', marginBottom: 5, textTransform: 'uppercase' }}>{label}</p>
+                  <p style={{ fontSize: 13, color, lineHeight: 1.65 }}>{text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>

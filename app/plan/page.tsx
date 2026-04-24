@@ -19,6 +19,42 @@ type Program = {
   status: string
 }
 
+type ExerciseDetail = {
+  name_normalized: string
+  name_display: string
+  how: string
+  breathing: string
+  core: string
+  tip: string
+}
+
+function parseExerciseName(movement: string): string {
+  return movement
+    .replace(/\s+\d+[×x]\d+.*$/i, '')
+    .replace(/\s+\d+\s+sets?.*$/i, '')
+    .trim()
+}
+
+function normalizeExerciseName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '_')
+}
+
+const REST_MOVEMENTS = new Set(['Full rest', 'Light walk optional', 'Sleep 8+ hours'])
+
+function extractDisplayNames(plan: DayPlan[]): string[] {
+  return [...new Set(
+    plan
+      .filter(d => d.type !== 'rest')
+      .flatMap(d => d.movements)
+      .map(parseExerciseName)
+      .filter(n => n && !REST_MOVEMENTS.has(n))
+  )]
+}
+
+function extractNormalizedNames(plan: DayPlan[]): string[] {
+  return extractDisplayNames(plan).map(normalizeExerciseName)
+}
+
 const TOTAL_WEEKS = 13
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
@@ -90,6 +126,8 @@ export default function PlanPage() {
   const [regenInstructions, setRegenInstructions] = useState('')
   const [showGenModal, setShowGenModal] = useState(false)
   const [pendingWeek, setPendingWeek] = useState<number | null>(null)
+  const [exerciseLibrary, setExerciseLibrary] = useState<Record<string, ExerciseDetail>>({})
+  const [selectedExercise, setSelectedExercise] = useState<ExerciseDetail | null>(null)
 
   useEffect(() => {
     if (!authLoading && !user) router.replace('/auth')
@@ -99,6 +137,56 @@ export default function PlanPage() {
     const { data } = await supabase.from('profiles').select('*').eq('id', user!.id).single()
     return data
   }, [user])
+
+  const loadLibraryForWeek = useCallback(async (plan: DayPlan[]) => {
+    const normalizedNames = extractNormalizedNames(plan)
+    if (normalizedNames.length === 0) return
+    const { data } = await supabase
+      .from('exercise_library')
+      .select('name_normalized, name_display, how, breathing, core, tip')
+      .in('name_normalized', normalizedNames)
+    if (data) {
+      setExerciseLibrary(prev => {
+        const next = { ...prev }
+        data.forEach(e => { next[e.name_normalized] = e as ExerciseDetail })
+        return next
+      })
+    }
+  }, [])
+
+  const populateLibrary = useCallback(async (plan: DayPlan[]) => {
+    const displayNames = extractDisplayNames(plan)
+    const normalizedNames = displayNames.map(normalizeExerciseName)
+    if (normalizedNames.length === 0) return
+
+    const { data: existing } = await supabase
+      .from('exercise_library')
+      .select('name_normalized')
+      .in('name_normalized', normalizedNames)
+
+    const existingSet = new Set(existing?.map(e => e.name_normalized) ?? [])
+    const uniqueMissing = [...new Set(
+      displayNames.filter(n => !existingSet.has(normalizeExerciseName(n)))
+    )]
+
+    if (uniqueMissing.length > 0) {
+      try {
+        const res = await fetch('/api/generate-exercise-details', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ exercises: uniqueMissing }),
+        })
+        if (res.ok) {
+          const { details } = await res.json()
+          if (Array.isArray(details) && details.length > 0) {
+            await supabase.from('exercise_library').upsert(details, { onConflict: 'name_normalized' })
+          }
+        }
+      } catch { /* silent — chips just won't be tappable yet */ }
+    }
+
+    await loadLibraryForWeek(plan)
+  }, [loadLibraryForWeek])
 
   const generateWeek = useCallback(async (
     prog: Program,
@@ -136,12 +224,13 @@ export default function PlanPage() {
       })
 
       setWeekPlans(prev => ({ ...prev, [weekNum]: plan }))
+      if (!silent) populateLibrary(plan)
     } catch {
       if (!silent) setError('Generation failed. Tap Regenerate to try again.')
     } finally {
       if (!silent) setGenerating(false)
     }
-  }, [fetchProfile, user])
+  }, [fetchProfile, user, populateLibrary])
 
   const initProgram = useCallback(async () => {
     // Load or create program
@@ -187,6 +276,11 @@ export default function PlanPage() {
     if (!user) return
     initProgram()
   }, [user, initProgram])
+
+  useEffect(() => {
+    const plan = weekPlans[viewingWeek]
+    if (plan) loadLibraryForWeek(plan)
+  }, [viewingWeek, weekPlans, loadLibraryForWeek])
 
   function navigateWeek(dir: number) {
     const next = viewingWeek + dir
@@ -380,11 +474,23 @@ export default function PlanPage() {
               <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{day.duration}</span>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {day.movements.map((m, mi) => (
-                <span key={mi} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-mid)' }}>
-                  {m}
-                </span>
-              ))}
+              {day.movements.map((m, mi) => {
+                const detail = exerciseLibrary[normalizeExerciseName(parseExerciseName(m))]
+                return (
+                  <button
+                    key={mi}
+                    onClick={() => detail && setSelectedExercise(detail)}
+                    style={{
+                      fontSize: 11, padding: '3px 10px', borderRadius: 20,
+                      background: 'var(--surface2)', border: '1px solid var(--border)',
+                      color: 'var(--text-mid)', cursor: detail ? 'pointer' : 'default',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    {m}
+                  </button>
+                )
+              })}
             </div>
           </div>
         ))}
@@ -402,6 +508,37 @@ export default function PlanPage() {
             <button onClick={restartProgram} style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
               Fresh Start
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Exercise detail modal */}
+      {selectedExercise && (
+        <div
+          onClick={() => setSelectedExercise(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000, padding: '0 0 0 0' }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: 'var(--surface)', borderRadius: '20px 20px 0 0', padding: '24px 24px 40px', width: '100%', maxWidth: 480, border: '1px solid var(--border)', borderBottom: 'none' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
+              <p style={{ fontWeight: 800, fontSize: 17, lineHeight: 1.3, paddingRight: 12 }}>{selectedExercise.name_display}</p>
+              <button onClick={() => setSelectedExercise(null)} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--text-dim)', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}>×</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {[
+                { label: 'HOW TO DO IT', text: selectedExercise.how, color: 'var(--text)' },
+                { label: 'BREATHING', text: selectedExercise.breathing, color: 'var(--text-mid)' },
+                { label: 'CORE ENGAGEMENT', text: selectedExercise.core, color: 'var(--text-mid)' },
+                { label: 'COACHING TIP', text: selectedExercise.tip, color: 'var(--accent)' },
+              ].map(({ label, text, color }) => (
+                <div key={label} style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)' }}>
+                  <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--text-dim)', marginBottom: 5, textTransform: 'uppercase' }}>{label}</p>
+                  <p style={{ fontSize: 13, color, lineHeight: 1.65 }}>{text}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
