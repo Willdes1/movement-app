@@ -16,6 +16,14 @@
 
 ## 🧠 Plan Generation UX
 - [ ] **Pre-generation instructions box** — Before regenerating a plan, show a prompt: "Do you have any specific instructions?" (e.g. "I don't work out Saturdays", "Wednesday I skate in the afternoon so morning only"). AI incorporates these into the generated week.
+- [ ] **Confirm before auto-generating unvisited weeks** — Currently, navigating to any week that hasn't been generated yet triggers an automatic AI generation. This burns tokens if the user is just browsing. Fix: when navigating to an ungenerated week, show a confirmation prompt instead of generating immediately. Prompt uses the same dumbbell+sparkle icon and style as the Regenerate modal. Message: "Generate Week N?" with a brief note that this will build a new AI plan. Cancel returns to the previous week. Confirm fires the generation. Also disable or gate the silent pre-generation of adjacent weeks — do not pre-generate unless the user is actively on the current program week.
+
+## 💪 Exercise Detail System — Global Library (added 2026-04-23)
+- [ ] **Exercise detail generation at plan time** — When a weekly plan is generated, run a second AI pass that produces structured detail for every exercise in that week: how-to instructions, breathing technique, core engagement cue, and one coaching tip. These match the depth of the SI Joint recovery playbook. Store results in a global `exercise_library` table (not per-user).
+- [ ] **Global deduplication — generate once, reuse forever** — Before generating details for any exercise, check the `exercise_library` table first. If that exercise already exists (matched by normalized name), skip the AI call and use the stored data. Tokens are only spent the first time a unique exercise appears across the entire platform — every user after that reads for free.
+- [ ] **Zero tap cost** — Exercise chips in both the Plan page and Calendar page become tappable. Tapping opens a detail modal that reads directly from the library — no API call, no token cost, instant load.
+- [ ] **Periodic refinement** — Admin can trigger a refinement scan on any exercise in the library. AI reviews the stored details and updates them if the cues can be improved. This is manual and infrequent — not automatic.
+- [ ] **Data model changes required** — New Supabase table: `exercise_library (id, name_normalized, name_display, how, breathing, core, tip, created_at, updated_at)`. Weekly plan generation flow: generate plan → check library for each exercise → generate missing details in batch → save to library → update plan with library IDs or inline detail. Update `DayPlan` type, bump `max_tokens` to ~6000, update plan page + calendar page UI to support tappable exercise chips.
 
 ## 🤖 AI Agent System — Core Vision (added 2026-04-21)
 > Full prompt saved for reference. Build in this order:
