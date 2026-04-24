@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
@@ -88,7 +88,8 @@ export default function PlanPage() {
   const [programComplete, setProgramComplete] = useState(false)
   const [showRegenModal, setShowRegenModal] = useState(false)
   const [regenInstructions, setRegenInstructions] = useState('')
-  const pregenRef = useRef<Set<number>>(new Set())
+  const [showGenModal, setShowGenModal] = useState(false)
+  const [pendingWeek, setPendingWeek] = useState<number | null>(null)
 
   useEffect(() => {
     if (!authLoading && !user) router.replace('/auth')
@@ -180,12 +181,6 @@ export default function PlanPage() {
 
     // Generate current week if missing
     if (!plans[week]) await generateWeek(prog, week)
-
-    // Pre-generate next week silently
-    if (week < TOTAL_WEEKS && !plans[week + 1] && !pregenRef.current.has(week + 1)) {
-      pregenRef.current.add(week + 1)
-      generateWeek(prog, week + 1, true)
-    }
   }, [user, generateWeek])
 
   useEffect(() => {
@@ -193,18 +188,29 @@ export default function PlanPage() {
     initProgram()
   }, [user, initProgram])
 
-  async function navigateWeek(dir: number) {
+  function navigateWeek(dir: number) {
     const next = viewingWeek + dir
     if (next < 1 || next > TOTAL_WEEKS || !program) return
-    setViewingWeek(next)
-    if (!weekPlans[next]) generateWeek(program, next)
-
-    // Pre-gen the one after
-    const after = next + dir
-    if (after >= 1 && after <= TOTAL_WEEKS && !weekPlans[after] && !pregenRef.current.has(after)) {
-      pregenRef.current.add(after)
-      generateWeek(program, after, true)
+    if (!weekPlans[next]) {
+      setPendingWeek(next)
+      setShowGenModal(true)
+      return
     }
+    setViewingWeek(next)
+  }
+
+  async function confirmGenerate() {
+    if (!pendingWeek || !program) return
+    setShowGenModal(false)
+    setViewingWeek(pendingWeek)
+    const week = pendingWeek
+    setPendingWeek(null)
+    generateWeek(program, week)
+  }
+
+  function cancelGenerate() {
+    setShowGenModal(false)
+    setPendingWeek(null)
   }
 
   async function regenerate() {
@@ -221,7 +227,6 @@ export default function PlanPage() {
     if (!user) return
     await supabase.from('training_programs').delete().eq('user_id', user.id)
     setProgram(null); setWeekPlans({}); setCurrentWeek(1); setViewingWeek(1); setProgramComplete(false)
-    pregenRef.current.clear()
     initProgram()
   }
 
@@ -232,7 +237,6 @@ export default function PlanPage() {
     await supabase.from('weekly_plans').delete().eq('program_id', program.id)
     const updated = { ...program, startDate: today, status: 'active' }
     setProgram(updated); setWeekPlans({}); setCurrentWeek(1); setViewingWeek(1); setProgramComplete(false)
-    pregenRef.current.clear()
     generateWeek(updated, 1)
   }
 
@@ -398,6 +402,41 @@ export default function PlanPage() {
             <button onClick={restartProgram} style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
               Fresh Start
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Generate week confirmation modal */}
+      {showGenModal && pendingWeek && (
+        <div
+          onClick={cancelGenerate}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24 }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: 'var(--surface)', borderRadius: 18, padding: 24, width: '100%', maxWidth: 420, border: '1px solid var(--border)' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+              <span style={{ color: 'var(--accent)' }}><DumbbellSparkleIcon size={26}/></span>
+              <p style={{ fontSize: 18, fontWeight: 700 }}>Generate Week {pendingWeek}?</p>
+            </div>
+            <p style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 20, lineHeight: 1.6 }}>
+              Your AI coach will build a new 7-day plan for Week {pendingWeek} — {getPhaseInfo(pendingWeek).label}.
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={cancelGenerate}
+                style={{ flex: 1, padding: '13px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmGenerate}
+                style={{ flex: 1, padding: '13px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
+              >
+                Generate →
+              </button>
+            </div>
           </div>
         </div>
       )}
