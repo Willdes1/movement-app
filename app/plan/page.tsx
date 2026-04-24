@@ -51,6 +51,29 @@ function getCurrentWeek(startDate: string): number {
   return Math.min(Math.max(Math.floor(diffDays / 7) + 1, 1), TOTAL_WEEKS)
 }
 
+function DumbbellSparkleIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+      {/* Left plate */}
+      <rect x="1" y="10" width="3" height="7" rx="1.2"/>
+      {/* Left collar */}
+      <rect x="4" y="11.5" width="2" height="4" rx="0.5"/>
+      {/* Bar */}
+      <rect x="6" y="12.5" width="12" height="2" rx="1"/>
+      {/* Right collar */}
+      <rect x="18" y="11.5" width="2" height="4" rx="0.5"/>
+      {/* Right plate */}
+      <rect x="20" y="10" width="3" height="7" rx="1.2"/>
+      {/* Large sparkle — top right */}
+      <path d="M20 1.5 L20.7 3.3 L22.5 4 L20.7 4.7 L20 6.5 L19.3 4.7 L17.5 4 L19.3 3.3 Z"/>
+      {/* Medium sparkle — top left */}
+      <path d="M5 1.5 L5.45 2.55 L6.5 3 L5.45 3.45 L5 4.5 L4.55 3.45 L3.5 3 L4.55 2.55 Z"/>
+      {/* Tiny dot sparkle */}
+      <circle cx="22" cy="8" r="0.9"/>
+    </svg>
+  )
+}
+
 export default function PlanPage() {
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
@@ -267,9 +290,9 @@ export default function PlanPage() {
         </div>
         <button
           onClick={() => setShowRegenModal(true)}
-          style={{ fontSize: 12, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent-border)', borderRadius: 20, padding: '5px 14px', cursor: 'pointer', fontWeight: 600, marginTop: 4 }}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', background: 'none', border: '1px solid var(--accent-border)', borderRadius: 20, padding: '6px 12px', cursor: 'pointer', marginTop: 4 }}
         >
-          Regenerate
+          <DumbbellSparkleIcon size={18}/>
         </button>
       </div>
 
@@ -389,7 +412,10 @@ export default function PlanPage() {
             onClick={e => e.stopPropagation()}
             style={{ background: 'var(--surface)', borderRadius: 18, padding: 24, width: '100%', maxWidth: 420, border: '1px solid var(--border)' }}
           >
-            <p style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>Regenerate Week {viewingWeek}?</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+              <span style={{ color: 'var(--accent)' }}><DumbbellSparkleIcon size={26}/></span>
+              <p style={{ fontSize: 18, fontWeight: 700 }}>Regenerate Week {viewingWeek}?</p>
+            </div>
             <p style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 18, lineHeight: 1.6 }}>
               Your current plan for this week will be replaced. Add any specific instructions below, or leave blank to let the AI decide.
             </p>
@@ -419,7 +445,6 @@ export default function PlanPage() {
                 Confirm →
               </button>
             </div>
-            <p style={{ fontSize: 11, color: 'var(--text-dim)', textAlign: 'center', marginTop: 12 }}>Uses AI tokens</p>
           </div>
         </div>
       )}
