@@ -115,7 +115,7 @@ export default function ForYouPage() {
     return <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-dim)' }}>Loading...</div>
   }
 
-  const hasProfile = profile && (profile.sport || profile.goal)
+  const hasProfile = Boolean(profile?.sport || profile?.goal)
 
   return (
     <div style={{ padding: '24px 16px 120px', maxWidth: 480, margin: '0 auto' }}>
