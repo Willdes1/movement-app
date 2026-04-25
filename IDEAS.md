@@ -3,6 +3,14 @@
 
 ---
 
+## 🔍 Research & Competitive Intelligence (added 2026-04-24)
+- **Pain point research across Reddit, review platforms, and fitness communities**: Run deep searches across Reddit (r/fitness, r/xxfitness, r/bodyweightfitness, r/running, sport-specific subs), App Store/Google Play reviews for top fitness apps (Whoop, Strava, Nike Training, Peloton, Fitbod, etc.), and other review platforms. Goal: identify every complaint, missing feature, and unmet need users voice about current fitness apps. Synthesize findings into a prioritized list of problems worth solving — filtered against this app's vision (AI-personalized plans grounded in physical training literature, kinesiology, and personal training principles). This app is already differentiated; the research tells us which pain points to solve next, and which to ignore because they conflict with the vision.
+
+## 👤 Profile & Personalization (added 2026-04-24)
+- **Profile picture upload**: The Account tab shows a circle with the user's initial. Let users tap an "Edit" option beneath the circle to upload or change their profile photo. Standard behavior users expect from any modern app.
+- **Extended personal profile tab**: Split profile into two tabs — the existing training questionnaire (kept short for onboarding) and a separate "Personal" tab. The personal tab includes: display name, nickname, birthday/age, height, and weight. These fields are optional but feed the AI generator for better personalization (e.g. weight for load progressions, age for recovery pacing). Show a message: "Fill this out for better plan generation." Keeping the onboarding questionnaire short is a priority — this is additive, not required on signup.
+- **Account tier labels**: Replace "Free Plan" with role-appropriate labels. Admin accounts show "Admin." Beta/promo users show "Pro" (or similar). Standard users show "Free Plan" with an "Upgrade →" link beneath it — placeholder for now, wired to billing once finalized. Makes account status immediately legible and sets up the upgrade funnel visually before billing is live.
+
 ## 🤖 AI & Wearables (added 2026-04-21)
 - **Oura Ring integration**: Pull recovery score and readiness data daily. If readiness is low, AI agent automatically shifts that day to rest or light mobility instead of heavy training. High readiness → push intensity.
 - **Biometric integration (Oura, Apple Watch, Samsung Galaxy Watch)**: Explore API availability for each device. Based on real-time biometric data (HRV, sleep score, readiness), system recommends: train hard / train moderately / proceed as planned / rest day. If rest day is taken, AI forecasts the weekly impact and dynamically restructures the remaining schedule so the user can plan ahead.
@@ -64,4 +72,4 @@
 - **Loop**: Phone dispatch → run SQL in Supabase → mention to Claude Code next session → .md files updated
 
 ---
-*Last updated: 2026-04-21*
+*Last updated: 2026-04-24*
