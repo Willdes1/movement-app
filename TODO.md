@@ -4,6 +4,7 @@
 ---
 
 ## 🔥 Active / Up Next
+- [ ] **Merge Your Plan into Home dashboard** — Delete "Your Plan" tab. Home becomes the main dashboard with the full weekly plan view (all 7 days, tappable exercise chips, log set, complete button). Replace "Your Plan" tab slot with "Nutrition" tab (placeholder). Updated nav: Home · Nutrition · For You · Calendar · Account (Admin only visible to admins).
 - [ ] Add more recovery playbooks (Shoulder Impingement, Knee Rehab)
 - [ ] Build out Browse & Learn page (exercise library + articles)
 
@@ -26,10 +27,10 @@
 > Full prompt saved for reference. Build in this order:
 
 - [ ] **Injury → Recovery handoff** — When user starts a recovery playbook, AI modifies remaining training plan to keep them active with safe, injury-appropriate workouts. No full stop.
+- [ ] **Return-to-sport agent** (added 2026-04-27) — During active recovery, a second agent generates a full sport-specific return-to-sport plan. For skateboarding: Day 1 = riding around, pool riding, slappies → Day 2 = shiftys → Day 3 = 50-50s → 180s, etc. Progression is sport- and skill-level-specific. Each day after the recovery workout, a prompt asks how the sport session felt before unlocking the next step. Agent runs token-heavy generation once, saves the full plan (as a stored record), and only reads/updates it on daily check-ins — no re-generation per session. Activates automatically when user enters recovery mode.
 - [ ] **Post-recovery re-entry plan** — After completing recovery, AI does NOT revert to old plan. It rebuilds around the healed area: targeted protective exercises + gradual intensity ramp for that body part over a set period
 - [ ] **Missed session / schedule conflict button** — "I couldn't make it today" button on each day. AI restructures remaining week to maintain balance and progression without losing momentum
 - [ ] **Progress persistence** — All phases (training, recovery, rest, transition) saved and tracked. Seamless handoffs between states; user can always resume exactly where they left off
-- [ ] **Multi-platform delivery** — Ensure full feature parity on iPhone, Android (PWA), and desktop browser
 
 ## 🧪 Testing & Dev Safety (added 2026-04-23)
 - [ ] **Test account isolation** — When testing new features, keep main account progress (SI joint recovery progress, 3-month workout plan) fully preserved. Ability to switch to a test account and jump back to main account without losing any data.
@@ -54,11 +55,37 @@
 ## 🗂️ Admin Tools (added 2026-04-23)
 - [ ] **PDF workout plan upload (admin only)** — Admin can upload a PDF of any existing workout program (e.g. Athlean-X Dragon). AI reads and analyzes the plan, then offers to: (1) replace the user's current generated plan with it, or (2) blend it in. If replacing, AI intelligently reschedules any missed days and adjusts the remaining weeks to fit the user's timeline.
 
+## 🥗 Nutrition Tab (added 2026-04-27)
+> Replaces "Your Plan" tab slot. Placeholder screen first, full build later.
+- [ ] **Placeholder screen** — "We're building this in the background. Stay tuned." Shown immediately after nav merge.
+- [ ] **Nutrition profile** — Separate from training profile. Collects: age, weight, height, wake time, first meal time, intermittent fasting preference, goals, known allergies, health conditions (gout, carpal tunnel, lactose intolerance, diabetes, etc.), doctor letters/dietary recommendations (file upload). If training profile or profile picture is incomplete, nudge user to fill those first.
+- [ ] **AI nutrition agent** — Trained at certified-nutritionist level. Reads training plan phase, activity level tracked in app, biometric data (when integrated), and nutrition profile. Generates a 3-month meal plan synchronized to the current workout program: morning to night, what to eat, when to eat, meal timing, and scheduling recommendations.
+- [ ] **Nutrition plan generation** — Paid feature (cost TBD during billing brainstorm). Token-heavy; runs once and stores the plan, not re-generated daily. Plan adapts as workout phase changes (Foundation → Build → Peak → Maintenance).
+- [ ] **File upload support** — Users can upload doctor letters or dietary notes to inform the nutrition agent.
+
+## 🎨 Branding (added 2026-04-27)
+- [ ] **Logo design** — Generate a strong prompt for LLMs (Midjourney, DALL-E, etc.) to explore logo concepts. Claude Code to produce the prompt based on app identity: AI-personalized training, recovery, performance, warrior mindset, movement. Brainstorm: wordmark vs. icon vs. combination mark. Consider how it looks on dark backgrounds, app icon grid, and marketing materials.
+
+## 📱 Native App — App Store & Google Play (added 2026-04-27)
+- [ ] **Evaluate wrapper approach** — Option A: Capacitor (wraps existing Next.js PWA into a native shell — fastest path). Option B: React Native rewrite (more native feel, bigger lift). For beta testing phase, Capacitor is likely the right call.
+- [ ] **iOS build** — Target App Store distribution via TestFlight for internal beta testing first. Requires Apple Developer account ($99/yr).
+- [ ] **Android build** — Target Google Play via internal testing track. Requires Google Play Developer account ($25 one-time).
+- [ ] **Goal** — Will downloads and tests on his own phone during active development. Full feature parity with web.
+
+## 🗂️ Admin Dashboard — Full Company Portal (added 2026-04-27)
+> Before building, Will wants to brainstorm and see a browser-link mockup. Design should feel analytical but match app vibe (focus, recovery, performance). Ask before starting.
+- [ ] **Brainstorm + mockup review** — Show Will a design direction before any code is written.
+- [ ] **Business analytics** — Click-to-purchase rate, click-out rate, ad spend ROI, conversion funnels.
+- [ ] **Marketing control panel** — SEO recommendations, Facebook/Meta ads, LinkedIn ads, PPC, LLM visibility (how the app appears in AI-generated search results), Reddit content strategy, educational fitness/nutrition content calendar.
+- [ ] **Partner management** — Physical therapists, nutritionists, personal trainers, fitness influencers, fitness enthusiasts with large followings. Track: audience size, performance, revenue contribution, referral clients, promotion activity. Revenue-sharing model: partners earn a cut when they bring in paying clients.
+- [ ] **Partner portal (future)** — Partners get their own login: analytics, expected pay, revenue generated, CTR on their content, ad ideas, marketing suggestions.
+- [ ] **Scout agent** — Actively searches the web for reviews mentioning the app and competing apps. Flags if someone says "X is better than Movement" or similar. Builds its own ideas/todo list of app improvement suggestions based on what people say online.
+- [ ] **Bug monitoring agent** — Scans for bugs, estimates fix time, notifies affected users when issue is under investigation, updates them when resolved. Triggers app update or refresh prompts when needed.
+- [ ] **Replaced existing item**: Supersedes "Admin analytics dashboard (user activity, completion rates)" from Infrastructure.
+
 ## 🏗️ Infrastructure
 - [ ] Stripe billing integration (freemium → paid tier)
-- [ ] Promo code system (beta friends get free access)
 - [ ] Push notifications (streaks, reminders, milestones)
-- [ ] Admin analytics dashboard (user activity, completion rates)
 
 ## ✅ Completed
 - [x] AI Plan Generator v1 — 3-month (13-week) personalized program with phase progression (Foundation → Build → Peak → Maintenance), lazy week generation, 1-week pre-generation, week navigation
@@ -80,4 +107,4 @@
 - [x] Account tab with sign out, edit profile, admin link
 
 ---
-*Last updated: 2026-04-23*
+*Last updated: 2026-04-27*
