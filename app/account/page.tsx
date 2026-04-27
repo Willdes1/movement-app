@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
@@ -10,10 +10,13 @@ export default function AccountPage() {
   const { user, isAdmin, role, signOut, loading } = useAuth()
   const router = useRouter()
   const [profile, setProfile] = useState<UserProfile>({})
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [avatarLoading, setAvatarLoading] = useState(false)
   const [promoCode, setPromoCode] = useState('')
   const [promoLoading, setPromoLoading] = useState(false)
   const [promoMsg, setPromoMsg] = useState('')
   const [promoError, setPromoError] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!loading && !user) router.replace('/auth')
@@ -23,6 +26,32 @@ export default function AccountPage() {
     const p = loadProfile() as UserProfile | null
     if (p) setProfile(p)
   }, [])
+
+  useEffect(() => {
+    if (!user) return
+    supabase.from('profiles').select('avatar_url').eq('id', user.id).single()
+      .then(({ data }) => { if (data?.avatar_url) setAvatarUrl(data.avatar_url) })
+  }, [user])
+
+  async function uploadAvatar(file: File) {
+    if (!user) return
+    setAvatarLoading(true)
+    try {
+      const ext = file.name.split('.').pop() ?? 'jpg'
+      const path = `${user.id}/avatar.${ext}`
+      const { error } = await supabase.storage
+        .from('avatars')
+        .upload(path, file, { upsert: true, contentType: file.type })
+      if (error) throw error
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
+      await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', user.id)
+      setAvatarUrl(publicUrl)
+    } catch (err) {
+      console.error('Avatar upload failed:', err)
+    } finally {
+      setAvatarLoading(false)
+    }
+  }
 
   async function handleSignOut() {
     await signOut()
@@ -87,14 +116,41 @@ export default function AccountPage() {
 
       {/* Avatar + greeting */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 28 }}>
-        <div style={{
-          width: 60, height: 60, borderRadius: '50%',
-          background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 22, fontWeight: 900, color: '#fff', flexShrink: 0,
-          boxShadow: '0 4px 16px var(--accent-shadow)',
-        }}>
-          {initials}
+        <div
+          onClick={() => fileInputRef.current?.click()}
+          style={{ position: 'relative', width: 60, height: 60, flexShrink: 0, cursor: 'pointer' }}
+        >
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt="Profile"
+              style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', boxShadow: '0 4px 16px var(--accent-shadow)', display: 'block' }}
+            />
+          ) : (
+            <div style={{
+              width: 60, height: 60, borderRadius: '50%',
+              background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: avatarLoading ? 14 : 22, fontWeight: 900, color: '#fff',
+              boxShadow: '0 4px 16px var(--accent-shadow)',
+            }}>
+              {avatarLoading ? '…' : initials}
+            </div>
+          )}
+          <div style={{
+            position: 'absolute', bottom: 0, right: 0, width: 20, height: 20,
+            borderRadius: '50%', background: 'var(--accent)', border: '2px solid var(--bg)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9,
+          }}>
+            {avatarLoading ? '·' : '✎'}
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={e => { const f = e.target.files?.[0]; if (f) uploadAvatar(f) }}
+          />
         </div>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em', marginBottom: 2 }}>
