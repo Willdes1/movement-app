@@ -7,7 +7,7 @@ import type { UserProfile } from '@/lib/types'
 import { useState } from 'react'
 
 export default function AccountPage() {
-  const { user, isAdmin, signOut, loading } = useAuth()
+  const { user, isAdmin, role, signOut, loading } = useAuth()
   const router = useRouter()
   const [profile, setProfile] = useState<UserProfile>({})
 
@@ -59,15 +59,26 @@ export default function AccountPage() {
       </div>
 
       {/* Plan tier badge */}
-      <div style={{ marginBottom: 20 }}>
-        <span style={{
-          padding: '5px 12px', borderRadius: 20, fontSize: 11, fontWeight: 700,
-          background: 'var(--accent-bg)', border: '1px solid var(--accent-border)',
-          color: 'var(--accent)', letterSpacing: '0.06em', textTransform: 'uppercase',
-        }}>
-          Free Plan
-        </span>
-      </div>
+      {(() => {
+        const tiers = {
+          admin: { label: 'Admin', color: 'var(--orange)', bg: 'rgba(255,150,50,0.1)', border: 'rgba(255,150,50,0.25)' },
+          beta:  { label: 'Beta Access', color: 'var(--green)', bg: 'rgba(78,201,122,0.1)', border: 'rgba(78,201,122,0.25)' },
+          free:  { label: 'Free Plan', color: 'var(--accent)', bg: 'var(--accent-bg)', border: 'var(--accent-border)' },
+        }
+        const tier = tiers[role] ?? tiers.free
+        return (
+          <div style={{ marginBottom: 20 }}>
+            <span style={{ padding: '5px 12px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: tier.bg, border: `1px solid ${tier.border}`, color: tier.color, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              {tier.label}
+            </span>
+            {role === 'free' && (
+              <p style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 8 }}>
+                Upgrade for full AI plan customization — <span style={{ color: 'var(--accent)', fontWeight: 700 }}>coming soon</span>
+              </p>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Profile summary card */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, marginBottom: 16, overflow: 'hidden' }}>
