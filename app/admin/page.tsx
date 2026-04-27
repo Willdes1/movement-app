@@ -310,11 +310,11 @@ export default function AdminPage() {
             <div key={promo.id} style={rowStyle}>
               <span style={{ fontSize: 14, fontWeight: 800, letterSpacing: '0.08em', minWidth: 110 }}>{promo.code}</span>
               <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, marginRight: 8,
-                background: promo.role === 'beta' ? 'rgba(78,201,122,0.1)' : 'rgba(255,150,50,0.1)',
-                color: promo.role === 'beta' ? 'var(--green)' : 'var(--orange)',
-              }}>{promo.role.toUpperCase()}</span>
+                background: (promo.role ?? 'beta') === 'beta' ? 'rgba(78,201,122,0.1)' : 'rgba(255,150,50,0.1)',
+                color: (promo.role ?? 'beta') === 'beta' ? 'var(--green)' : 'var(--orange)',
+              }}>{(promo.role ?? 'beta').toUpperCase()}</span>
               <span style={{ flex: 1, fontSize: 12, color: 'var(--text-dim)' }}>
-                {promo.uses} / {promo.max_uses} used
+                {promo.uses ?? 0} / {promo.max_uses ?? '∞'} used
               </span>
               <span style={{ fontSize: 11, color: 'var(--text-dim)', marginRight: 8 }}>{fmtDate(promo.created_at)}</span>
               <button onClick={() => deletePromo(promo.id)} style={deleteBtn}>✕</button>
