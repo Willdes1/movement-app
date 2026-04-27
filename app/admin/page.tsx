@@ -8,8 +8,8 @@ type Tab = 'overview' | 'todos' | 'ideas' | 'promos' | 'users'
 
 type TodoRow = { id: string; content: string; category: string; status: string; priority: string; created_at: string; updated_at: string }
 type IdeaRow = { id: string; content: string; category: string; created_at: string }
-type PromoRow = { id: string; code: string; description: string | null; uses_remaining: number; created_at: string }
-type UserRow = { id: string; email: string; full_name: string | null; plan_tier: string; is_admin: boolean; created_at: string }
+type PromoRow = { id: string; code: string; role: string; max_uses: number; uses: number; created_at: string }
+type UserRow = { id: string; email: string; full_name: string | null; role: string; is_admin: boolean; created_at: string }
 
 export default function AdminPage() {
   const { user, isAdmin, loading } = useAuth()
@@ -27,7 +27,7 @@ export default function AdminPage() {
   const [newIdea, setNewIdea] = useState('')
   const [newIdeaCategory, setNewIdeaCategory] = useState('General')
   const [newPromoCode, setNewPromoCode] = useState('')
-  const [newPromoDesc, setNewPromoDesc] = useState('')
+  const [newPromoRole, setNewPromoRole] = useState('beta')
   const [newPromoUses, setNewPromoUses] = useState('')
 
   const [saving, setSaving] = useState(false)
@@ -48,7 +48,7 @@ export default function AdminPage() {
       supabase.from('todos').select('*').order('created_at', { ascending: false }),
       supabase.from('ideas').select('*').order('created_at', { ascending: false }),
       supabase.from('promo_codes').select('*').order('created_at', { ascending: false }),
-      supabase.from('profiles').select('id, email, full_name, plan_tier, is_admin, created_at').order('created_at', { ascending: false }),
+      supabase.from('profiles').select('id, email, full_name, role, is_admin, created_at').order('created_at', { ascending: false }),
     ])
     if (t.data) setTodos(t.data)
     if (i.data) setIdeas(i.data)
@@ -102,11 +102,10 @@ export default function AdminPage() {
     setSaving(true)
     await supabase.from('promo_codes').insert({
       code: newPromoCode.trim().toUpperCase(),
-      description: newPromoDesc.trim() || null,
-      uses_remaining: newPromoUses ? parseInt(newPromoUses) : -1,
+      role: newPromoRole,
+      max_uses: newPromoUses ? parseInt(newPromoUses) : 10,
     })
     setNewPromoCode('')
-    setNewPromoDesc('')
     setNewPromoUses('')
     await fetchAll()
     flash('Promo code created')
@@ -129,7 +128,7 @@ export default function AdminPage() {
   const activeTodos = todos.filter(t => t.status === 'pending')
   const doneTodos = todos.filter(t => t.status === 'done')
   const totalUsers = users.length
-  const proUsers = users.filter(u => u.plan_tier === 'pro').length
+  const betaUsers = users.filter(u => u.role === 'beta').length
 
   return (
     <div style={{ padding: '24px 20px 100px', maxWidth: 700, margin: '0 auto' }}>
@@ -185,7 +184,7 @@ export default function AdminPage() {
       {tab === 'overview' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           {[
-            { label: 'Total Users', value: totalUsers, sub: `${proUsers} pro` },
+            { label: 'Total Users', value: totalUsers, sub: `${betaUsers} beta` },
             { label: 'Active Todos', value: activeTodos.length, sub: `${doneTodos.length} done` },
             { label: 'Ideas Logged', value: ideas.length, sub: 'in backlog' },
             { label: 'Promo Codes', value: promos.length, sub: 'created' },
@@ -286,36 +285,38 @@ export default function AdminPage() {
             <input
               value={newPromoCode}
               onChange={e => setNewPromoCode(e.target.value.toUpperCase())}
-              placeholder="CODE"
-              style={{ ...inputStyle, width: 120, letterSpacing: '0.08em' }}
+              placeholder="CODE (e.g. BETA2026)"
+              style={{ ...inputStyle, flex: 2, letterSpacing: '0.08em' }}
             />
-            <input
-              value={newPromoDesc}
-              onChange={e => setNewPromoDesc(e.target.value)}
-              placeholder="Description (optional)"
-              style={{ ...inputStyle, flex: 1 }}
-            />
+            <select value={newPromoRole} onChange={e => setNewPromoRole(e.target.value)} style={{ ...inputStyle, flex: 1 }}>
+              <option value="beta">Beta Access</option>
+              <option value="admin">Admin</option>
+            </select>
             <input
               value={newPromoUses}
               onChange={e => setNewPromoUses(e.target.value)}
-              placeholder="Max uses (blank = ∞)"
+              placeholder="Max uses (blank = 10)"
               type="number"
-              style={{ ...inputStyle, width: 150 }}
+              style={{ ...inputStyle, flex: 1 }}
             />
             <button onClick={addPromo} disabled={saving} style={addBtnStyle}>Create</button>
           </div>
           <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 20 }}>
-            Leave max uses blank for unlimited. BETA2026 is already active.
+            Each user can only redeem one code. Codes are case-insensitive.
           </p>
 
           {promos.length === 0 && <p style={emptyStyle}>No promo codes yet</p>}
           {promos.map(promo => (
             <div key={promo.id} style={rowStyle}>
-              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.06em', minWidth: 100 }}>{promo.code}</span>
-              <span style={{ flex: 1, fontSize: 13, color: 'var(--text-dim)' }}>{promo.description ?? '—'}</span>
-              <span style={{ fontSize: 12, color: 'var(--text-dim)', marginRight: 8 }}>
-                {promo.uses_remaining === -1 ? '∞ uses' : `${promo.uses_remaining} left`}
+              <span style={{ fontSize: 14, fontWeight: 800, letterSpacing: '0.08em', minWidth: 110 }}>{promo.code}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, marginRight: 8,
+                background: promo.role === 'beta' ? 'rgba(78,201,122,0.1)' : 'rgba(255,150,50,0.1)',
+                color: promo.role === 'beta' ? 'var(--green)' : 'var(--orange)',
+              }}>{promo.role.toUpperCase()}</span>
+              <span style={{ flex: 1, fontSize: 12, color: 'var(--text-dim)' }}>
+                {promo.uses} / {promo.max_uses} used
               </span>
+              <span style={{ fontSize: 11, color: 'var(--text-dim)', marginRight: 8 }}>{fmtDate(promo.created_at)}</span>
               <button onClick={() => deletePromo(promo.id)} style={deleteBtn}>✕</button>
             </div>
           ))}
@@ -326,7 +327,7 @@ export default function AdminPage() {
       {tab === 'users' && (
         <div>
           <p style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 16 }}>
-            {totalUsers} total · {proUsers} pro · {totalUsers - proUsers} free
+            {totalUsers} total · {betaUsers} beta · {totalUsers - betaUsers} free
           </p>
           {users.length === 0 && <p style={emptyStyle}>No users yet</p>}
           {users.map(u => (
@@ -338,10 +339,10 @@ export default function AdminPage() {
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
                 <span style={{
                   padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700,
-                  background: u.plan_tier === 'pro' ? 'rgba(255,92,53,0.12)' : 'var(--surface2)',
-                  color: u.plan_tier === 'pro' ? 'var(--accent)' : 'var(--text-dim)',
+                  background: u.role === 'beta' ? 'rgba(78,201,122,0.1)' : u.role === 'admin' ? 'rgba(255,150,50,0.1)' : 'var(--surface2)',
+                  color: u.role === 'beta' ? 'var(--green)' : u.role === 'admin' ? 'var(--orange)' : 'var(--text-dim)',
                 }}>
-                  {u.plan_tier ?? 'free'}
+                  {u.role ?? 'free'}
                 </span>
                 {u.is_admin && (
                   <span style={{ fontSize: 10, fontWeight: 700, color: '#FFD700', letterSpacing: '0.06em' }}>ADMIN</span>

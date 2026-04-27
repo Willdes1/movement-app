@@ -1,15 +1,19 @@
 'use client'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { supabase } from '@/lib/supabase'
 import { loadProfile } from '@/lib/storage'
 import type { UserProfile } from '@/lib/types'
-import { useState } from 'react'
 
 export default function AccountPage() {
   const { user, isAdmin, role, signOut, loading } = useAuth()
   const router = useRouter()
   const [profile, setProfile] = useState<UserProfile>({})
+  const [promoCode, setPromoCode] = useState('')
+  const [promoLoading, setPromoLoading] = useState(false)
+  const [promoMsg, setPromoMsg] = useState('')
+  const [promoError, setPromoError] = useState('')
 
   useEffect(() => {
     if (!loading && !user) router.replace('/auth')
@@ -23,6 +27,48 @@ export default function AccountPage() {
   async function handleSignOut() {
     await signOut()
     router.push('/auth')
+  }
+
+  async function redeemCode() {
+    if (!promoCode.trim() || !user) return
+    setPromoLoading(true)
+    setPromoError('')
+    setPromoMsg('')
+    const code = promoCode.trim().toUpperCase()
+    try {
+      // Check if user already redeemed any code
+      const { data: existing } = await supabase
+        .from('promo_redemptions').select('id').eq('user_id', user.id).single()
+      if (existing) { setPromoError('You have already redeemed a promo code.'); return }
+
+      // Find the code
+      const { data: promo } = await supabase
+        .from('promo_codes').select('id, role, max_uses, uses, expires_at').eq('code', code).single()
+      if (!promo) { setPromoError('Code not found. Check spelling and try again.'); return }
+
+      // Check expiry
+      if (promo.expires_at && new Date(promo.expires_at) < new Date()) {
+        setPromoError('This code has expired.'); return
+      }
+
+      // Check max uses by counting redemptions
+      if (promo.max_uses > 0) {
+        const { count } = await supabase
+          .from('promo_redemptions').select('*', { count: 'exact', head: true }).eq('code_id', promo.id)
+        if ((count ?? 0) >= promo.max_uses) { setPromoError('This code has reached its maximum uses.'); return }
+      }
+
+      // Grant access
+      await supabase.from('profiles').update({ role: promo.role }).eq('id', user.id)
+      await supabase.from('promo_redemptions').insert({ user_id: user.id, code_id: promo.id })
+
+      setPromoMsg('Code redeemed! Refreshing your account…')
+      setTimeout(() => window.location.reload(), 1500)
+    } catch {
+      setPromoError('Something went wrong. Try again.')
+    } finally {
+      setPromoLoading(false)
+    }
   }
 
   if (loading || !user) return null
@@ -79,6 +125,30 @@ export default function AccountPage() {
           </div>
         )
       })()}
+
+      {/* Promo code redemption — free users only */}
+      {role === 'free' && (
+        <div style={{ marginBottom: 20, padding: '16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14 }}>
+          <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Have a promo code?</p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              value={promoCode}
+              onChange={e => setPromoCode(e.target.value.toUpperCase())}
+              placeholder="ENTER CODE"
+              style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontSize: 13, letterSpacing: '0.06em', fontFamily: 'inherit', outline: 'none' }}
+            />
+            <button
+              onClick={redeemCode}
+              disabled={promoLoading || !promoCode.trim()}
+              style={{ padding: '10px 18px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: promoLoading || !promoCode.trim() ? 'default' : 'pointer', opacity: promoLoading || !promoCode.trim() ? 0.5 : 1 }}
+            >
+              {promoLoading ? '…' : 'Redeem'}
+            </button>
+          </div>
+          {promoMsg && <p style={{ fontSize: 12, color: 'var(--green)', marginTop: 8, fontWeight: 600 }}>{promoMsg}</p>}
+          {promoError && <p style={{ fontSize: 12, color: 'rgba(255,100,100,0.9)', marginTop: 8 }}>{promoError}</p>}
+        </div>
+      )}
 
       {/* Profile summary card */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, marginBottom: 16, overflow: 'hidden' }}>
