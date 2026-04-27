@@ -4,7 +4,6 @@
 ---
 
 ## 🔥 Active / Up Next
-- [ ] **Merge Your Plan into Home dashboard** — Delete "Your Plan" tab. Home becomes the main dashboard with the full weekly plan view (all 7 days, tappable exercise chips, log set, complete button). Replace "Your Plan" tab slot with "Nutrition" tab (placeholder). Updated nav: Home · Nutrition · For You · Calendar · Account (Admin only visible to admins).
 - [ ] Add more recovery playbooks (Shoulder Impingement, Knee Rehab)
 - [ ] Build out Browse & Learn page (exercise library + articles)
 
@@ -57,7 +56,7 @@
 
 ## 🥗 Nutrition Tab (added 2026-04-27)
 > Replaces "Your Plan" tab slot. Placeholder screen first, full build later.
-- [ ] **Placeholder screen** — "We're building this in the background. Stay tuned." Shown immediately after nav merge.
+- [x] **Placeholder screen** — "We're building this in the background. Stay tuned." Shown immediately after nav merge.
 - [ ] **Nutrition profile** — Separate from training profile. Collects: age, weight, height, wake time, first meal time, intermittent fasting preference, goals, known allergies, health conditions (gout, carpal tunnel, lactose intolerance, diabetes, etc.), doctor letters/dietary recommendations (file upload). If training profile or profile picture is incomplete, nudge user to fill those first.
 - [ ] **AI nutrition agent** — Trained at certified-nutritionist level. Reads training plan phase, activity level tracked in app, biometric data (when integrated), and nutrition profile. Generates a 3-month meal plan synchronized to the current workout program: morning to night, what to eat, when to eat, meal timing, and scheduling recommendations.
 - [ ] **Nutrition plan generation** — Paid feature (cost TBD during billing brainstorm). Token-heavy; runs once and stores the plan, not re-generated daily. Plan adapts as workout phase changes (Foundation → Build → Peak → Maintenance).
@@ -88,6 +87,9 @@
 - [ ] Push notifications (streaks, reminders, milestones)
 
 ## ✅ Completed
+- [x] Nav restructure — "Your Plan" tab replaced by "Nutrition" (center tab). Nav: Home · For You · Nutrition · Calendar · Account. Plan page lives at /plan, accessible from Home quick nav.
+- [x] Nutrition placeholder tab — "Building in the Background" screen with what's coming list.
+- [x] Complete Day button — calendar day detail shows "✓ Complete Day" for past/today workout days; saves to `day_completions` table; shows "✓ Completed" on re-open.
 - [x] AI Plan Generator v1 — 3-month (13-week) personalized program with phase progression (Foundation → Build → Peak → Maintenance), lazy week generation, 1-week pre-generation, week navigation
 - [x] Pre-generation instructions box — optional instructions textarea in Regenerate modal
 - [x] Calendar page — monthly grid, color-coded by type, tap-to-detail panel, week/phase label, month navigation, program range dimming
