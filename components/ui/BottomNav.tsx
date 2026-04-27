@@ -24,13 +24,13 @@ const tabs = [
     ),
   },
   {
-    href: '/plan',
-    label: 'Your Plan',
+    href: '/nutrition',
+    label: 'Nutrition',
     center: true,
     icon: (active: boolean) => (
-      <svg width="22" height="22" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-        <rect x="3" y="4" width="18" height="18" rx="2" fillOpacity={active ? 0.15 : 0}/>
-        <path d="M16 2v4M8 2v4M3 10h18"/>
+      <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+        <path d="M3 11h18c0 5.5-4.5 9-9 9s-9-3.5-9-9z" fill={active ? 'currentColor' : 'none'} fillOpacity={active ? 0.2 : 0}/>
+        <path d="M8 3v5M12 2v5M16 3v5" strokeLinecap="round"/>
       </svg>
     ),
   },
@@ -88,7 +88,6 @@ export default function BottomNav() {
 
       {tabs.map(tab => {
         const active = pathname.startsWith(tab.href) || (tab.href === '/account' && pathname.startsWith('/profile'))
-        const isRecoveryTab = tab.href === '/plan' && !!activeRecovery
 
         if (tab.center) {
           return (
@@ -128,7 +127,7 @@ export default function BottomNav() {
                 {tab.icon(active)}
               </div>
               <span style={{ color: active ? 'var(--accent)' : 'var(--text-dim)' }}>
-                {isRecoveryTab ? 'Recovery' : tab.label}
+                {tab.label}
               </span>
             </Link>
           )

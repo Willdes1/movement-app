@@ -91,6 +91,8 @@ export default function CalendarPage() {
   const [exerciseLibrary, setExerciseLibrary] = useState<Record<string, ExerciseDetail>>({})
   const [selectedExercise, setSelectedExercise] = useState<ExerciseDetail | null>(null)
   const [lastLog, setLastLog] = useState<WorkoutLog | null>(null)
+  const [completions, setCompletions] = useState<Set<string>>(new Set())
+  const [completing, setCompleting] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !user) router.replace('/auth')
@@ -111,10 +113,12 @@ export default function CalendarPage() {
     setProgram(program)
     setViewMonth(new Date(prog.start_date))
 
-    const { data: plans } = await supabase
-      .from('weekly_plans')
-      .select('week_number, plan')
-      .eq('program_id', prog.id)
+    const [{ data: plans }, { data: compData }] = await Promise.all([
+      supabase.from('weekly_plans').select('week_number, plan').eq('program_id', prog.id),
+      supabase.from('day_completions').select('week_number, day_index').eq('program_id', prog.id).eq('user_id', user.id),
+    ])
+
+    if (compData) setCompletions(new Set(compData.map(r => `${r.week_number}-${r.day_index}`)))
 
     const map: Record<number, DayPlan[]> = {}
     plans?.forEach(p => { map[p.week_number] = p.plan as DayPlan[] })
@@ -162,6 +166,17 @@ export default function CalendarPage() {
       .then(({ data }) => { if (data) setLastLog(data as WorkoutLog) })
   }, [selectedExercise, user])
 
+  async function completeDay(weekNum: number, dayIdx: number) {
+    if (!program || !user || completing) return
+    setCompleting(true)
+    await supabase.from('day_completions').upsert(
+      { user_id: user.id, program_id: program.id, week_number: weekNum, day_index: dayIdx, skipped: false },
+      { onConflict: 'user_id,program_id,week_number,day_index' }
+    )
+    setCompletions(prev => new Set([...prev, `${weekNum}-${dayIdx}`]))
+    setCompleting(false)
+  }
+
   // Build date → plan day map from all generated weeks
   const dayMap: Record<string, { day: DayPlan; weekNum: number }> = {}
   if (program) {
@@ -205,10 +220,10 @@ export default function CalendarPage() {
           Generate your 13-week program first, then your full calendar will appear here.
         </p>
         <button
-          onClick={() => router.push('/plan')}
+          onClick={() => router.push('/today')}
           style={{ padding: '13px 28px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
         >
-          Go to Your Plan →
+          Go to Home →
         </button>
       </div>
     )
@@ -341,7 +356,7 @@ export default function CalendarPage() {
               style={{ background: 'none', border: 'none', fontSize: 20, color: 'var(--text-dim)', cursor: 'pointer', padding: '0 0 0 12px', lineHeight: 1 }}
             >×</button>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: selectedEntry.day.type !== 'rest' ? 12 : 0 }}>
             {selectedEntry.day.movements.map((m, i) => {
               const detail = exerciseLibrary[normalizeExerciseName(parseExerciseName(m))]
               return (
@@ -360,13 +375,39 @@ export default function CalendarPage() {
               )
             })}
           </div>
+          {(() => {
+            if (!selectedEntry || selectedEntry.day.type === 'rest') return null
+            const dayIdx = (() => {
+              if (!program || !selectedKey) return -1
+              const cellDate = new Date(selectedKey + 'T12:00:00')
+              const start = new Date(program.startDate)
+              const diffDays = Math.floor((cellDate.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+              return diffDays % 7
+            })()
+            if (dayIdx < 0) return null
+            const compKey = `${selectedEntry.weekNum}-${dayIdx}`
+            const done = completions.has(compKey)
+            const isPastOrToday = selectedKey! <= dateKey(new Date())
+            if (!isPastOrToday) return null
+            return done ? (
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#4ec97a' }}>✓ Completed</div>
+            ) : (
+              <button
+                onClick={() => completeDay(selectedEntry.weekNum, dayIdx)}
+                disabled={completing}
+                style={{ width: '100%', padding: '9px', borderRadius: 8, border: '1px solid rgba(78,201,122,0.3)', background: 'rgba(78,201,122,0.08)', color: '#4ec97a', fontWeight: 700, fontSize: 12, cursor: completing ? 'default' : 'pointer', fontFamily: 'inherit', letterSpacing: '0.04em' }}
+              >
+                {completing ? '…' : '✓  Complete Day'}
+              </button>
+            )
+          })()}
         </div>
       )}
 
       {/* Weeks not yet generated notice */}
       {Object.keys(weekPlans).length < TOTAL_WEEKS && (
         <div style={{ marginTop: 20, padding: '12px 16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12, color: 'var(--text-dim)', textAlign: 'center' }}>
-          Weeks generate automatically as you progress. Navigate to <span style={{ color: 'var(--accent)', fontWeight: 700, cursor: 'pointer' }} onClick={() => router.push('/plan')}>Your Plan</span> to view or generate any week.
+          Weeks generate automatically as you progress. Navigate to <span style={{ color: 'var(--accent)', fontWeight: 700, cursor: 'pointer' }} onClick={() => router.push('/today')}>Home</span> to view or generate any week.
         </div>
       )}
 
