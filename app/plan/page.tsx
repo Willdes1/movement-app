@@ -346,7 +346,7 @@ export default function PlanPage() {
         <p style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>Building Week {viewingWeek}…</p>
         <p style={{ fontSize: 13, color, fontWeight: 600, marginBottom: 12 }}>{label}</p>
         <p style={{ color: 'var(--text-dim)', fontSize: 14, lineHeight: 1.6 }}>
-          Your AI coach is designing a personalized 7-day plan. This takes about 10 seconds.
+          Your 3-month program generates week by week — each week is built fresh when you need it. Takes about 10 seconds.
         </p>
       </div>
     )
