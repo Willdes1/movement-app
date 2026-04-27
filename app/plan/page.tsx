@@ -295,8 +295,8 @@ export default function PlanPage() {
 
   useEffect(() => {
     const plan = weekPlans[viewingWeek]
-    if (plan) loadLibraryForWeek(plan)
-  }, [viewingWeek, weekPlans, loadLibraryForWeek])
+    if (plan) populateLibrary(plan)
+  }, [viewingWeek, weekPlans, populateLibrary])
 
   useEffect(() => {
     setLastLog(null)
