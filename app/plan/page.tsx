@@ -28,6 +28,16 @@ type ExerciseDetail = {
   tip: string
 }
 
+type WorkoutLog = {
+  id: string
+  exercise_normalized: string
+  logged_at: string
+  sets: number | null
+  reps: number | null
+  weight: number | null
+  weight_unit: string
+}
+
 function parseExerciseName(movement: string): string {
   return movement
     .replace(/\s+\d+[×x]\d+.*$/i, '')
@@ -128,6 +138,12 @@ export default function PlanPage() {
   const [pendingWeek, setPendingWeek] = useState<number | null>(null)
   const [exerciseLibrary, setExerciseLibrary] = useState<Record<string, ExerciseDetail>>({})
   const [selectedExercise, setSelectedExercise] = useState<ExerciseDetail | null>(null)
+  const [lastLog, setLastLog] = useState<WorkoutLog | null>(null)
+  const [logWeight, setLogWeight] = useState('')
+  const [logSets, setLogSets] = useState('')
+  const [logReps, setLogReps] = useState('')
+  const [logSaving, setLogSaving] = useState(false)
+  const [logSaved, setLogSaved] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !user) router.replace('/auth')
@@ -281,6 +297,48 @@ export default function PlanPage() {
     const plan = weekPlans[viewingWeek]
     if (plan) loadLibraryForWeek(plan)
   }, [viewingWeek, weekPlans, loadLibraryForWeek])
+
+  useEffect(() => {
+    setLastLog(null)
+    setLogWeight('')
+    setLogSets('')
+    setLogReps('')
+    setLogSaved(false)
+    if (!selectedExercise || !user) return
+    supabase
+      .from('workout_logs')
+      .select('id, exercise_normalized, logged_at, sets, reps, weight, weight_unit')
+      .eq('user_id', user.id)
+      .eq('exercise_normalized', selectedExercise.name_normalized)
+      .order('logged_at', { ascending: false })
+      .limit(1)
+      .single()
+      .then(({ data }) => { if (data) setLastLog(data as WorkoutLog) })
+  }, [selectedExercise, user])
+
+  async function logSet() {
+    if (!user || !selectedExercise || logSaving || logSaved) return
+    setLogSaving(true)
+    await supabase.from('workout_logs').insert({
+      user_id: user.id,
+      exercise_normalized: selectedExercise.name_normalized,
+      sets: logSets ? parseInt(logSets) : null,
+      reps: logReps ? parseInt(logReps) : null,
+      weight: logWeight ? parseFloat(logWeight) : null,
+      weight_unit: 'lbs',
+    })
+    const { data } = await supabase
+      .from('workout_logs')
+      .select('id, exercise_normalized, logged_at, sets, reps, weight, weight_unit')
+      .eq('user_id', user.id)
+      .eq('exercise_normalized', selectedExercise.name_normalized)
+      .order('logged_at', { ascending: false })
+      .limit(1)
+      .single()
+    if (data) setLastLog(data as WorkoutLog)
+    setLogSaved(true)
+    setLogSaving(false)
+  }
 
   function navigateWeek(dir: number) {
     const next = viewingWeek + dir
@@ -516,28 +574,85 @@ export default function PlanPage() {
       {selectedExercise && (
         <div
           onClick={() => setSelectedExercise(null)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000, padding: '0 0 0 0' }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000 }}
         >
           <div
             onClick={e => e.stopPropagation()}
-            style={{ background: 'var(--surface)', borderRadius: '20px 20px 0 0', padding: '24px 24px 40px', width: '100%', maxWidth: 480, border: '1px solid var(--border)', borderBottom: 'none' }}
+            style={{ background: 'var(--surface)', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, border: '1px solid var(--border)', borderBottom: 'none', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
-              <p style={{ fontWeight: 800, fontSize: 17, lineHeight: 1.3, paddingRight: 12 }}>{selectedExercise.name_display}</p>
-              <button onClick={() => setSelectedExercise(null)} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--text-dim)', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}>×</button>
+            {/* Fixed header */}
+            <div style={{ padding: '20px 24px 0', flexShrink: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                <p style={{ fontWeight: 800, fontSize: 17, lineHeight: 1.3, paddingRight: 12 }}>{selectedExercise.name_display}</p>
+                <button onClick={() => setSelectedExercise(null)} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--text-dim)', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}>×</button>
+              </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {[
-                { label: 'HOW TO DO IT', text: selectedExercise.how, color: 'var(--text)' },
-                { label: 'BREATHING', text: selectedExercise.breathing, color: 'var(--text-mid)' },
-                { label: 'CORE ENGAGEMENT', text: selectedExercise.core, color: 'var(--text-mid)' },
-                { label: 'COACHING TIP', text: selectedExercise.tip, color: 'var(--accent)' },
-              ].map(({ label, text, color }) => (
-                <div key={label} style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)' }}>
-                  <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--text-dim)', marginBottom: 5, textTransform: 'uppercase' }}>{label}</p>
-                  <p style={{ fontSize: 13, color, lineHeight: 1.65 }}>{text}</p>
+            {/* Scrollable content */}
+            <div style={{ overflowY: 'auto', padding: '0 24px 40px', flexGrow: 1 }}>
+              {/* Last session */}
+              <div style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)', marginBottom: 14 }}>
+                <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--text-dim)', marginBottom: 6, textTransform: 'uppercase' }}>Last Session</p>
+                {lastLog ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    {lastLog.weight != null && (
+                      <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>{lastLog.weight} {lastLog.weight_unit}</span>
+                    )}
+                    {(lastLog.sets != null || lastLog.reps != null) && (
+                      <span style={{ fontSize: 13, color: 'var(--text-mid)' }}>
+                        {[lastLog.sets != null && `${lastLog.sets} sets`, lastLog.reps != null && `${lastLog.reps} reps`].filter(Boolean).join(' · ')}
+                      </span>
+                    )}
+                    <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 'auto' }}>
+                      {new Date(lastLog.logged_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                  </div>
+                ) : (
+                  <p style={{ fontSize: 13, color: 'var(--text-dim)' }}>No sessions logged yet</p>
+                )}
+              </div>
+              {/* Technique cards */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+                {[
+                  { label: 'HOW TO DO IT', text: selectedExercise.how, color: 'var(--text)' },
+                  { label: 'BREATHING', text: selectedExercise.breathing, color: 'var(--text-mid)' },
+                  { label: 'CORE ENGAGEMENT', text: selectedExercise.core, color: 'var(--text-mid)' },
+                  { label: 'COACHING TIP', text: selectedExercise.tip, color: 'var(--accent)' },
+                ].map(({ label, text, color }) => (
+                  <div key={label} style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)' }}>
+                    <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--text-dim)', marginBottom: 5, textTransform: 'uppercase' }}>{label}</p>
+                    <p style={{ fontSize: 13, color, lineHeight: 1.65 }}>{text}</p>
+                  </div>
+                ))}
+              </div>
+              {/* Log set form */}
+              <div style={{ padding: '14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)' }}>
+                <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--text-dim)', marginBottom: 10, textTransform: 'uppercase' }}>Log Set</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
+                  {[
+                    { label: 'Weight (lbs)', value: logWeight, set: setLogWeight },
+                    { label: 'Sets', value: logSets, set: setLogSets },
+                    { label: 'Reps', value: logReps, set: setLogReps },
+                  ].map(({ label, value, set }) => (
+                    <div key={label}>
+                      <p style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 4, letterSpacing: '0.04em' }}>{label}</p>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={value}
+                        onChange={e => { set(e.target.value); setLogSaved(false) }}
+                        style={{ width: '100%', padding: '8px 6px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 15, fontWeight: 700, boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none', textAlign: 'center' }}
+                      />
+                    </div>
+                  ))}
                 </div>
-              ))}
+                <button
+                  onClick={logSet}
+                  disabled={logSaving || logSaved}
+                  style={{ width: '100%', padding: '11px', borderRadius: 8, border: 'none', background: logSaved ? '#4ec97a' : 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: logSaving || logSaved ? 'default' : 'pointer', transition: 'background 0.2s' }}
+                >
+                  {logSaving ? 'Saving…' : logSaved ? '✓ Logged' : 'Log Set'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

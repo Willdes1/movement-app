@@ -41,8 +41,9 @@
 - [ ] **Read-aloud workout instructions** — Speaker button on each exercise reads instructions aloud using text-to-speech. Default: American male voice, with option to switch to female. Audio ducks (lowers) background music while reading, then restores — does not pause it. Designed for eyes-free use mid-workout on both iPhone and Android.
 
 ## 📊 Stats & Tracking (added 2026-04-23)
-- [ ] **Auto-save stats on every workout** — In the background, log sets/reps/weight per exercise per session. On the exercise screen, show "Last time: 25 lb × 3×10" so the user always knows where they left off. No manual input required — auto-captures from the workout flow.
-- [ ] **Cross-plan stat persistence with timestamps** — If a user lifts 45 lb on hang cleans in one plan, that stat appears when the same exercise shows up in any future plan, with date context ("Last done: Apr 10"). Persists across program restarts, plan switches, and recovery periods.
+- [x] **Workout log system** — `workout_logs` table (user_id, exercise_normalized, sets, reps, weight, logged_at). Exercise modal shows "Last Session" card (weight, sets, reps, date) + "Log Set" form with 3 inputs. Logs persist across plans/weeks. Calendar modal shows last session read-only.
+- [ ] **Auto-capture from workout flow** — Currently requires manual tap to log. Future: auto-prompt when marking a session complete.
+- [ ] **Cross-plan stat persistence with timestamps** — Covered by current `workout_logs` design (exercise_normalized is the key). Just needs display in more places as needed.
 
 ## 🎬 Exercise Demos (added 2026-04-23)
 - [ ] **Exercise demo solution** — Evaluate two options: (1) YouTube links that open in-app via embedded player — quick to implement, no hosting cost, but dependent on third-party links staying live. (2) Custom GIFs or muscle-highlight animations — higher quality, fully controlled, bigger production effort. Brainstorm what's realistic for beta vs. what to build for launch.

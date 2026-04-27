@@ -26,6 +26,16 @@ type ExerciseDetail = {
   tip: string
 }
 
+type WorkoutLog = {
+  id: string
+  exercise_normalized: string
+  logged_at: string
+  sets: number | null
+  reps: number | null
+  weight: number | null
+  weight_unit: string
+}
+
 function parseExerciseName(movement: string): string {
   return movement
     .replace(/\s+\d+[×x]\d+.*$/i, '')
@@ -80,6 +90,7 @@ export default function CalendarPage() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [exerciseLibrary, setExerciseLibrary] = useState<Record<string, ExerciseDetail>>({})
   const [selectedExercise, setSelectedExercise] = useState<ExerciseDetail | null>(null)
+  const [lastLog, setLastLog] = useState<WorkoutLog | null>(null)
 
   useEffect(() => {
     if (!authLoading && !user) router.replace('/auth')
@@ -136,6 +147,20 @@ export default function CalendarPage() {
   useEffect(() => {
     if (user) loadData()
   }, [user, loadData])
+
+  useEffect(() => {
+    setLastLog(null)
+    if (!selectedExercise || !user) return
+    supabase
+      .from('workout_logs')
+      .select('id, exercise_normalized, logged_at, sets, reps, weight, weight_unit')
+      .eq('user_id', user.id)
+      .eq('exercise_normalized', selectedExercise.name_normalized)
+      .order('logged_at', { ascending: false })
+      .limit(1)
+      .single()
+      .then(({ data }) => { if (data) setLastLog(data as WorkoutLog) })
+  }, [selectedExercise, user])
 
   // Build date → plan day map from all generated weeks
   const dayMap: Record<string, { day: DayPlan; weekNum: number }> = {}
@@ -353,24 +378,50 @@ export default function CalendarPage() {
         >
           <div
             onClick={e => e.stopPropagation()}
-            style={{ background: 'var(--surface)', borderRadius: '20px 20px 0 0', padding: '24px 24px 40px', width: '100%', maxWidth: 480, border: '1px solid var(--border)', borderBottom: 'none' }}
+            style={{ background: 'var(--surface)', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, border: '1px solid var(--border)', borderBottom: 'none', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
-              <p style={{ fontWeight: 800, fontSize: 17, lineHeight: 1.3, paddingRight: 12 }}>{selectedExercise.name_display}</p>
-              <button onClick={() => setSelectedExercise(null)} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--text-dim)', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}>×</button>
+            <div style={{ padding: '20px 24px 0', flexShrink: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                <p style={{ fontWeight: 800, fontSize: 17, lineHeight: 1.3, paddingRight: 12 }}>{selectedExercise.name_display}</p>
+                <button onClick={() => setSelectedExercise(null)} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--text-dim)', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}>×</button>
+              </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {[
-                { label: 'HOW TO DO IT', text: selectedExercise.how, color: 'var(--text)' },
-                { label: 'BREATHING', text: selectedExercise.breathing, color: 'var(--text-mid)' },
-                { label: 'CORE ENGAGEMENT', text: selectedExercise.core, color: 'var(--text-mid)' },
-                { label: 'COACHING TIP', text: selectedExercise.tip, color: 'var(--accent)' },
-              ].map(({ label, text, color }) => (
-                <div key={label} style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)' }}>
-                  <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--text-dim)', marginBottom: 5, textTransform: 'uppercase' }}>{label}</p>
-                  <p style={{ fontSize: 13, color, lineHeight: 1.65 }}>{text}</p>
-                </div>
-              ))}
+            <div style={{ overflowY: 'auto', padding: '0 24px 40px', flexGrow: 1 }}>
+              {/* Last session (read-only) */}
+              <div style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)', marginBottom: 14 }}>
+                <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--text-dim)', marginBottom: 6, textTransform: 'uppercase' }}>Last Session</p>
+                {lastLog ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    {lastLog.weight != null && (
+                      <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>{lastLog.weight} {lastLog.weight_unit}</span>
+                    )}
+                    {(lastLog.sets != null || lastLog.reps != null) && (
+                      <span style={{ fontSize: 13, color: 'var(--text-mid)' }}>
+                        {[lastLog.sets != null && `${lastLog.sets} sets`, lastLog.reps != null && `${lastLog.reps} reps`].filter(Boolean).join(' · ')}
+                      </span>
+                    )}
+                    <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 'auto' }}>
+                      {new Date(lastLog.logged_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                  </div>
+                ) : (
+                  <p style={{ fontSize: 13, color: 'var(--text-dim)' }}>No sessions logged yet</p>
+                )}
+              </div>
+              {/* Technique cards */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {[
+                  { label: 'HOW TO DO IT', text: selectedExercise.how, color: 'var(--text)' },
+                  { label: 'BREATHING', text: selectedExercise.breathing, color: 'var(--text-mid)' },
+                  { label: 'CORE ENGAGEMENT', text: selectedExercise.core, color: 'var(--text-mid)' },
+                  { label: 'COACHING TIP', text: selectedExercise.tip, color: 'var(--accent)' },
+                ].map(({ label, text, color }) => (
+                  <div key={label} style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)' }}>
+                    <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--text-dim)', marginBottom: 5, textTransform: 'uppercase' }}>{label}</p>
+                    <p style={{ fontSize: 13, color, lineHeight: 1.65 }}>{text}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
