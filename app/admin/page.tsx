@@ -663,7 +663,9 @@ export default function AdminPage() {
               <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.textDim, padding: '4px 10px 6px' }}>{group.label}</p>
               {group.items.map(item => {
                 const active = tab === item.id
-                const badge = item.id === 'todos' ? (activeTodoCount > 0 ? activeTodoCount : null) : null
+                const badge = item.id === 'todos' ? (activeTodoCount > 0 ? activeTodoCount : null)
+                           : item.id === 'ideas' ? (ideas.length > 0 ? ideas.length : null)
+                           : null
                 return (
                   <button key={item.id} onClick={() => setTab(item.id)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', borderRadius: 6, border: 'none', background: active ? C.accentDim : 'none', color: active ? C.accent : C.textMid, fontWeight: active ? 600 : 400, fontSize: 13, cursor: 'pointer', marginBottom: 2, textAlign: 'left', transition: 'all 0.1s', fontFamily: 'inherit' }}>
                     <span>{item.label}</span>
