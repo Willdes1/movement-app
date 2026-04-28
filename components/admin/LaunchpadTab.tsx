@@ -164,11 +164,12 @@ function Panel({ children, style }: { children: React.ReactNode; style?: React.C
 }
 
 // ─── SUB-TAB NAV ──────────────────────────────────────────────────────────────
-type SubTab = 'overview' | 'prompts' | 'assets'
+type SubTab = 'overview' | 'prompts' | 'assets' | 'ai'
 const SUB_TABS: { id: SubTab; label: string }[] = [
   { id: 'overview', label: '📊 Overview' },
   { id: 'prompts', label: '💬 Prompts' },
   { id: 'assets', label: '📁 Assets' },
+  { id: 'ai', label: '✦ AI Generate' },
 ]
 
 // ─── OVERVIEW SECTION ────────────────────────────────────────────────────────
@@ -593,6 +594,303 @@ function AssetsSection() {
   )
 }
 
+// ─── QUICK PROMPTS ───────────────────────────────────────────────────────────
+const QUICK_PROMPTS = [
+  { label: 'Angel Investor Summary', prompt: 'Generate a compelling 1-page angel investor summary document for Move. Include: the problem we solve, our solution, market opportunity ($96B TAM), what\'s already built and working, business model overview, our key differentiators, and a closing call to action. Write it as a polished document ready to share.' },
+  { label: 'Marketing Roadmap', prompt: 'Generate a detailed marketing roadmap document for the Move. marketing team. Include: phase 1 pre-launch community strategy (specific subreddits, communities, content types), phase 2 professional seeding strategy (how to get trainers and PTs on the platform), phase 3 paid acquisition plan (channels, audiences, budgets), and content calendar framework. Make it actionable with specific steps.' },
+  { label: 'Operations Roadmap', prompt: 'Generate an operations roadmap document for Move. Include the 5 development phases with specific deliverables, technology decisions, team roles needed as we scale, infrastructure milestones, and key operational risks with mitigation plans. Format as a structured document for internal team use.' },
+  { label: 'Competitive Analysis', prompt: 'Generate a thorough competitive analysis document for Move. Compare us in detail against Nike Training Club, Whoop, Fitbod, Trainerize, TrueCoach, Athlean-X, and MyFitnessPal. For each competitor: strengths, weaknesses, pricing, user base, and why our platform outperforms them. Include our positioning statement.' },
+  { label: 'Business Model Breakdown', prompt: 'Generate a detailed business model document for Move. Cover: all consumer tiers (Free/Pro/Plus/Supreme) with value props, all B2B professional tiers with value props, the marketplace commission model, the Nuggets module system, revenue projections framework, and the two-sided marketplace flywheel. Include ARPU targets and LTV considerations.' },
+  { label: 'Legal & Compliance Checklist', prompt: 'Generate a legal and compliance checklist document for Move. Cover: medical disclaimer requirements, fitness vs medical advice distinctions, PT/trainer liability language for the B2B portal, privacy policy requirements (GDPR/CCPA), health data handling, App Store and Google Play policy requirements, trademark filing priorities, and AI-generated content ownership. Flag what requires a licensed attorney.' },
+  { label: 'Pitch Deck Outline', prompt: 'Generate a complete pitch deck outline for Move. — 12-15 slides. For each slide: the slide title, key message, bullet points to include, and what visual/chart would work best. Cover: title, problem, solution, product demo narrative, market size, business model, competitive advantage, traction, roadmap, team slide placeholder, financials framework, and the ask.' },
+  { label: 'Partnership Proposal', prompt: 'Generate a partnership proposal document for approaching physical therapy clinics and personal training studios about the Move. professional platform. Cover: the value proposition for their practice, how the B2B portal works, client profile tiers, built-in marketing benefits, revenue-sharing model, onboarding process, and success metrics. Make it persuasive and professional.' },
+]
+
+// ─── MARKDOWN → HTML (lightweight converter) ─────────────────────────────────
+function mdToHtml(md: string): string {
+  return md
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/^---$/gm, '<hr>')
+    .replace(/^[-•] (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul>${m}</ul>`)
+    .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+    .replace(/^(?!<[h|u|l|h|e])(.*\S.*)$/gm, '<p>$1</p>')
+    .replace(/<p><\/p>/g, '')
+    .replace(/\n{2,}/g, '')
+}
+
+// ─── PDF EXPORT ──────────────────────────────────────────────────────────────
+function exportToPDF(title: string, content: string) {
+  const html = mdToHtml(content)
+  const win = window.open('', '_blank')
+  if (!win) { alert('Allow popups to export PDF'); return }
+  win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${title} — Move.</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Georgia, 'Times New Roman', serif;
+      color: #1a1a1a;
+      line-height: 1.7;
+      padding: 56px 72px;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+    .doc-header {
+      border-bottom: 3px solid #FF5C35;
+      padding-bottom: 20px;
+      margin-bottom: 36px;
+    }
+    .doc-brand {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #FF5C35;
+      margin-bottom: 8px;
+    }
+    .doc-title {
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      color: #0d0d0f;
+      margin-bottom: 6px;
+    }
+    .doc-date {
+      font-size: 12px;
+      color: #888;
+    }
+    h1 { font-size: 22px; font-weight: 800; color: #111; margin: 32px 0 12px; }
+    h2 { font-size: 18px; font-weight: 700; color: #222; margin: 28px 0 10px; border-left: 3px solid #FF5C35; padding-left: 12px; }
+    h3 { font-size: 15px; font-weight: 700; color: #333; margin: 20px 0 8px; }
+    p { font-size: 14px; color: #333; margin-bottom: 12px; }
+    ul { margin: 10px 0 16px 20px; }
+    li { font-size: 14px; color: #333; margin-bottom: 6px; line-height: 1.6; }
+    strong { color: #111; }
+    hr { border: none; border-top: 1px solid #e0e0e0; margin: 24px 0; }
+    .doc-footer {
+      margin-top: 60px;
+      padding-top: 16px;
+      border-top: 1px solid #e0e0e0;
+      font-size: 11px;
+      color: #aaa;
+      text-align: center;
+    }
+    @media print {
+      body { padding: 0; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="doc-header">
+    <div class="doc-brand">Move. — Confidential</div>
+    <div class="doc-title">${title}</div>
+    <div class="doc-date">Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+  </div>
+  <div class="doc-body">${html}</div>
+  <div class="doc-footer">Move. — AI-Powered Movement & Recovery Platform &nbsp;|&nbsp; Confidential &nbsp;|&nbsp; ${new Date().getFullYear()}</div>
+  <script>setTimeout(() => window.print(), 400)</script>
+</body>
+</html>`)
+  win.document.close()
+}
+
+// ─── AI GENERATE SECTION ─────────────────────────────────────────────────────
+function AIGenerateSection() {
+  const [prompt, setPrompt] = useState('')
+  const [result, setResult] = useState('')
+  const [docTitle, setDocTitle] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [copied, setCopied] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  async function generate(customPrompt?: string) {
+    const p = (customPrompt ?? prompt).trim()
+    if (!p) return
+    setLoading(true)
+    setResult('')
+    setError('')
+    setDocTitle(p.slice(0, 60) + (p.length > 60 ? '…' : ''))
+
+    try {
+      const res = await fetch('/api/launchpad-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: p }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setResult(data.result)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Generation failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function useQuickPrompt(qp: typeof QUICK_PROMPTS[0]) {
+    setPrompt(qp.prompt)
+    setDocTitle(qp.label)
+    generate(qp.prompt)
+  }
+
+  function copyResult() {
+    navigator.clipboard.writeText(result).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  // Render markdown for preview
+  function renderMd(md: string) {
+    return md
+      .replace(/^### (.+)$/gm, `<div style="font-size:14px;font-weight:700;color:${C.text};margin:18px 0 6px">$1</div>`)
+      .replace(/^## (.+)$/gm, `<div style="font-size:16px;font-weight:800;color:${C.text};margin:22px 0 8px;padding-left:10px;border-left:2px solid ${C.accent}">$1</div>`)
+      .replace(/^# (.+)$/gm, `<div style="font-size:20px;font-weight:900;color:${C.text};margin:24px 0 10px">$1</div>`)
+      .replace(/\*\*(.+?)\*\*/g, `<strong style="color:${C.text}">$1</strong>`)
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/^---$/gm, `<hr style="border:none;border-top:1px solid ${C.border};margin:20px 0">`)
+      .replace(/^[-•] (.+)$/gm, `<div style="display:flex;gap:8px;margin-bottom:5px"><span style="color:${C.accent};flex-shrink:0;margin-top:1px">→</span><span style="font-size:13px;color:${C.textMid};line-height:1.6">$1</span></div>`)
+      .replace(/^\d+\. (.+)$/gm, `<div style="display:flex;gap:8px;margin-bottom:5px"><span style="color:${C.accent};flex-shrink:0;font-weight:700;margin-top:1px">·</span><span style="font-size:13px;color:${C.textMid};line-height:1.6">$1</span></div>`)
+      .replace(/^(?!<div)(.*\S.*)$/gm, `<p style="font-size:13px;color:${C.textMid};line-height:1.75;margin-bottom:8px">$1</p>`)
+      .replace(/<p style[^>]+><\/p>/g, '')
+  }
+
+  return (
+    <div>
+      <p style={{ fontSize: 13, color: C.textDim, marginBottom: 20 }}>
+        Ask anything about the business, request a specific document, or search for information. The AI knows everything about Move. — the product, market, competitors, roadmap, and strategy.
+      </p>
+
+      {/* Search / prompt bar */}
+      <div style={{ background: C.surface, border: `1px solid ${C.accentBorder}`, borderRadius: 12, padding: 16, marginBottom: 20, boxShadow: `0 0 0 3px ${C.accentDim}` }}>
+        <textarea
+          ref={textareaRef}
+          value={prompt}
+          onChange={e => setPrompt(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) generate() }}
+          placeholder='Ask anything — e.g. "Write an updated angel investor summary" or "What are our top 3 competitive advantages?" or "Draft a cold email to a PT clinic"'
+          rows={3}
+          style={{
+            width: '100%', background: 'none', border: 'none', outline: 'none',
+            color: C.text, fontSize: 14, lineHeight: 1.6, resize: 'none',
+            fontFamily: 'inherit', marginBottom: 12,
+          }}
+        />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 11, color: C.textDim }}>⌘ + Enter to generate</span>
+          <button
+            onClick={() => generate()}
+            disabled={loading || !prompt.trim()}
+            style={{
+              padding: '8px 20px', borderRadius: 7, border: 'none',
+              background: loading || !prompt.trim() ? C.surface2 : C.accent,
+              color: loading || !prompt.trim() ? C.textDim : '#fff',
+              fontWeight: 700, fontSize: 13, cursor: loading || !prompt.trim() ? 'not-allowed' : 'pointer',
+              fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            {loading ? (
+              <>
+                <span style={{ display: 'inline-block', width: 10, height: 10, border: `2px solid ${C.textDim}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                Generating…
+              </>
+            ) : '✦ Generate'}
+          </button>
+        </div>
+      </div>
+
+      {/* Quick prompt chips */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 10 }}>Quick Documents</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {QUICK_PROMPTS.map(qp => (
+            <button
+              key={qp.label}
+              onClick={() => useQuickPrompt(qp)}
+              disabled={loading}
+              style={{
+                padding: '6px 14px', borderRadius: 20,
+                border: `1px solid ${C.border}`,
+                background: C.surface2,
+                color: C.textMid, fontSize: 12, fontWeight: 600,
+                cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                transition: 'all 0.15s',
+              }}
+            >
+              {qp.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Loading skeleton */}
+      {loading && (
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 32, textAlign: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, color: C.accent, marginBottom: 10 }}>
+            <span style={{ display: 'inline-block', width: 14, height: 14, border: `2px solid ${C.accentBorder}`, borderTopColor: C.accent, borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+            <span style={{ fontSize: 14, fontWeight: 600 }}>Generating your document…</span>
+          </div>
+          <p style={{ fontSize: 12, color: C.textDim }}>Claude is reading the full business context and drafting your response.</p>
+        </div>
+      )}
+
+      {/* Error */}
+      {error && (
+        <div style={{ padding: '12px 16px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 10, fontSize: 13, color: C.red }}>
+          {error}
+        </div>
+      )}
+
+      {/* Result */}
+      {result && !loading && (
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
+          {/* Result header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', background: C.surface2, borderBottom: `1px solid ${C.border}` }}>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: C.accent, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 2 }}>Generated Document</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{docTitle}</div>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={copyResult}
+                style={{ padding: '7px 14px', borderRadius: 7, border: `1px solid ${copied ? C.green : C.border}`, background: copied ? C.greenDim : 'transparent', color: copied ? C.green : C.textMid, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                {copied ? '✓ Copied' : 'Copy Text'}
+              </button>
+              <button
+                onClick={() => exportToPDF(docTitle, result)}
+                style={{ padding: '7px 14px', borderRadius: 7, border: 'none', background: C.accent, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5 }}
+              >
+                ↓ Export PDF
+              </button>
+            </div>
+          </div>
+
+          {/* Rendered content */}
+          <div
+            style={{ padding: '24px 28px', maxHeight: 640, overflowY: 'auto' }}
+            dangerouslySetInnerHTML={{ __html: renderMd(result) }}
+          />
+        </div>
+      )}
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
+    </div>
+  )
+}
+
 // ─── MAIN EXPORT ─────────────────────────────────────────────────────────────
 export default function LaunchpadTab() {
   const [subTab, setSubTab] = useState<SubTab>('overview')
@@ -634,6 +932,7 @@ export default function LaunchpadTab() {
       {subTab === 'overview' && <OverviewSection />}
       {subTab === 'prompts' && <PromptsSection />}
       {subTab === 'assets' && <AssetsSection />}
+      {subTab === 'ai' && <AIGenerateSection />}
     </div>
   )
 }
