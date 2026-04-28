@@ -98,10 +98,11 @@ const addBtnSt: React.CSSProperties = { padding: '9px 16px', borderRadius: 7, bo
 const deleteBtnSt: React.CSSProperties = { background: 'none', border: 'none', color: C.textDim, cursor: 'pointer', fontSize: 13, padding: '2px 6px', borderRadius: 4, fontFamily: 'inherit' }
 
 // ─── OVERVIEW TAB ─────────────────────────────────────────────────────────────
-function OverviewTab({ users, events, kpis }: {
+function OverviewTab({ users, events, kpis, isMobile }: {
   users: UserStat[]
   events: ActivityEvent[]
   kpis: { label: string; value: string | number; sub: string; accent: string }[]
+  isMobile: boolean
 }) {
   const now = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
   const ACTIVITY_COLOR: Record<string, string> = { signup: C.amber, week: C.accent, complete: C.green, log: C.purple }
@@ -114,7 +115,7 @@ function OverviewTab({ users, events, kpis }: {
       </div>
 
       {/* KPI grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
         {kpis.map(k => (
           <div key={k.label} style={{ padding: '20px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, borderTop: `2px solid ${k.accent}` }}>
             <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: C.textDim, marginBottom: 10 }}>{k.label}</p>
@@ -500,6 +501,8 @@ export default function AdminPage() {
   const { user, isAdmin, loading: authLoading } = useAuth()
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('overview')
+  const [isMobile, setIsMobile] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   // Data state
   const [users, setUsers] = useState<UserStat[]>([])
@@ -509,6 +512,13 @@ export default function AdminPage() {
   const [promos, setPromos] = useState<PromoRow[]>([])
   const [kpis, setKpis] = useState<{ label: string; value: string | number; sub: string; accent: string }[]>([])
   const [dataLoading, setDataLoading] = useState(true)
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   useEffect(() => {
     if (!authLoading && (!user || !isAdmin)) router.replace('/today')
@@ -637,11 +647,35 @@ export default function AdminPage() {
 
   const activeTodoCount = todos.filter(t => t.status === 'pending').length
 
+  function selectTab(t: Tab) {
+    setTab(t)
+    if (isMobile) setSidebarOpen(false)
+  }
+
   return (
     <div style={{ position: 'fixed', inset: 0, display: 'flex', overflow: 'hidden', background: C.bg, color: C.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', zIndex: 50 }}>
 
+      {/* Mobile backdrop */}
+      {isMobile && sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 59 }}
+        />
+      )}
+
       {/* ── Sidebar ── */}
-      <aside style={{ width: 220, flexShrink: 0, background: C.surface, borderRight: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <aside style={{
+        width: 220, background: C.surface, borderRight: `1px solid ${C.border}`,
+        display: 'flex', flexDirection: 'column',
+        ...(isMobile ? {
+          position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 60,
+          transform: sidebarOpen ? 'translateX(0)' : 'translateX(-220px)',
+          transition: 'transform 0.25s ease',
+          boxShadow: sidebarOpen ? '4px 0 32px rgba(0,0,0,0.7)' : 'none',
+        } : {
+          flexShrink: 0, height: '100%',
+        }),
+      }}>
 
         {/* Logo */}
         <div style={{ padding: '22px 20px 18px', borderBottom: `1px solid ${C.border}` }}>
@@ -667,7 +701,7 @@ export default function AdminPage() {
                            : item.id === 'ideas' ? (ideas.length > 0 ? ideas.length : null)
                            : null
                 return (
-                  <button key={item.id} onClick={() => setTab(item.id)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', borderRadius: 6, border: 'none', background: active ? C.accentDim : 'none', color: active ? C.accent : C.textMid, fontWeight: active ? 600 : 400, fontSize: 13, cursor: 'pointer', marginBottom: 2, textAlign: 'left', transition: 'all 0.1s', fontFamily: 'inherit' }}>
+                  <button key={item.id} onClick={() => selectTab(item.id)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', borderRadius: 6, border: 'none', background: active ? C.accentDim : 'none', color: active ? C.accent : C.textMid, fontWeight: active ? 600 : 400, fontSize: 13, cursor: 'pointer', marginBottom: 2, textAlign: 'left', transition: 'all 0.1s', fontFamily: 'inherit' }}>
                     <span>{item.label}</span>
                     {badge && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: active ? C.accentBorder : C.surface2, color: active ? C.accent : C.textDim }}>{badge}</span>}
                   </button>
@@ -690,25 +724,35 @@ export default function AdminPage() {
       </aside>
 
       {/* ── Main ── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', minWidth: 0 }}>
 
         {/* Top bar */}
-        <header style={{ height: 56, borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 28px', background: C.surface, flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <header style={{ height: 56, borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '0 16px' : '0 28px', background: C.surface, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {isMobile && (
+              <button
+                onClick={() => setSidebarOpen(o => !o)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: 6, color: C.textMid, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+                </svg>
+              </button>
+            )}
             <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{NAV_GROUPS.flatMap(g => g.items).find(i => i.id === tab)?.label}</span>
             {dataLoading && <span style={{ fontSize: 11, color: C.textDim }}>· loading…</span>}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: C.accentDim, border: `1px solid ${C.accentBorder}`, color: C.accent, fontWeight: 700, letterSpacing: '0.06em' }}>ADMIN</span>
-            <div style={{ width: 30, height: 30, borderRadius: '50%', background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, color: '#fff' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {!isMobile && <span style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: C.accentDim, border: `1px solid ${C.accentBorder}`, color: C.accent, fontWeight: 700, letterSpacing: '0.06em' }}>ADMIN</span>}
+            <div style={{ width: 30, height: 30, borderRadius: '50%', background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, color: '#fff', flexShrink: 0 }}>
               {user?.email?.[0]?.toUpperCase() ?? 'A'}
             </div>
           </div>
         </header>
 
         {/* Scrollable content */}
-        <main style={{ flex: 1, overflowY: 'auto', padding: '28px 28px 60px' }}>
-          {tab === 'overview' && <OverviewTab users={users} events={events} kpis={kpis} />}
+        <main style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '20px 16px 40px' : '28px 28px 60px' }}>
+          {tab === 'overview' && <OverviewTab users={users} events={events} kpis={kpis} isMobile={isMobile} />}
           {tab === 'users' && <UsersTab users={users} onRoleChange={handleRoleChange} />}
           {tab === 'activity' && <ActivityTab events={events} />}
           {tab === 'todos' && <TodosTab todos={todos} onRefresh={loadAll} />}
