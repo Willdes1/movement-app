@@ -103,7 +103,7 @@ export default function TodayPage() {
   }
 
   return (
-    <div style={{ maxWidth: 480, margin: '0 auto' }}>
+    <div className="page-content">
 
       {/* Header */}
       <div style={{ padding: '24px 16px 16px' }}>

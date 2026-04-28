@@ -185,3 +185,17 @@ input, textarea, select { transition: border-color 0.2s; }
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ── RESPONSIVE LAYOUT ── */
+.app-sidebar { display: none; }
+.app-main { padding-bottom: 80px; min-height: 100vh; }
+.mobile-nav-wrapper { display: block; }
+
+.page-content { max-width: 480px; margin: 0 auto; }
+
+@media (min-width: 768px) {
+  .app-sidebar { display: flex; }
+  .app-main { margin-left: 230px; padding-bottom: 0; }
+  .mobile-nav-wrapper { display: none; }
+  .page-content { max-width: 860px; }
+}

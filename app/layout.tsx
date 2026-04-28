@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { DM_Sans, Space_Mono } from 'next/font/google'
 import './globals.css'
 import BottomNav from '@/components/ui/BottomNav'
+import Sidebar from '@/components/ui/Sidebar'
 import RecoveryBanner from '@/components/ui/RecoveryBanner'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
@@ -45,11 +46,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AuthProvider>
           <ThemeProvider>
             <div className="grain" />
-            <RecoveryBanner />
-            <main style={{ paddingBottom: '80px', minHeight: '100vh' }}>
+            <Sidebar />
+            <main className="app-main">
+              <RecoveryBanner />
               {children}
             </main>
-            <BottomNav />
+            <div className="mobile-nav-wrapper">
+              <BottomNav />
+            </div>
           </ThemeProvider>
         </AuthProvider>
       </body>
