@@ -63,6 +63,8 @@ export default function BottomNav() {
   const pathname = usePathname()
   const { activeRecovery } = useTheme()
 
+  if (pathname.startsWith('/admin')) return null
+
   return (
     <nav style={{
       position: 'fixed',
