@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 
-type DayPlan = { day: string; label: string; type: string; movements: string[]; duration: string }
+type DayPlan = { day: string; label: string; type: string; movements: string[]; duration: string; focus?: string; rest?: { between_sets: string; between_rounds: string }; coaching?: string }
 type Program = { id: string; startDate: string; totalWeeks: number; status: string }
 type ExerciseDetail = { name_normalized: string; name_display: string; how: string; breathing: string; core: string; tip: string }
 type WorkoutLog = { id: string; exercise_normalized: string; logged_at: string; sets: number | null; reps: number | null; weight: number | null; weight_unit: string }
@@ -420,7 +420,8 @@ export default function PlanPage() {
                 const isRest = day.type === 'rest'
                 return (
                   <div key={day.day} style={{ background: isToday ? (TYPE_BG[day.type] ?? 'var(--surface)') : 'var(--surface)', border: `1px solid ${isToday ? (TYPE_BORDER[day.type] ?? 'var(--border)') : 'var(--border)'}`, borderRadius: 12, padding: '14px 16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    {/* Header row */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: (!isRest && (day.focus || day.coaching)) ? 6 : 8 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <span style={{ fontSize: 11, fontWeight: 700, minWidth: 28, letterSpacing: '0.04em', color: TYPE_COLOR[day.type] ?? 'var(--text-dim)' }}>{day.day}</span>
                         <span style={{ fontWeight: 700, fontSize: 14 }}>{day.label}</span>
@@ -430,6 +431,27 @@ export default function PlanPage() {
                         <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{day.duration}</span>
                       </div>
                     </div>
+
+                    {/* Focus, rest protocol, coaching note */}
+                    {!isRest && (day.focus || day.rest || day.coaching) && (
+                      <div style={{ marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
+                        {day.focus && (
+                          <p style={{ fontSize: 11, fontWeight: 700, color: TYPE_COLOR[day.type] ?? 'var(--text-dim)', marginBottom: 4, letterSpacing: '0.02em' }}>{day.focus}</p>
+                        )}
+                        {day.rest && day.rest.between_sets !== '—' && (
+                          <p style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: day.coaching ? 6 : 0 }}>
+                            ⏱ {day.rest.between_sets} between sets · {day.rest.between_rounds} between rounds
+                          </p>
+                        )}
+                        {day.coaching && (
+                          <p style={{ fontSize: 12, color: 'var(--text-mid)', fontStyle: 'italic', lineHeight: 1.55, borderLeft: '2px solid var(--border)', paddingLeft: 8 }}>
+                            {day.coaching}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Movement tags */}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: actionable && !isRest && !completed ? 10 : 0 }}>
                       {day.movements.map((m, mi) => {
                         const detail = exerciseLibrary[normalizeExerciseName(parseExerciseName(m))]
@@ -440,6 +462,7 @@ export default function PlanPage() {
                         )
                       })}
                     </div>
+
                     {actionable && !isRest && !completed && (
                       <button onClick={() => handleCompleteDay(viewingWeek, i)} disabled={completing} style={{ width: '100%', padding: '9px', borderRadius: 8, border: '1px solid rgba(78,201,122,0.3)', background: 'rgba(78,201,122,0.08)', color: '#4ec97a', fontWeight: 700, fontSize: 12, cursor: completing ? 'default' : 'pointer', fontFamily: 'inherit', letterSpacing: '0.04em' }}>
                         {completing ? '…' : '✓  Complete Day'}

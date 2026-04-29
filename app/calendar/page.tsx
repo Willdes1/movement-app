@@ -10,6 +10,9 @@ type DayPlan = {
   type: string
   movements: string[]
   duration: string
+  focus?: string
+  rest?: { between_sets: string; between_rounds: string }
+  coaching?: string
 }
 
 type Program = {

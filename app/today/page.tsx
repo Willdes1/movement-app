@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { supabase } from '@/lib/supabase'
 
-type DayPlan = { day: string; label: string; type: string; movements: string[]; duration: string }
+type DayPlan = { day: string; label: string; type: string; movements: string[]; duration: string; focus?: string; rest?: { between_sets: string; between_rounds: string }; coaching?: string }
 
 const TIPS = [
   'Consistency beats intensity. 10 minutes daily outperforms 1 hour occasionally.',
