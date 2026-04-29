@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JARVIS — Movement Anatomy System</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --void:#020208;--j1:#00d4ff;--j2:#0055ff;--j3:#00ffcc;
+  --dim:rgba(0,180,255,.15);--text:rgba(0,210,255,.85);--faint:rgba(0,180,255,.38);
+}
+body{background:var(--void);color:var(--text);font-family:'Courier New',monospace;height:100vh;overflow:hidden;user-select:none}
+#pcanvas{position:fixed;inset:0;z-index:0;pointer-events:none}
+.grid{position:fixed;inset:0;background-image:linear-gradient(rgba(0,180,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,180,255,.03) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0}
+.radial{position:fixed;inset:0;background:radial-gradient(ellipse 60% 70% at 50% 42%,rgba(0,40,180,.12) 0%,transparent 70%);pointer-events:none;z-index:0}
+.scanlines{position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.06) 2px,rgba(0,0,0,.06) 3px);pointer-events:none;z-index:0;opacity:.4}
+.shell{display:flex;flex-direction:column;height:100vh;position:relative;z-index:1}
+header{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:1px solid rgba(0,180,255,.1);flex-shrink:0}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{font-size:19px;font-weight:900;letter-spacing:-.04em;color:#fff;font-family:-apple-system,sans-serif}
+.logo em{font-style:normal;background:linear-gradient(135deg,#ff5c35,#ff9f60);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.dvd{width:1px;height:20px;background:rgba(0,180,255,.18)}
+.sys{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--j1);font-weight:700}
+.vsw{display:flex;gap:3px;background:rgba(0,100,200,.06);border:1px solid rgba(0,180,255,.13);border-radius:8px;padding:3px}
+.vb{padding:5px 13px;border-radius:6px;border:none;background:none;color:var(--faint);font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;cursor:pointer;transition:all .2s;font-family:'Courier New',monospace}
+.vb.on{background:var(--j1);color:#000}
+.vb:not(.on):hover{color:var(--j1)}
+.hstats{display:flex;align-items:center;gap:18px;font-size:9px;letter-spacing:.1em;text-transform:uppercase}
+.live-s{display:flex;align-items:center;gap:5px;color:#00ff88}
+.pdot{width:5px;height:5px;border-radius:50%;background:#00ff88;box-shadow:0 0 8px #00ff88;animation:bl 2s ease-in-out infinite}
+@keyframes bl{0%,100%{opacity:1}50%{opacity:.2}}
+main{flex:1;display:flex;align-items:center;justify-content:center;gap:16px;padding:12px 18px;overflow:hidden;position:relative}
+.lrail{width:190px;flex-shrink:0}
+.rpanel{background:rgba(0,50,140,.07);border:1px solid rgba(0,180,255,.1);border-radius:8px;padding:11px 13px;margin-bottom:10px}
+.rlabel{font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin-bottom:9px}
+.rrow{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(0,180,255,.06);cursor:pointer;transition:all .15s}
+.rrow:last-child{border-bottom:none}
+.rrow:hover{padding-left:5px}
+.rname{font-size:11px;color:var(--text);font-weight:700}
+.rtag{font-size:8px;font-weight:800;letter-spacing:.07em;padding:2px 6px;border-radius:3px}
+.lt{background:rgba(0,255,136,.14);color:#00ff88}
+.st{background:rgba(255,201,64,.1);color:#ffc940}
+.drow{display:flex;justify-content:space-between;font-size:8px;color:var(--faint);margin-bottom:3px;letter-spacing:.05em}
+.dval{color:var(--j1);font-weight:700}
+#lregion{display:none}
+#lregname{font-size:11px;color:var(--j1);font-weight:700;margin-bottom:3px}
+#lregcoord{font-size:8px;color:var(--faint);line-height:1.5}
+.awrap{position:relative;flex-shrink:0;width:560px;height:600px;display:flex;align-items:center;justify-content:center}
+.hleft,.hright{position:absolute;top:50%;transform:translateY(-50%);width:118px;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.hleft{left:0}
+.hright{right:0}
+.hdblock{background:rgba(0,20,80,.65);border:1px solid rgba(0,180,255,.13);border-radius:7px;padding:9px 10px;backdrop-filter:blur(10px)}
+.hdlbl{font-size:7px;letter-spacing:.16em;text-transform:uppercase;color:rgba(0,180,255,.35);margin-bottom:6px}
+.hdval{font-size:18px;font-weight:900;color:var(--j1);line-height:1;margin-bottom:2px}
+.hdsub{font-size:7px;color:rgba(0,180,255,.4);letter-spacing:.06em}
+.hdbar{margin-top:7px;height:2px;background:rgba(0,180,255,.12);border-radius:1px}
+.hdbarfill{height:100%;border-radius:1px;background:linear-gradient(90deg,var(--j2),var(--j1));animation:fillp 3.2s ease-in-out infinite alternate}
+@keyframes fillp{from{width:72%}to{width:91%}}
+.hdrow{display:flex;justify-content:space-between;font-size:7px;margin-bottom:3px}
+.hdrowk{color:rgba(0,180,255,.4);letter-spacing:.05em}
+.hdrowv{color:var(--j1);font-weight:700}
+.hdstatus{display:inline-flex;align-items:center;gap:4px;font-size:7px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-top:5px}
+.hddot{width:4px;height:4px;border-radius:50%;background:#00ff88;box-shadow:0 0 5px #00ff88;animation:bl 1.8s ease-in-out infinite}
+.oring{position:absolute;top:50%;left:50%;border-radius:50%;border:1px solid rgba(0,180,255,.12);pointer-events:none;transform-style:preserve-3d}
+.or1{width:380px;height:380px;margin:-190px 0 0 -190px;animation:ora 10s linear infinite}
+.or2{width:310px;height:310px;margin:-155px 0 0 -155px;animation:orb 7s linear infinite;border-color:rgba(0,255,180,.08)}
+.or3{width:450px;height:115px;margin:-57px 0 0 -225px;animation:orc 12s linear infinite;border-color:rgba(100,80,255,.08)}
+.or1::after{content:'';position:absolute;width:6px;height:6px;background:var(--j1);border-radius:50%;box-shadow:0 0 12px var(--j1),0 0 24px var(--j1);top:-3px;left:50%;margin-left:-3px}
+.or2::after{content:'';position:absolute;width:5px;height:5px;background:#00ffcc;border-radius:50%;box-shadow:0 0 10px #00ffcc;top:-2.5px;left:50%;margin-left:-2.5px}
+.or3::after{content:'';position:absolute;width:4px;height:4px;background:#8855ff;border-radius:50%;box-shadow:0 0 8px #8855ff;top:-2px;left:50%;margin-left:-2px}
+@keyframes ora{to{transform:rotateZ(360deg)}}
+@keyframes orb{to{transform:rotateX(68deg) rotateZ(-360deg)}}
+@keyframes orc{to{transform:rotateX(82deg) rotateZ(360deg)}}
+.farea{position:relative;width:270px;height:570px}
+.bk{position:absolute;width:24px;height:24px;border-color:rgba(0,200,255,.5);border-style:solid;pointer-events:none;z-index:2}
+.bk.tl{top:0;left:0;border-width:2px 0 0 2px;box-shadow:-2px -2px 8px rgba(0,200,255,.2)}
+.bk.tr{top:0;right:0;border-width:2px 2px 0 0;box-shadow:2px -2px 8px rgba(0,200,255,.2)}
+.bk.bl{bottom:0;left:0;border-width:0 0 2px 2px;box-shadow:-2px 2px 8px rgba(0,200,255,.2)}
+.bk.br{bottom:0;right:0;border-width:0 2px 2px 0;box-shadow:2px 2px 8px rgba(0,200,255,.2)}
+.scanl{position:absolute;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent 0%,rgba(0,220,255,.9) 30%,rgba(0,255,200,.6) 70%,transparent 100%);box-shadow:0 0 8px rgba(0,220,255,.4);animation:scanmv 4.2s ease-in-out infinite;pointer-events:none;z-index:5}
+@keyframes scanmv{0%{top:0;opacity:.8}85%{top:100%;opacity:.4}100%{top:100%;opacity:0}}
+.stage{width:100%;height:100%;transform-style:preserve-3d;will-change:transform}
+.bsvg{width:100%;height:100%;overflow:visible;transition:transform .65s cubic-bezier(.16,1,.3,1)}
+.sstatus{position:absolute;bottom:-22px;left:0;right:0;text-align:center;font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);animation:stbl 3.5s ease-in-out infinite}
+@keyframes stbl{0%,100%{opacity:.3}55%{opacity:.95}}
+.bg{cursor:crosshair;transform-box:fill-box;transform-origin:center;transition:opacity .38s ease,transform .5s cubic-bezier(.34,1.56,.64,1)}
+.bg *{transition:stroke .25s,stroke-width .25s,filter .25s;stroke-linecap:round;stroke-linejoin:round}
+body.vs .bg path,body.vs .bg ellipse,body.vs .bg rect,body.vs .bg circle,body.vs .bg line{stroke:#38bbd8;fill:none;stroke-width:1.5;filter:drop-shadow(0 0 3px rgba(0,180,255,.6))}
+body.vs .bg:hover path,body.vs .bg:hover ellipse,body.vs .bg:hover rect,body.vs .bg:hover circle,body.vs .bg:hover line{stroke:#00ffff;stroke-width:2.2;filter:drop-shadow(0 0 10px rgba(0,255,255,1)) drop-shadow(0 0 22px rgba(0,200,255,.5))}
+body.vs .bg.sel path,body.vs .bg.sel ellipse,body.vs .bg.sel rect,body.vs .bg.sel circle,body.vs .bg.sel line{stroke:#fff;stroke-width:2.5;filter:drop-shadow(0 0 18px #00ffff) drop-shadow(0 0 36px rgba(0,200,255,.6))}
+body.vm .bg path,body.vm .bg ellipse,body.vm .bg rect,body.vm .bg line{stroke:rgba(255,50,90,.55);fill:none;stroke-width:1.3;filter:drop-shadow(0 0 2px rgba(255,60,90,.4))}
+body.vm .bg:hover path,body.vm .bg:hover ellipse{stroke:#ff8899;stroke-width:2;filter:drop-shadow(0 0 9px #ff4466)}
+body.vm .bg.sel path{stroke:#ffc0d0;filter:drop-shadow(0 0 14px #ff3355)}
+body.vm .ml{display:block!important}
+body.vj .bg path,body.vj .bg ellipse,body.vj .bg rect,body.vj .bg line{stroke:rgba(255,195,50,.45);fill:none;stroke-width:1.2}
+body.vj .bg.sel path{stroke:#ffe090;filter:drop-shadow(0 0 12px #ffc940)}
+body.vj .jl{display:block!important}
+body.vl .bg path,body.vl .bg ellipse,body.vl .bg rect,body.vl .bg line{stroke:rgba(150,100,255,.45);fill:none;stroke-width:1.2}
+body.vl .bg.sel path{stroke:#c4aaff;filter:drop-shadow(0 0 12px #9b7fff)}
+body.vl .ll{display:block!important}
+.bg.dim{opacity:.05;transform:scale(.96)}
+.bg.sel{opacity:1!important}
+.ms{fill:rgba(255,50,80,.13);stroke:rgba(255,80,110,.42);stroke-width:1.1}
+.jc{fill:rgba(255,195,50,.11);stroke:rgba(255,195,50,.6);stroke-width:1.8}
+.lne{stroke:rgba(150,100,255,.58);stroke-width:1.8;stroke-dasharray:5 3;fill:none}
+#panel{width:278px;flex-shrink:0;opacity:0;transform:translateX(26px);transition:all .45s cubic-bezier(.16,1,.3,1);pointer-events:none}
+#panel.show{opacity:1;transform:translateX(0);pointer-events:all}
+.pcard{background:rgba(0,15,55,.72);border:1px solid rgba(0,180,255,.18);border-radius:13px;overflow:hidden;backdrop-filter:blur(24px)}
+.phead{padding:15px 18px;border-bottom:1px solid rgba(0,180,255,.1);background:rgba(0,60,180,.07)}
+.peye{font-size:8px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--j1);margin-bottom:5px}
+.ptitle{font-size:18px;font-weight:900;letter-spacing:-.02em;color:#fff;margin-bottom:3px;font-family:-apple-system,sans-serif}
+.psub{font-size:11px;color:var(--faint);line-height:1.55}
+.pbody{padding:14px 18px}
+.slabel{font-size:8px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-bottom:9px}
+.bcard{border-radius:9px;padding:12px;margin-bottom:9px;cursor:pointer;transition:all .2s}
+.bclive{background:rgba(0,255,136,.06);border:1px solid rgba(0,255,136,.18)}
+.bclive:hover{background:rgba(0,255,136,.12)}
+.bcsoon{background:rgba(255,255,255,.02);border:1px solid rgba(0,180,255,.1)}
+.btag{font-size:8px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;padding:2px 7px;border-radius:3px;display:inline-block;margin-bottom:7px}
+.btlive{background:rgba(0,255,136,.14);color:#00ff88}
+.btsoon{background:rgba(255,201,64,.1);color:#ffc940}
+.bname{font-size:13px;font-weight:700;color:#fff;margin-bottom:3px;font-family:-apple-system,sans-serif}
+.bdetail{font-size:11px;color:var(--faint);line-height:1.5}
+.obtn{display:block;width:100%;text-align:center;padding:8px;background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.22);border-radius:6px;font-size:11px;font-weight:700;color:#00ff88;cursor:pointer;margin-top:9px;text-decoration:none;transition:all .2s;font-family:inherit}
+.obtn:hover{background:rgba(0,255,136,.22)}
+.aibox{margin-top:10px;padding:11px;background:rgba(0,100,200,.07);border:1px solid rgba(0,180,255,.11);border-radius:8px}
+.ailbl{font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(0,180,255,.38);margin-bottom:4px}
+.aitxt{font-size:11px;color:var(--faint);line-height:1.5;margin-bottom:7px}
+.aibtn{display:block;text-align:center;padding:6px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);border-radius:5px;font-size:10px;font-weight:700;color:#60a5fa;cursor:pointer;transition:all .2s;font-family:inherit}
+.aibtn:hover{background:rgba(59,130,246,.22)}
+.cbtn{display:flex;align-items:center;justify-content:center;width:100%;padding:10px;background:none;border:none;border-top:1px solid rgba(0,180,255,.1);color:var(--faint);font-size:9px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.12em;text-transform:uppercase;transition:color .2s}
+.cbtn:hover{color:var(--j1)}
+.ptcl{position:fixed;border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%)}
+.rpl{position:fixed;border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);border:2px solid var(--j1);animation:rplout .9s ease-out forwards}
+@keyframes rplout{from{width:0;height:0;opacity:.9}to{width:140px;height:140px;opacity:0;border-width:1px}}
+#tip{position:fixed;pointer-events:none;z-index:500;background:rgba(1,4,22,.96);border:1px solid rgba(0,180,255,.4);border-radius:9px;padding:10px 14px;max-width:220px;opacity:0;transform:translateY(5px);transition:opacity .14s,transform .14s;backdrop-filter:blur(20px)}
+#tip.show{opacity:1;transform:translateY(0)}
+.tname{font-size:12px;font-weight:800;color:var(--j1);margin-bottom:3px}
+.tdesc{font-size:10px;color:var(--faint);line-height:1.5}
+.tcta{font-size:8px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;margin-top:6px}
+footer{padding:9px 24px;border-top:1px solid rgba(0,180,255,.09);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.hint{font-size:9px;color:var(--faint);letter-spacing:.06em;text-transform:uppercase}
+.hint b{color:var(--j1)}
+.awrap{cursor:grab}.awrap:active{cursor:grabbing}
+</style>
+</head>
+<body class="vs">
+<canvas id="pcanvas"></canvas>
+<div class="grid"></div><div class="radial"></div><div class="scanlines"></div>
+
+<div class="shell">
+<header>
+  <div class="brand">
+    <div class="logo">Move<em>.</em></div>
+    <div class="dvd"></div>
+    <div class="sys">Biomechanical Anatomy System v0.3</div>
+  </div>
+  <div class="vsw">
+    <button class="vb on" data-v="vs">Skeleton</button>
+    <button class="vb" data-v="vm">Muscles</button>
+    <button class="vb" data-v="vj">Joints</button>
+    <button class="vb" data-v="vl">Ligaments</button>
+  </div>
+  <div class="hstats">
+    <div class="live-s"><div class="pdot"></div>Protocol Active</div>
+    <div style="color:#ffc940">3 In Dev</div>
+    <div style="color:rgba(0,180,255,.5)">206 Bones</div>
+  </div>
+</header>
+
+<main>
+<div class="lrail">
+  <div class="rpanel">
+    <div class="rlabel">Recovery Protocols</div>
+    <div class="rrow" data-t="si-joint"><span class="rname">SI Joint</span><span class="rtag lt">Live</span></div>
+    <div class="rrow" data-t="left-knee"><span class="rname">Knee Rehab</span><span class="rtag st">Soon</span></div>
+    <div class="rrow" data-t="left-shoulder"><span class="rname">Shoulder</span><span class="rtag st">Soon</span></div>
+    <div class="rrow" data-t="neck"><span class="rname">Cervical Spine</span><span class="rtag st">Soon</span></div>
+  </div>
+  <div class="rpanel">
+    <div class="rlabel">System Readout</div>
+    <div class="drow"><span>Bones Mapped</span><span class="dval">206</span></div>
+    <div class="drow"><span>Joints Tracked</span><span class="dval">360</span></div>
+    <div class="drow"><span>Protocols Online</span><span class="dval">01 / 12</span></div>
+    <div class="drow"><span>System Status</span><span class="dval" style="color:#00ff88">ONLINE</span></div>
+  </div>
+  <div class="rpanel" id="lregion">
+    <div class="rlabel">Locked Region</div>
+    <div id="lregname"></div>
+    <div id="lregcoord"></div>
+  </div>
+</div>
+
+<div class="awrap">
+  <div class="oring or1"></div>
+  <div class="oring or2"></div>
+  <div class="oring or3"></div>
+
+  <div class="hleft">
+    <div class="hdblock">
+      <div class="hdlbl">Neural Sync</div>
+      <div class="hdval" id="nsync">97.4</div>
+      <div class="hdsub">% coherence</div>
+      <div class="hdbar"><div class="hdbarfill"></div></div>
+    </div>
+    <div class="hdblock">
+      <div class="hdlbl">Bone Density</div>
+      <div class="hdrow"><span class="hdrowk">Lumbar</span><span class="hdrowv">1.24</span></div>
+      <div class="hdrow"><span class="hdrowk">Femoral</span><span class="hdrowv">0.98</span></div>
+      <div class="hdrow"><span class="hdrowk">Cortical</span><span class="hdrowv">1.61</span></div>
+    </div>
+  </div>
+
+  <div class="farea">
+    <div class="bk tl"></div><div class="bk tr"></div>
+    <div class="bk bl"></div><div class="bk br"></div>
+    <div class="scanl"></div>
+    <div class="stage" id="stage">
+      <svg class="bsvg" viewBox="0 0 320 640" id="bsvg">
+        <defs>
+          <filter id="bloom" x="-100%" y="-60%" width="300%" height="220%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="18" result="b1"/>
+            <feColorMatrix in="b1" type="matrix" values="0 0 0 0 0  0 0 0 0 0.25  0 0 0 0 1  0 0 0 0.4 0" result="c1"/>
+            <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="b2"/>
+            <feColorMatrix in="b2" type="matrix" values="0 0 0 0 0.05  0 0 0 0 0.5  0 0 0 0 1  0 0 0 0.55 0" result="c2"/>
+            <feMerge><feMergeNode in="c1"/><feMergeNode in="c2"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="gl" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="jglow" x="-200%" y="-200%" width="500%" height="500%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="4"/>
+          </filter>
+        </defs>
+
+        <!-- BODY SILHOUETTE BLOOM -->
+        <g pointer-events="none" filter="url(#bloom)" opacity="0.9">
+          <ellipse cx="160" cy="52" rx="48" ry="52" fill="rgba(0,55,200,0.22)"/>
+          <rect x="148" y="100" width="24" height="40" rx="8" fill="rgba(0,55,200,0.18)"/>
+          <path d="M88,138 L232,138 L210,308 L110,308 Z" fill="rgba(0,55,200,0.18)"/>
+          <path d="M88,148 C72,185 64,224 62,262 L80,262 C82,224 90,185 106,148 Z" fill="rgba(0,55,200,0.15)"/>
+          <path d="M232,148 C248,185 256,224 258,262 L240,262 C238,224 230,185 214,148 Z" fill="rgba(0,55,200,0.15)"/>
+          <path d="M60,260 C54,292 48,325 44,364 L62,364 C64,325 70,292 76,260 Z" fill="rgba(0,55,200,0.13)"/>
+          <path d="M260,260 C266,292 272,325 276,364 L258,364 C256,325 250,292 244,260 Z" fill="rgba(0,55,200,0.13)"/>
+          <ellipse cx="52" cy="380" rx="15" ry="20" fill="rgba(0,55,200,0.11)"/>
+          <ellipse cx="268" cy="380" rx="15" ry="20" fill="rgba(0,55,200,0.11)"/>
+          <path d="M108,306 C88,312 80,328 82,346 L238,346 C240,328 232,312 212,306 Z" fill="rgba(0,55,200,0.17)"/>
+          <path d="M112,342 C96,378 90,430 94,480 L140,480 C142,430 136,378 148,342 Z" fill="rgba(0,55,200,0.14)"/>
+          <path d="M208,342 C224,378 230,430 226,480 L180,480 C178,430 184,378 172,342 Z" fill="rgba(0,55,200,0.14)"/>
+          <path d="M106,494 C100,532 100,568 106,602 L134,602 C134,568 132,532 126,494 Z" fill="rgba(0,55,200,0.12)"/>
+          <path d="M214,494 C220,532 220,568 214,602 L186,602 C186,568 188,532 194,494 Z" fill="rgba(0,55,200,0.12)"/>
+          <ellipse cx="114" cy="618" rx="28" ry="11" fill="rgba(0,55,200,0.11)"/>
+          <ellipse cx="206" cy="618" rx="28" ry="11" fill="rgba(0,55,200,0.11)"/>
+        </g>
+
+        <!-- SKULL -->
+        <g class="bg" data-r="head" data-l="Skull &amp; Cranium" data-d="22 bones protect the brain and form the facial structure. Cranial sutures fuse during development. The temporal bone houses the inner ear and auditory ossicles.">
+          <ellipse cx="160" cy="52" rx="46" ry="50"/>
+          <ellipse cx="144" cy="46" rx="11" ry="8.5"/>
+          <ellipse cx="176" cy="46" rx="11" ry="8.5"/>
+          <path d="M154 56 L151 68 L160 72 L169 68 L166 56 Z"/>
+          <path d="M120 64 Q116 74 120 84"/><path d="M200 64 Q204 74 200 84"/>
+          <path d="M119 82 Q119 100 129 107 Q160 116 191 107 Q201 100 201 82"/>
+          <line x1="132" y1="106" x2="188" y2="106"/>
+          <path d="M160 6 L160 36" stroke-width=".8" opacity=".5"/>
+          <path d="M122 28 Q140 26 160 24 Q180 26 198 28" stroke-width=".8" opacity=".4"/>
+        </g>
+
+        <!-- CERVICAL SPINE -->
+        <g class="bg" data-r="neck" data-l="Cervical Spine (C1–C7)" data-d="7 vertebrae supporting the skull. C1 (atlas) allows nodding; C2 (axis) allows rotation. Whiplash and disc herniation causing arm pain are common injuries.">
+          <rect x="152" y="116" width="16" height="5" rx="2"/>
+          <rect x="152" y="123" width="16" height="5" rx="2"/>
+          <rect x="152" y="130" width="16" height="5" rx="2"/>
+          <line x1="150" y1="118" x2="144" y2="121"/><line x1="170" y1="118" x2="176" y2="121"/>
+          <line x1="150" y1="125" x2="144" y2="128"/><line x1="170" y1="125" x2="176" y2="128"/>
+          <line x1="150" y1="132" x2="144" y2="135"/><line x1="170" y1="132" x2="176" y2="135"/>
+        </g>
+
+        <!-- LEFT SHOULDER -->
+        <g class="bg" data-r="left-shoulder" data-l="Left Shoulder Girdle" data-d="Clavicle + scapula. The glenohumeral joint allows the widest range of motion of any joint — at the cost of stability. Rotator cuff tears are the most common shoulder injury.">
+          <path d="M155 138 C140 134 115 131 86 146"/>
+          <path d="M84 148 L78 185 L105 179 Z"/>
+          <line x1="78" y1="167" x2="105" y2="163"/>
+          <path d="M86 148 Q80 158 78 168" stroke-width=".9" opacity=".5"/>
+        </g>
+
+        <!-- RIGHT SHOULDER -->
+        <g class="bg" data-r="right-shoulder" data-l="Right Shoulder Girdle" data-d="The rotator cuff (SITS: supraspinatus, infraspinatus, teres minor, subscapularis) stabilizes the humeral head. Impingement occurs when the supraspinatus is compressed under the acromion.">
+          <path d="M165 138 C180 134 205 131 234 146"/>
+          <path d="M236 148 L242 185 L215 179 Z"/>
+          <line x1="242" y1="167" x2="215" y2="163"/>
+          <path d="M234 148 Q240 158 242 168" stroke-width=".9" opacity=".5"/>
+        </g>
+
+        <!-- RIBCAGE + STERNUM -->
+        <g class="bg" data-r="chest" data-l="Ribcage &amp; Sternum" data-d="12 rib pairs protect the heart and lungs. True ribs 1–7 attach directly to sternum via costal cartilage. False ribs 8–10 share cartilage. Floating ribs 11–12 have no anterior attachment.">
+          <rect x="156" y="138" width="8" height="90" rx="2.5"/>
+          <path d="M158 146 C131 144 111 154 106 166"/>
+          <path d="M158 157 C129 154 107 166 102 181"/>
+          <path d="M158 168 C127 165 104 177 99 194"/>
+          <path d="M158 179 C126 176 102 188 98 207"/>
+          <path d="M158 190 C126 187 102 199 99 219"/>
+          <path d="M158 200 C127 197 104 208 102 228"/>
+          <path d="M162 146 C189 144 209 154 214 166"/>
+          <path d="M162 157 C191 154 213 166 218 181"/>
+          <path d="M162 168 C193 165 216 177 221 194"/>
+          <path d="M162 179 C194 176 218 188 222 207"/>
+          <path d="M162 190 C194 187 218 199 221 219"/>
+          <path d="M162 200 C193 197 216 208 218 228"/>
+        </g>
+
+        <!-- THORACIC + LUMBAR SPINE -->
+        <g class="bg" data-r="spine" data-l="Thoracic &amp; Lumbar Spine" data-d="T1–T12 thoracic attach to ribs. L1–L5 lumbar are the largest, bearing the most load. L4-L5 disc herniation compresses the sciatic nerve, causing radiating leg pain (sciatica).">
+          <rect x="154" y="143" width="12" height="4" rx="1"/><rect x="154" y="149" width="12" height="4" rx="1"/>
+          <rect x="154" y="155" width="12" height="4" rx="1"/><rect x="154" y="161" width="12" height="4" rx="1"/>
+          <rect x="154" y="167" width="12" height="4" rx="1"/><rect x="154" y="173" width="12" height="4" rx="1"/>
+          <rect x="154" y="179" width="12" height="4" rx="1"/><rect x="154" y="185" width="12" height="4" rx="1"/>
+          <rect x="154" y="191" width="12" height="4" rx="1"/><rect x="154" y="197" width="12" height="4" rx="1"/>
+          <rect x="154" y="203" width="12" height="4" rx="1"/><rect x="154" y="209" width="12" height="4" rx="1"/>
+          <rect x="152" y="217" width="16" height="6" rx="1.5"/><rect x="152" y="225" width="16" height="6" rx="1.5"/>
+          <rect x="152" y="233" width="16" height="6" rx="1.5"/><rect x="152" y="241" width="16" height="6" rx="1.5"/>
+          <rect x="152" y="249" width="16" height="6" rx="1.5"/>
+        </g>
+
+        <!-- SI JOINT -->
+        <g class="bg" data-r="si-joint" data-l="Sacroiliac Joint" data-d="Connects the sacrum to the ilium bilaterally. Causes 25% of all lower back pain — often misdiagnosed as lumbar disc herniation. Deep glute and posterior hip pain are the hallmarks.">
+          <path d="M150 258 L147 292 L160 305 L173 292 L170 258 Z"/>
+          <path d="M147 262 C133 267 125 281 129 297"/>
+          <path d="M173 262 C187 267 195 281 191 297"/>
+          <ellipse cx="148" cy="275" rx="7.5" ry="15"/>
+          <ellipse cx="172" cy="275" rx="7.5" ry="15"/>
+        </g>
+
+        <!-- LEFT HIP -->
+        <g class="bg" data-r="left-hip" data-l="Left Hip" data-d="Ball-and-socket joint. The femoral head articulates with the acetabulum. FAI (femoroacetabular impingement) and labral tears are common in squatters and cyclists.">
+          <path d="M147 267 C122 258 101 268 95 287 L95 322 Q107 342 136 340 L140 307 Z"/>
+        </g>
+
+        <!-- RIGHT HIP -->
+        <g class="bg" data-r="right-hip" data-l="Right Hip" data-d="The iliotibial band runs from the iliac crest to the lateral knee. IT band syndrome causes lateral hip-to-knee pain in runners from friction at the lateral femoral condyle.">
+          <path d="M173 267 C198 258 219 268 225 287 L225 322 Q213 342 184 340 L180 307 Z"/>
+        </g>
+
+        <!-- PUBIS -->
+        <g class="bg" data-r="pelvis" data-l="Pubic Symphysis" data-d="Fibrocartilaginous joint at the anterior pelvis. Osteitis pubis causes midline groin pain in kicking sports and distance runners from repetitive adductor and abdominal stress.">
+          <path d="M137 340 Q160 352 183 340"/>
+          <ellipse cx="160" cy="344" rx="16" ry="9"/>
+        </g>
+
+        <!-- LEFT HUMERUS -->
+        <g class="bg" data-r="left-upper-arm" data-l="Left Humerus" data-d="Upper arm bone spanning shoulder to elbow. The biceps long head tendon runs in the bicipital groove. Tennis elbow originates at the lateral epicondyle from wrist extensor overuse.">
+          <path d="M82 150 L66 256" stroke-width="4"/>
+          <circle cx="82" cy="148" r="8"/>
+          <ellipse cx="65" cy="258" rx="9.5" ry="7"/>
+        </g>
+
+        <!-- LEFT FOREARM -->
+        <g class="bg" data-r="left-forearm" data-l="Left Forearm" data-d="Radius (lateral) and ulna (medial). They allow pronation and supination. Distal radius fracture (Colles') is the most common wrist fracture — from a fall on an outstretched hand.">
+          <path d="M60 264 L46 362"/>
+          <path d="M71 264 L60 360"/>
+        </g>
+
+        <!-- LEFT HAND -->
+        <g class="bg" data-r="left-hand" data-l="Left Hand &amp; Wrist" data-d="27 bones. The scaphoid fractures silently and is missed on X-ray. Carpal tunnel compresses the median nerve causing thumb-side numbness, tingling, and thenar weakness.">
+          <ellipse cx="52" cy="368" rx="13" ry="9"/>
+          <line x1="43" y1="374" x2="34" y2="402"/>
+          <line x1="49" y1="376" x2="42" y2="406"/>
+          <line x1="55" y1="377" x2="50" y2="409"/>
+          <line x1="61" y1="376" x2="58" y2="406"/>
+          <line x1="66" y1="372" x2="66" y2="396"/>
+        </g>
+
+        <!-- RIGHT HUMERUS -->
+        <g class="bg" data-r="right-upper-arm" data-l="Right Humerus" data-d="Spiral fractures of the humeral shaft can damage the radial nerve (wrist drop). The deltoid tuberosity mid-shaft is where the deltoid muscle attaches.">
+          <path d="M238 150 L254 256" stroke-width="4"/>
+          <circle cx="238" cy="148" r="8"/>
+          <ellipse cx="255" cy="258" rx="9.5" ry="7"/>
+        </g>
+
+        <!-- RIGHT FOREARM -->
+        <g class="bg" data-r="right-forearm" data-l="Right Forearm" data-d="Golfer's elbow (medial epicondylitis) affects the flexor-pronator origin. The interosseous membrane connects radius and ulna along their length, transmitting force between bones.">
+          <path d="M260 264 L274 362"/>
+          <path d="M249 264 L260 360"/>
+        </g>
+
+        <!-- RIGHT HAND -->
+        <g class="bg" data-r="right-hand" data-l="Right Hand &amp; Wrist" data-d="De Quervain's tenosynovitis affects the APL and EPB tendons at the radial styloid — presents as radial wrist pain with thumb use. Trigger finger affects the A1 pulley.">
+          <ellipse cx="268" cy="368" rx="13" ry="9"/>
+          <line x1="277" y1="374" x2="286" y2="402"/>
+          <line x1="271" y1="376" x2="278" y2="406"/>
+          <line x1="265" y1="377" x2="270" y2="409"/>
+          <line x1="259" y1="376" x2="262" y2="406"/>
+          <line x1="254" y1="372" x2="254" y2="396"/>
+        </g>
+
+        <!-- LEFT FEMUR -->
+        <g class="bg" data-r="left-thigh" data-l="Left Femur" data-d="Longest, strongest bone in the body. The IT band attaches at Gerdy's tubercle distally. Femoral neck fractures in elderly from osteoporosis. Femoral stress fractures in distance runners.">
+          <path d="M133 342 L127 478" stroke-width="5"/>
+          <circle cx="133" cy="340" r="11.5"/>
+        </g>
+
+        <!-- RIGHT FEMUR -->
+        <g class="bg" data-r="right-thigh" data-l="Right Femur" data-d="Distal femur forms the knee joint via medial and lateral condyles. Hamstrings attach at the ischial tuberosity proximally and the tibia/fibula distally.">
+          <path d="M187 342 L193 478" stroke-width="5"/>
+          <circle cx="187" cy="340" r="11.5"/>
+        </g>
+
+        <!-- LEFT KNEE -->
+        <g class="bg" data-r="left-knee" data-l="Left Knee" data-d="ACL, PCL, MCL, LCL + medial/lateral menisci. ACL tears peak in cutting/pivoting sports. Patellar tendinopathy (jumper's knee) from overloading. Meniscus tears from twisting.">
+          <ellipse cx="125" cy="482" rx="16" ry="12"/>
+          <ellipse cx="120" cy="479" rx="10" ry="8"/>
+          <path d="M109 482 Q106 490 110 497" stroke-width=".9" opacity=".5"/>
+          <path d="M141 482 Q144 490 140 497" stroke-width=".9" opacity=".5"/>
+        </g>
+
+        <!-- RIGHT KNEE -->
+        <g class="bg" data-r="right-knee" data-l="Right Knee" data-d="The knee is the most frequently injured joint in sport. PFPS (runner's knee) from patellar maltracking. Pes anserine bursitis affects medial tibial flare in runners and cyclists.">
+          <ellipse cx="195" cy="482" rx="16" ry="12"/>
+          <ellipse cx="200" cy="479" rx="10" ry="8"/>
+          <path d="M211 482 Q214 490 210 497" stroke-width=".9" opacity=".5"/>
+          <path d="M179 482 Q176 490 180 497" stroke-width=".9" opacity=".5"/>
+        </g>
+
+        <!-- LEFT LOWER LEG -->
+        <g class="bg" data-r="left-lower-leg" data-l="Left Tibia &amp; Fibula" data-d="Tibia bears 85% of body weight. Fibula provides rotational stability and forms the lateral ankle mortise. Medial tibial stress syndrome (shin splints) affects the tibial periosteum.">
+          <path d="M121 494 L117 592" stroke-width="4"/>
+          <line x1="132" y1="494" x2="131" y2="587"/>
+        </g>
+
+        <!-- RIGHT LOWER LEG -->
+        <g class="bg" data-r="right-lower-leg" data-l="Right Tibia &amp; Fibula" data-d="Fibula stress fractures occur 5–6 cm proximal to the lateral malleolus in distance runners. Compartment syndrome causes chronic exertional pain during activity that resolves with rest.">
+          <path d="M199 494 L203 592" stroke-width="4"/>
+          <line x1="188" y1="494" x2="189" y2="587"/>
+        </g>
+
+        <!-- LEFT FOOT -->
+        <g class="bg" data-r="left-foot" data-l="Left Foot &amp; Ankle" data-d="26 bones. ATFL is the most commonly sprained ligament in the body. Plantar fasciitis causes heel pain from fascial micro-tearing. Achilles tendinopathy from repetitive loading.">
+          <ellipse cx="117" cy="594" rx="14" ry="9"/>
+          <path d="M103 594 L89 606 L93 617 Q117 630 145 618 L143 594"/>
+          <line x1="97" y1="610" x2="94" y2="627"/><line x1="108" y1="617" x2="107" y2="633"/>
+          <line x1="121" y1="621" x2="121" y2="637"/><line x1="133" y1="619" x2="134" y2="634"/>
+          <line x1="142" y1="614" x2="143" y2="626"/>
+        </g>
+
+        <!-- RIGHT FOOT -->
+        <g class="bg" data-r="right-foot" data-l="Right Foot &amp; Ankle" data-d="Subtalar joint controls inversion/eversion. Overpronation shifts load medially through the entire kinetic chain — contributing to shin splints, knee pain, hip impingement, and SI joint dysfunction.">
+          <ellipse cx="203" cy="594" rx="14" ry="9"/>
+          <path d="M217 594 L231 606 L227 617 Q203 630 175 618 L177 594"/>
+          <line x1="223" y1="610" x2="226" y2="627"/><line x1="212" y1="617" x2="213" y2="633"/>
+          <line x1="199" y1="621" x2="199" y2="637"/><line x1="187" y1="619" x2="186" y2="634"/>
+          <line x1="178" y1="614" x2="177" y2="626"/>
+        </g>
+
+        <!-- COLORFUL JOINT NODES -->
+        <g pointer-events="none">
+          <!-- Cyan: head/cervical junction -->
+          <circle cx="160" cy="140" r="13" fill="rgba(0,255,255,0.04)" stroke="rgba(0,255,255,0.12)" stroke-width="1"/>
+          <circle cx="160" cy="140" r="6" fill="rgba(0,255,255,0.1)" stroke="rgba(0,255,255,0.5)" stroke-width="1.2"><animate attributeName="r" values="6;8.5;6" dur="2.4s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;0.45;1" dur="2.4s" repeatCount="indefinite"/></circle>
+          <circle cx="160" cy="140" r="2.5" fill="#00ffff"/><circle cx="160" cy="140" r="6" fill="rgba(0,255,255,0.3)" filter="url(#jglow)"/>
+
+          <!-- Violet: shoulders -->
+          <circle cx="82" cy="148" r="14" fill="rgba(136,80,255,0.04)" stroke="rgba(136,80,255,0.1)" stroke-width="1"/>
+          <circle cx="82" cy="148" r="7" fill="rgba(136,80,255,0.1)" stroke="rgba(136,80,255,0.5)" stroke-width="1.2"><animate attributeName="r" values="7;9.5;7" dur="2.1s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;0.4;1" dur="2.1s" repeatCount="indefinite"/></circle>
+          <circle cx="82" cy="148" r="3" fill="#8855ff"/><circle cx="82" cy="148" r="7" fill="rgba(136,80,255,0.3)" filter="url(#jglow)"/>
+
+          <circle cx="238" cy="148" r="14" fill="rgba(136,80,255,0.04)" stroke="rgba(136,80,255,0.1)" stroke-width="1"/>
+          <circle cx="238" cy="148" r="7" fill="rgba(136,80,255,0.1)" stroke="rgba(136,80,255,0.5)" stroke-width="1.2"><animate attributeName="r" values="7;9.5;7" dur="2.1s" repeatCount="indefinite" begin="-1.05s"/><animate attributeName="opacity" values="1;0.4;1" dur="2.1s" repeatCount="indefinite" begin="-1.05s"/></circle>
+          <circle cx="238" cy="148" r="3" fill="#8855ff"/><circle cx="238" cy="148" r="7" fill="rgba(136,80,255,0.3)" filter="url(#jglow)"/>
+
+          <!-- Teal: elbows -->
+          <circle cx="65" cy="258" r="11" fill="rgba(0,200,170,0.04)" stroke="rgba(0,200,170,0.15)" stroke-width="1"/>
+          <circle cx="65" cy="258" r="5" fill="rgba(0,200,170,0.12)" stroke="rgba(0,200,170,0.5)" stroke-width="1"><animate attributeName="r" values="5;7;5" dur="2.6s" repeatCount="indefinite"/></circle>
+          <circle cx="65" cy="258" r="2" fill="#00ccaa"/><circle cx="65" cy="258" r="5" fill="rgba(0,200,170,0.3)" filter="url(#jglow)"/>
+
+          <circle cx="255" cy="258" r="11" fill="rgba(0,200,170,0.04)" stroke="rgba(0,200,170,0.15)" stroke-width="1"/>
+          <circle cx="255" cy="258" r="5" fill="rgba(0,200,170,0.12)" stroke="rgba(0,200,170,0.5)" stroke-width="1"><animate attributeName="r" values="5;7;5" dur="2.6s" repeatCount="indefinite" begin="-1.3s"/></circle>
+          <circle cx="255" cy="258" r="2" fill="#00ccaa"/><circle cx="255" cy="258" r="5" fill="rgba(0,200,170,0.3)" filter="url(#jglow)"/>
+
+          <!-- Mint: wrists -->
+          <circle cx="52" cy="366" r="8" fill="rgba(0,220,140,0.04)" stroke="rgba(0,220,140,0.18)" stroke-width="1"/>
+          <circle cx="52" cy="366" r="3.5" fill="rgba(0,220,140,0.12)" stroke="rgba(0,220,140,0.5)" stroke-width="1"><animate attributeName="r" values="3.5;5.5;3.5" dur="3s" repeatCount="indefinite"/></circle>
+          <circle cx="52" cy="366" r="1.8" fill="#00dd88"/>
+
+          <circle cx="268" cy="366" r="8" fill="rgba(0,220,140,0.04)" stroke="rgba(0,220,140,0.18)" stroke-width="1"/>
+          <circle cx="268" cy="366" r="3.5" fill="rgba(0,220,140,0.12)" stroke="rgba(0,220,140,0.5)" stroke-width="1"><animate attributeName="r" values="3.5;5.5;3.5" dur="3s" repeatCount="indefinite" begin="-1.5s"/></circle>
+          <circle cx="268" cy="366" r="1.8" fill="#00dd88"/>
+
+          <!-- Red: SI joint (active protocol) -->
+          <circle cx="148" cy="275" r="16" fill="rgba(255,40,60,0.06)" stroke="rgba(255,40,60,0.18)" stroke-width="1.2"/>
+          <circle cx="148" cy="275" r="9" fill="rgba(255,40,60,0.12)" stroke="rgba(255,60,80,0.65)" stroke-width="1.5"><animate attributeName="r" values="9;12;9" dur="1.7s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;0.35;1" dur="1.7s" repeatCount="indefinite"/></circle>
+          <circle cx="148" cy="275" r="3.5" fill="#ff3344"/><circle cx="148" cy="275" r="9" fill="rgba(255,40,60,0.4)" filter="url(#jglow)"/>
+
+          <circle cx="172" cy="275" r="16" fill="rgba(255,40,60,0.06)" stroke="rgba(255,40,60,0.18)" stroke-width="1.2"/>
+          <circle cx="172" cy="275" r="9" fill="rgba(255,40,60,0.12)" stroke="rgba(255,60,80,0.65)" stroke-width="1.5"><animate attributeName="r" values="9;12;9" dur="1.7s" repeatCount="indefinite" begin="-0.85s"/><animate attributeName="opacity" values="1;0.35;1" dur="1.7s" repeatCount="indefinite" begin="-0.85s"/></circle>
+          <circle cx="172" cy="275" r="3.5" fill="#ff3344"/><circle cx="172" cy="275" r="9" fill="rgba(255,40,60,0.4)" filter="url(#jglow)"/>
+
+          <!-- Orange: hips -->
+          <circle cx="133" cy="338" r="15" fill="rgba(255,110,30,0.04)" stroke="rgba(255,110,30,0.14)" stroke-width="1"/>
+          <circle cx="133" cy="338" r="7" fill="rgba(255,110,30,0.1)" stroke="rgba(255,120,40,0.5)" stroke-width="1.2"><animate attributeName="r" values="7;9.5;7" dur="2.3s" repeatCount="indefinite"/></circle>
+          <circle cx="133" cy="338" r="3" fill="#ff7722"/><circle cx="133" cy="338" r="7" fill="rgba(255,110,30,0.3)" filter="url(#jglow)"/>
+
+          <circle cx="187" cy="338" r="15" fill="rgba(255,110,30,0.04)" stroke="rgba(255,110,30,0.14)" stroke-width="1"/>
+          <circle cx="187" cy="338" r="7" fill="rgba(255,110,30,0.1)" stroke="rgba(255,120,40,0.5)" stroke-width="1.2"><animate attributeName="r" values="7;9.5;7" dur="2.3s" repeatCount="indefinite" begin="-1.15s"/></circle>
+          <circle cx="187" cy="338" r="3" fill="#ff7722"/><circle cx="187" cy="338" r="7" fill="rgba(255,110,30,0.3)" filter="url(#jglow)"/>
+
+          <!-- Amber: knees -->
+          <circle cx="125" cy="482" r="15" fill="rgba(255,200,30,0.04)" stroke="rgba(255,200,30,0.13)" stroke-width="1"/>
+          <circle cx="125" cy="482" r="7" fill="rgba(255,200,30,0.1)" stroke="rgba(255,200,40,0.45)" stroke-width="1.1"><animate attributeName="r" values="7;9;7" dur="2.5s" repeatCount="indefinite"/></circle>
+          <circle cx="125" cy="482" r="3" fill="#ffcc22"/><circle cx="125" cy="482" r="7" fill="rgba(255,200,30,0.3)" filter="url(#jglow)"/>
+
+          <circle cx="195" cy="482" r="15" fill="rgba(255,200,30,0.04)" stroke="rgba(255,200,30,0.13)" stroke-width="1"/>
+          <circle cx="195" cy="482" r="7" fill="rgba(255,200,30,0.1)" stroke="rgba(255,200,40,0.45)" stroke-width="1.1"><animate attributeName="r" values="7;9;7" dur="2.5s" repeatCount="indefinite" begin="-1.25s"/></circle>
+          <circle cx="195" cy="482" r="3" fill="#ffcc22"/><circle cx="195" cy="482" r="7" fill="rgba(255,200,30,0.3)" filter="url(#jglow)"/>
+
+          <!-- Green: ankles -->
+          <circle cx="117" cy="592" r="10" fill="rgba(60,255,130,0.04)" stroke="rgba(60,255,130,0.16)" stroke-width="1"/>
+          <circle cx="117" cy="592" r="4.5" fill="rgba(60,255,130,0.1)" stroke="rgba(60,255,130,0.45)" stroke-width="1"><animate attributeName="r" values="4.5;6.5;4.5" dur="2.8s" repeatCount="indefinite"/></circle>
+          <circle cx="117" cy="592" r="2" fill="#44ff88"/>
+
+          <circle cx="203" cy="592" r="10" fill="rgba(60,255,130,0.04)" stroke="rgba(60,255,130,0.16)" stroke-width="1"/>
+          <circle cx="203" cy="592" r="4.5" fill="rgba(60,255,130,0.1)" stroke="rgba(60,255,130,0.45)" stroke-width="1"><animate attributeName="r" values="4.5;6.5;4.5" dur="2.8s" repeatCount="indefinite" begin="-1.4s"/></circle>
+          <circle cx="203" cy="592" r="2" fill="#44ff88"/>
+        </g>
+
+        <!-- SPINE ENERGY PULSE -->
+        <g pointer-events="none">
+          <path id="sppath" d="M160,116 L160,143 L160,180 L160,220 L160,258" fill="none" stroke="none"/>
+          <circle r="3" fill="#00ffff" opacity="0">
+            <animateMotion dur="2.8s" repeatCount="indefinite"><mpath href="#sppath"/></animateMotion>
+            <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.07;0.93;1" dur="2.8s" repeatCount="indefinite"/>
+          </circle>
+          <circle r="8" fill="rgba(0,255,255,0.18)" opacity="0">
+            <animateMotion dur="2.8s" repeatCount="indefinite"><mpath href="#sppath"/></animateMotion>
+            <animate attributeName="opacity" values="0;0.7;0.7;0" keyTimes="0;0.07;0.93;1" dur="2.8s" repeatCount="indefinite"/>
+          </circle>
+        </g>
+
+        <!-- MUSCLE LAYER -->
+        <g class="ml" style="display:none">
+          <path class="ms" d="M158 142 C131 148 102 161 96 183 L107 204 C126 185 148 173 158 173 Z"/>
+          <path class="ms" d="M162 142 C189 148 218 161 224 183 L213 204 C194 185 172 173 162 173 Z"/>
+          <ellipse class="ms" cx="82" cy="162" rx="20" ry="16"/>
+          <ellipse class="ms" cx="238" cy="162" rx="20" ry="16"/>
+          <path class="ms" d="M74 177 C64 200 60 224 62 248 L72 248 C72 224 76 200 86 177 Z"/>
+          <path class="ms" d="M246 177 C256 200 260 224 258 248 L248 248 C248 224 244 200 234 177 Z"/>
+          <rect class="ms" x="149" y="222" width="9" height="11" rx="4.5"/>
+          <rect class="ms" x="160" y="222" width="9" height="11" rx="4.5"/>
+          <rect class="ms" x="149" y="235" width="9" height="11" rx="4.5"/>
+          <rect class="ms" x="160" y="235" width="9" height="11" rx="4.5"/>
+          <rect class="ms" x="149" y="248" width="9" height="11" rx="4.5"/>
+          <rect class="ms" x="160" y="248" width="9" height="11" rx="4.5"/>
+          <path class="ms" d="M110 352 C100 394 98 434 104 476 L134 476 C134 434 134 394 142 352 Z"/>
+          <path class="ms" d="M210 352 C220 394 222 434 216 476 L186 476 C186 434 186 394 178 352 Z"/>
+          <path class="ms" d="M111 502 C105 532 105 562 109 590 L127 590 C127 562 129 532 127 502 Z"/>
+          <path class="ms" d="M209 502 C215 532 215 562 211 590 L193 590 C193 562 191 532 193 502 Z"/>
+          <path class="ms" d="M106 300 C98 314 98 332 106 344 L142 348 C138 332 136 314 138 300 Z"/>
+          <path class="ms" d="M214 300 C222 314 222 332 214 344 L178 348 C182 332 184 314 182 300 Z"/>
+        </g>
+
+        <!-- JOINT LAYER -->
+        <g class="jl" style="display:none">
+          <circle class="jc" cx="82" cy="148" r="14"/><circle class="jc" cx="238" cy="148" r="14"/>
+          <circle class="jc" cx="65" cy="258" r="11"/><circle class="jc" cx="255" cy="258" r="11"/>
+          <circle class="jc" cx="52" cy="366" r="9"/><circle class="jc" cx="268" cy="366" r="9"/>
+          <circle class="jc" cx="133" cy="338" r="13"/><circle class="jc" cx="187" cy="338" r="13"/>
+          <circle class="jc" cx="125" cy="482" r="17"/><circle class="jc" cx="195" cy="482" r="17"/>
+          <circle class="jc" cx="117" cy="592" r="11"/><circle class="jc" cx="203" cy="592" r="11"/>
+          <circle class="jc" cx="160" cy="140" r="9"/>
+          <ellipse class="jc" cx="148" cy="276" rx="9.5" ry="17" style="stroke:rgba(255,60,60,.7);fill:rgba(255,60,60,.13)"/>
+          <ellipse class="jc" cx="172" cy="276" rx="9.5" ry="17" style="stroke:rgba(255,60,60,.7);fill:rgba(255,60,60,.13)"/>
+        </g>
+
+        <!-- LIGAMENT LAYER -->
+        <g class="ll" style="display:none">
+          <line class="lne" x1="160" y1="137" x2="160" y2="299"/>
+          <path class="lne" d="M84 148 C88 136 102 132 116 134"/>
+          <path class="lne" d="M236 148 C232 136 218 132 204 134"/>
+          <path class="lne" d="M99 291 C115 275 129 271 137 275"/>
+          <path class="lne" d="M221 291 C205 275 191 271 183 275"/>
+          <line class="lne" x1="116" y1="470" x2="128" y2="492"/>
+          <line class="lne" x1="134" y1="470" x2="122" y2="492"/>
+          <line class="lne" x1="186" y1="470" x2="198" y2="492"/>
+          <line class="lne" x1="204" y1="470" x2="192" y2="492"/>
+          <path class="lne" d="M105 590 C99 598 97 606 105 614"/>
+          <path class="lne" d="M215 590 C221 598 223 606 215 614"/>
+          <path class="lne" d="M91 612 Q117 634 143 618"/>
+          <path class="lne" d="M229 612 Q203 634 177 618"/>
+          <path class="lne" d="M133 262 C129 272 131 286 135 294"/>
+          <path class="lne" d="M187 262 C191 272 189 286 185 294"/>
+        </g>
+      </svg>
+    </div>
+    <div class="sstatus" id="sstatus">// SCANNING — drag to rotate · hover to identify · click to analyze</div>
+  </div>
+
+  <div class="hright">
+    <div class="hdblock">
+      <div class="hdlbl">Joint Matrix</div>
+      <div class="hdrow"><span class="hdrowk">SI Joint</span><span class="hdrowv" style="color:#ff3344">● ACTIVE</span></div>
+      <div class="hdrow"><span class="hdrowk">Shoulders</span><span class="hdrowv">● NOM</span></div>
+      <div class="hdrow"><span class="hdrowk">Knees</span><span class="hdrowv">● NOM</span></div>
+      <div class="hdrow"><span class="hdrowk">Ankles</span><span class="hdrowv">● NOM</span></div>
+    </div>
+    <div class="hdblock">
+      <div class="hdlbl">Protocol</div>
+      <div class="hdval" style="color:#00ff88;font-size:11px;font-weight:900;margin-bottom:3px">SI JOINT</div>
+      <div class="hdsub" style="margin-bottom:6px">Phase-Based Recovery</div>
+      <div class="hdstatus"><div class="hddot"></div>PROTOCOL ACTIVE</div>
+    </div>
+  </div>
+</div>
+
+<div id="panel"><div class="pcard" id="pcard"></div></div>
+</main>
+
+<footer>
+  <div class="hint"><b>Drag</b> to rotate · <b>Hover</b> to identify · <b>Click</b> to analyze · <b>Esc</b> to reset</div>
+  <div class="hint">View: <b id="vlabel">Skeleton</b></div>
+  <div class="hint">Move. — Biomechanical System v0.3</div>
+</footer>
+</div>
+
+<div id="tip"><div class="tname" id="tname"></div><div class="tdesc" id="tdesc"></div><div class="tcta" id="tcta"></div></div>
+
+<script>
+// Particle canvas
+const PC=document.getElementById('pcanvas'),PX=PC.getContext('2d')
+let pts=[]
+function initPts(){
+  PC.width=innerWidth;PC.height=innerHeight
+  pts=Array.from({length:55},()=>({x:Math.random()*innerWidth,y:Math.random()*innerHeight,vx:(Math.random()-.5)*.25,vy:-.15-Math.random()*.3,r:.5+Math.random()*1.5,p:Math.random()*Math.PI*2}))
+}
+function drawPts(){
+  PX.clearRect(0,0,PC.width,PC.height)
+  pts.forEach(p=>{
+    p.x+=p.vx;p.y+=p.vy;p.p+=.012
+    if(p.y<-5){p.y=PC.height+5;p.x=Math.random()*PC.width}
+    const a=(Math.sin(p.p)*.5+.5)*.32
+    PX.beginPath();PX.arc(p.x,p.y,p.r,0,Math.PI*2)
+    PX.fillStyle=`rgba(0,180,255,${a})`;PX.fill()
+  })
+  requestAnimationFrame(drawPts)
+}
+initPts();drawPts()
+window.addEventListener('resize',initPts)
+
+// Recovery data
+const DATA={
+  'si-joint':{title:'Sacroiliac Joint',sub:'25% of lower back pain originates here. Often misdiagnosed as lumbar disc herniation. Deep glute and posterior hip pain are the hallmarks.',
+    books:[{name:'SI Joint 4-Phase Recovery Playbook',detail:'82+ exercises across 4 progressive phases. Phase 1: calm & stabilize → Phase 4: return to power. Dynamic per-phase theming.',status:'live',link:'/recovery/si-joint'}]},
+  'left-knee':{title:'Knee Rehabilitation',sub:'ACL, MCL, meniscus, and patellar tendon protocols for athletes and active individuals.',
+    books:[{name:'Knee Rehab Playbook',detail:"ACL reconstruction, patellar tendinopathy, meniscus tears, and runner's knee. Phase-based progressive loading.",status:'soon'}]},
+  'right-knee':{title:'Knee Rehabilitation',sub:'The most frequently injured joint in sport. Comprehensive phase-based recovery protocols.',
+    books:[{name:'Knee Rehab Playbook',detail:'Progressive eccentric loading protocols for ACL, PFPS, meniscal repair, and patellar tendinopathy.',status:'soon'}]},
+  'left-shoulder':{title:'Shoulder Recovery',sub:'The shoulder sacrifices stability for range of motion — making it uniquely vulnerable to impingement and instability.',
+    books:[{name:'Shoulder Impingement Playbook',detail:'Rotator cuff syndrome, subacromial impingement, labral tears, and overhead athlete shoulder pain.',status:'soon'}]},
+  'right-shoulder':{title:'Shoulder Recovery',sub:'Rotator cuff dysfunction is the most common shoulder complaint in active adults.',
+    books:[{name:'Shoulder Impingement Playbook',detail:'Phase-based strengthening of the SITS muscles with scapular stabilization and progressive loading.',status:'soon'}]},
+  'neck':{title:'Cervical Spine',sub:'Neck strain and cervicogenic dysfunction respond well to deep neck flexor activation and mobility work.',
+    books:[{name:'Cervical Spine Playbook',detail:'Whiplash recovery, cervicogenic headaches, C-spine disc issues, and deep neck flexor rehabilitation.',status:'soon'}]},
+}
+const DEF={books:[{name:'Recovery Playbook',detail:'A targeted protocol for this region is in development. All major joints and soft tissue structures are planned.',status:'soon'}]}
+
+// State — drag rotation only, no auto-spin
+let sel=null
+let rotX=0,rotY=0,tRotX=0,tRotY=0
+let isDragging=false,wasDragging=false,potentialDrag=false
+let dragStartX=0,dragStartY=0,lastX=0,lastY=0
+
+const stage=document.getElementById('stage'),bsvg=document.getElementById('bsvg')
+const tip=document.getElementById('tip'),panel=document.getElementById('panel'),pcard=document.getElementById('pcard'),sstatus=document.getElementById('sstatus')
+const groups=[...bsvg.querySelectorAll('.bg')]
+
+// Render loop — stationary until dragged
+;(function loop(){
+  rotX+=(tRotX-rotX)*.1
+  rotY+=(tRotY-rotY)*.1
+  stage.style.transform=`perspective(960px) rotateX(${rotX}deg) rotateY(${rotY}deg)`
+  requestAnimationFrame(loop)
+})()
+
+// Drag rotation
+const dragTarget=document.querySelector('.awrap')
+function onDragStart(cx,cy){potentialDrag=true;isDragging=false;wasDragging=false;dragStartX=lastX=cx;dragStartY=lastY=cy}
+function onDragMove(cx,cy){
+  if(!potentialDrag)return
+  if(!isDragging&&Math.hypot(cx-dragStartX,cy-dragStartY)>4)isDragging=true
+  if(isDragging){tRotY+=(cx-lastX)*.6;tRotX-=(cy-lastY)*.32;tRotX=Math.max(-80,Math.min(80,tRotX));lastX=cx;lastY=cy}
+}
+function onDragEnd(){wasDragging=isDragging;potentialDrag=false;isDragging=false;setTimeout(()=>{wasDragging=false},50)}
+dragTarget.addEventListener('mousedown',e=>onDragStart(e.clientX,e.clientY))
+document.addEventListener('mousemove',e=>onDragMove(e.clientX,e.clientY))
+document.addEventListener('mouseup',onDragEnd)
+dragTarget.addEventListener('touchstart',e=>{onDragStart(e.touches[0].clientX,e.touches[0].clientY)},{passive:true})
+document.addEventListener('touchmove',e=>{if(isDragging)onDragMove(e.touches[0].clientX,e.touches[0].clientY)},{passive:true})
+document.addEventListener('touchend',onDragEnd)
+
+// View switching
+const VN={vs:'Skeleton',vm:'Muscles',vj:'Joints',vl:'Ligaments'}
+document.querySelectorAll('.vb').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.vb').forEach(b=>b.classList.remove('on'))
+    btn.classList.add('on')
+    const v=btn.dataset.v
+    document.body.className=v
+    document.getElementById('vlabel').textContent=VN[v]
+    bsvg.querySelector('.ml').style.display=v==='vm'?'block':'none'
+    bsvg.querySelector('.jl').style.display=v==='vj'?'block':'none'
+    bsvg.querySelector('.ll').style.display=v==='vl'?'block':'none'
+  })
+})
+
+const EX={head:{x:0,y:-34},neck:{x:0,y:-18},'left-shoulder':{x:-38,y:-10},'right-shoulder':{x:38,y:-10},chest:{x:0,y:0},spine:{x:0,y:0},'si-joint':{x:0,y:9},pelvis:{x:0,y:16},'left-hip':{x:-34,y:7},'right-hip':{x:34,y:7},'left-upper-arm':{x:-38,y:0},'right-upper-arm':{x:38,y:0},'left-forearm':{x:-40,y:6},'right-forearm':{x:40,y:6},'left-hand':{x:-38,y:11},'right-hand':{x:38,y:11},'left-thigh':{x:-30,y:17},'right-thigh':{x:30,y:17},'left-knee':{x:-36,y:8},'right-knee':{x:36,y:8},'left-lower-leg':{x:-32,y:17},'right-lower-leg':{x:32,y:17},'left-foot':{x:-28,y:22},'right-foot':{x:28,y:22}}
+const RC={head:{x:160,y:52},neck:{x:160,y:125},'left-shoulder':{x:84,y:164},'right-shoulder':{x:236,y:164},chest:{x:160,y:188},spine:{x:160,y:212},'si-joint':{x:160,y:282},'left-hip':{x:108,y:304},'right-hip':{x:212,y:304},pelvis:{x:160,y:344},'left-upper-arm':{x:74,y:204},'right-upper-arm':{x:246,y:204},'left-forearm':{x:58,y:313},'right-forearm':{x:262,y:313},'left-hand':{x:52,y:386},'right-hand':{x:268,y:386},'left-thigh':{x:130,y:410},'right-thigh':{x:190,y:410},'left-knee':{x:125,y:482},'right-knee':{x:195,y:482},'left-lower-leg':{x:120,y:542},'right-lower-leg':{x:200,y:542},'left-foot':{x:117,y:614},'right-foot':{x:203,y:614}}
+
+// Hover
+groups.forEach(g=>{
+  const r=g.dataset.r
+  g.addEventListener('mouseenter',()=>{
+    if(sel||isDragging)return
+    document.getElementById('tname').textContent=g.dataset.l
+    document.getElementById('tdesc').textContent=g.dataset.d
+    const live=DATA[r]?.books[0]?.status==='live'
+    const cta=document.getElementById('tcta')
+    cta.textContent=live?'● Live Playbook — Click to Analyze':'↑ Click to Explode & Analyze'
+    cta.style.color=live?'#00ff88':'rgba(0,180,255,.6)'
+    tip.classList.add('show')
+  })
+  g.addEventListener('mousemove',e=>{
+    const tw=228,l=e.clientX+18+tw>innerWidth?e.clientX-tw-14:e.clientX+18
+    tip.style.left=l+'px';tip.style.top=Math.min(e.clientY-20,innerHeight-100)+'px'
+  })
+  g.addEventListener('mouseleave',()=>tip.classList.remove('show'))
+  g.addEventListener('click',e=>{if(wasDragging)return;pick(r,g,e)})
+})
+
+document.querySelectorAll('.rrow').forEach(row=>{
+  row.addEventListener('click',()=>{
+    const t=row.dataset.t,g=bsvg.querySelector(`[data-r="${t}"]`)
+    if(g)pick(t,g,null)
+  })
+})
+
+function pick(region,gEl,evt){
+  if(sel===region){reset();return}
+  sel=region
+  tip.classList.remove('show')
+  const cx=evt?evt.clientX:getFX(region),cy=evt?evt.clientY:getFY(region)
+  burst(cx,cy);ripples(cx,cy)
+  groups.forEach(g=>{
+    const r=g.dataset.r
+    if(r===region){g.classList.remove('dim');g.classList.add('sel');const d=EX[r]||{x:0,y:0};g.style.transform=`translate(${d.x}px,${d.y}px) scale(1.12)`}
+    else{g.classList.remove('sel');g.classList.add('dim');g.style.transform=''}
+  })
+  setTimeout(()=>zoomTo(region),120)
+  document.getElementById('lregion').style.display='block'
+  document.getElementById('lregname').textContent=gEl.dataset.l
+  document.getElementById('lregcoord').textContent='LOCK: '+gEl.dataset.l.toUpperCase()
+  sstatus.textContent='// LOCK: '+gEl.dataset.l.toUpperCase()
+  renderPanel(region,gEl)
+  panel.classList.add('show')
+}
+
+function reset(){
+  sel=null
+  groups.forEach(g=>{g.classList.remove('sel','dim');g.style.transform=''})
+  bsvg.style.transform='';panel.classList.remove('show')
+  document.getElementById('lregion').style.display='none'
+  sstatus.textContent='// SCANNING — drag to rotate · hover to identify · click to analyze'
+}
+
+function zoomTo(region){
+  const c=RC[region]||{x:160,y:320},sw=stage.clientWidth||270,sh=stage.clientHeight||570,zoom=2.1
+  bsvg.style.transform=`translate(${sw/2-c.x*(sw/320)*zoom}px,${sh/2-c.y*(sh/640)*zoom}px) scale(${zoom})`
+}
+function getFX(r){const b=stage.getBoundingClientRect(),c=RC[r]||{x:160,y:320};return b.left+c.x*(b.width/320)}
+function getFY(r){const b=stage.getBoundingClientRect(),c=RC[r]||{x:160,y:320};return b.top+c.y*(b.height/640)}
+
+function burst(x,y){
+  const cols=['#00d4ff','#00ffcc','#ffffff','#0099ff','#88eeff','#00ffff','#ff3344','#8855ff']
+  for(let i=0;i<34;i++){
+    const p=document.createElement('div');p.className='ptcl'
+    const a=(i/34)*Math.PI*2,spd=55+Math.random()*90,sz=1.5+Math.random()*4,col=cols[i%cols.length]
+    p.style.cssText=`left:${x}px;top:${y}px;width:${sz}px;height:${sz}px;background:${col};box-shadow:0 0 ${sz*2}px ${col}`
+    document.body.appendChild(p)
+    p.animate([{transform:'translate(-50%,-50%) scale(1)',opacity:1},{transform:`translate(calc(-50% + ${Math.cos(a)*spd}px),calc(-50% + ${Math.sin(a)*spd}px)) scale(0)`,opacity:0}],{duration:500+Math.random()*500,easing:'cubic-bezier(.25,.46,.45,.94)'}).onfinish=()=>p.remove()
+  }
+  for(let i=0;i<16;i++){
+    const p=document.createElement('div');p.className='ptcl'
+    const a=Math.random()*Math.PI*2,spd=15+Math.random()*40,sz=1+Math.random()*2
+    p.style.cssText=`left:${x}px;top:${y}px;width:${sz}px;height:${sz}px;background:#fff;box-shadow:0 0 4px #00ffff`
+    document.body.appendChild(p)
+    p.animate([{transform:'translate(-50%,-50%)',opacity:1},{transform:`translate(calc(-50% + ${Math.cos(a)*spd}px),calc(-50% + ${Math.sin(a)*spd}px))`,opacity:0}],{duration:200+Math.random()*250,delay:Math.random()*100,easing:'ease-out'}).onfinish=()=>p.remove()
+  }
+}
+
+function ripples(x,y){
+  for(let i=0;i<4;i++)setTimeout(()=>{
+    const r=document.createElement('div');r.className='rpl'
+    r.style.cssText=`left:${x}px;top:${y}px;border-color:rgba(0,212,255,${.85-i*.18})`
+    document.body.appendChild(r);setTimeout(()=>r.remove(),950)
+  },i*160)
+}
+
+function renderPanel(region,g){
+  const d=DATA[region]||{title:g.dataset.l,sub:g.dataset.d,books:DEF.books}
+  pcard.innerHTML=`
+    <div class="phead">
+      <div class="peye">// Biomechanical Analysis Lock</div>
+      <div class="ptitle">${d.title}</div>
+      <div class="psub">${d.sub}</div>
+    </div>
+    <div class="pbody">
+      <div class="slabel">Recovery Protocols</div>
+      ${d.books.map(b=>`
+        <div class="bcard ${b.status==='live'?'bclive':'bcsoon'}">
+          <span class="btag ${b.status==='live'?'btlive':'btsoon'}">${b.status==='live'?'✓ LIVE':'⏳ SOON'}</span>
+          <div class="bname">${b.name}</div>
+          <div class="bdetail">${b.detail}</div>
+          ${b.status==='live'&&b.link?`<a class="obtn" href="${b.link}" target="_parent">Open Playbook →</a>`:''}
+        </div>`).join('')}
+      <div class="aibox">
+        <div class="ailbl">AI Recovery Assessment</div>
+        <div class="aitxt">Describe your symptoms — the recovery AI will recommend the correct protocol and starting phase.</div>
+        <div class="aibtn">✦ Ask Recovery AI</div>
+      </div>
+    </div>
+    <button class="cbtn" onclick="reset()">✕ &nbsp; Deselect / Reset View</button>
+  `
+}
+
+document.addEventListener('keydown',e=>{if(e.key==='Escape')reset()})
+
+// Neural sync fluctuation
+let ns=97.4
+setInterval(()=>{
+  ns=96.5+Math.random()*1.8
+  const el=document.getElementById('nsync')
+  if(el)el.textContent=ns.toFixed(1)
+},3200)
+</script>
+</body>
+</html>
