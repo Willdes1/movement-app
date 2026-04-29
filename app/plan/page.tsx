@@ -50,7 +50,7 @@ function DumbbellSparkleIcon({ size = 20 }: { size?: number }) {
 }
 
 export default function PlanPage() {
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, isAdmin, role } = useAuth()
   const router = useRouter()
   const todayIdx = (new Date().getDay() + 6) % 7
 
@@ -277,7 +277,7 @@ export default function PlanPage() {
   if (generating && !weekPlans[viewingWeek]) {
     const { label, color } = getPhaseInfo(viewingWeek)
     return (
-      <div style={{ padding: '80px 32px', textAlign: 'center', maxWidth: 480, margin: '0 auto' }}>
+      <div style={{ padding: '80px 32px', textAlign: 'center', maxWidth: 600, margin: '0 auto' }}>
         <div style={{ fontSize: 40, marginBottom: 20 }}>⚡</div>
         <p style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>Building Week {viewingWeek}…</p>
         <p style={{ fontSize: 13, color, fontWeight: 600, marginBottom: 12 }}>{label}</p>
@@ -288,7 +288,7 @@ export default function PlanPage() {
 
   if (programComplete && !weekPlans[viewingWeek]) {
     return (
-      <div style={{ padding: '60px 24px', maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
+      <div style={{ padding: '60px 24px', maxWidth: 600, margin: '0 auto', textAlign: 'center' }}>
         <div style={{ fontSize: 48, marginBottom: 16 }}>🏆</div>
         <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Program Complete!</h1>
         <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 32, lineHeight: 1.6 }}>You finished all 13 weeks. That&apos;s a serious achievement. What&apos;s next?</p>
@@ -302,7 +302,7 @@ export default function PlanPage() {
 
   if (!program) {
     return (
-      <div style={{ padding: '60px 24px', maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
+      <div style={{ padding: '60px 24px', maxWidth: 600, margin: '0 auto', textAlign: 'center' }}>
         <p style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>No Active Plan</p>
         <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 24 }}>Set up your profile to generate your personalized 3-month program.</p>
         <button onClick={() => router.push('/profile')} style={{ padding: '13px 28px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Set Up Profile →</button>
@@ -310,104 +310,156 @@ export default function PlanPage() {
     )
   }
 
+  const showRightPanel = isAdmin || role === 'ff'
   const { label: phaseLabel, color: phaseColor } = getPhaseInfo(viewingWeek)
   const progress = Math.round((viewingWeek / TOTAL_WEEKS) * 100)
   const plan = weekPlans[viewingWeek] ?? []
 
   return (
-    <div style={{ padding: '24px 16px 100px', maxWidth: 480, margin: '0 auto' }}>
+    <>
+      <style>{`
+        .plan-outer { padding: 24px 16px 100px; max-width: 760px; margin: 0 auto; }
+        .plan-grid { display: flex; flex-direction: column; gap: 24px; }
+        @media (min-width: 768px) {
+          .plan-outer { padding: 32px 40px 80px; }
+          .plan-outer.with-sidebar { max-width: 1060px; }
+          .plan-grid.has-sidebar { flex-direction: row; align-items: flex-start; gap: 40px; }
+          .plan-grid.has-sidebar .plan-left { flex: 1; min-width: 0; }
+          .plan-grid.has-sidebar .plan-right { flex: 0 0 300px; }
+        }
+      `}</style>
+      <div className={`plan-outer${showRightPanel ? ' with-sidebar' : ''}`}>
 
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 2 }}>Your Plan</h1>
-          <p style={{ fontSize: 12, color: phaseColor, fontWeight: 700, letterSpacing: '0.04em' }}>{phaseLabel}</p>
-        </div>
-        <button onClick={() => setShowRegenModal(true)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', background: 'none', border: '1px solid var(--accent-border)', borderRadius: 20, padding: '6px 12px', cursor: 'pointer', marginTop: 4 }}>
-          <DumbbellSparkleIcon size={18}/>
-        </button>
-      </div>
-
-      <div style={{ marginTop: 12, marginBottom: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-          <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Week {viewingWeek} of {TOTAL_WEEKS}</span>
-          <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{progress}%</span>
-        </div>
-        <div style={{ height: 5, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${progress}%`, background: phaseColor, borderRadius: 4, transition: 'width 0.4s ease' }} />
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, padding: '10px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12 }}>
-        <button onClick={() => navigateWeek(-1)} disabled={viewingWeek <= 1} style={{ fontSize: 13, fontWeight: 600, color: viewingWeek <= 1 ? 'var(--text-dim)' : 'var(--accent)', background: 'none', border: 'none', cursor: viewingWeek <= 1 ? 'default' : 'pointer', padding: '4px 8px' }}>
-          ← Week {viewingWeek - 1 > 0 ? viewingWeek - 1 : ''}
-        </button>
-        <div style={{ textAlign: 'center' }}>
-          <span style={{ fontSize: 13, fontWeight: 700 }}>Week {viewingWeek}</span>
-          {viewingWeek === currentWeek && <div style={{ fontSize: 10, color: phaseColor, fontWeight: 700, marginTop: 1 }}>CURRENT</div>}
-        </div>
-        <button onClick={() => navigateWeek(1)} disabled={viewingWeek >= TOTAL_WEEKS} style={{ fontSize: 13, fontWeight: 600, color: viewingWeek >= TOTAL_WEEKS ? 'var(--text-dim)' : 'var(--accent)', background: 'none', border: 'none', cursor: viewingWeek >= TOTAL_WEEKS ? 'default' : 'pointer', padding: '4px 8px' }}>
-          Week {viewingWeek + 1 <= TOTAL_WEEKS ? viewingWeek + 1 : ''} →
-        </button>
-      </div>
-
-      {error && <div style={{ padding: '12px 16px', background: 'var(--orange-bg)', border: '1px solid var(--orange-border)', borderRadius: 10, marginBottom: 16, fontSize: 13 }}>{error}</div>}
-
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20, overflowX: 'auto', paddingBottom: 4 }}>
-        {DAYS.map((d, i) => (
-          <div key={d} style={{ flexShrink: 0, width: 42, height: 42, borderRadius: 10, background: i === todayIdx && viewingWeek === currentWeek ? 'var(--accent)' : 'var(--surface)', border: `1px solid ${i === todayIdx && viewingWeek === currentWeek ? 'var(--accent)' : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ fontSize: 10, fontWeight: 700, color: i === todayIdx && viewingWeek === currentWeek ? '#fff' : 'var(--text-dim)' }}>{d}</span>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
+          <div>
+            <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 2 }}>Your Plan</h1>
+            <p style={{ fontSize: 12, color: phaseColor, fontWeight: 700, letterSpacing: '0.04em' }}>{phaseLabel}</p>
           </div>
-        ))}
-      </div>
+          <button onClick={() => setShowRegenModal(true)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', background: 'none', border: '1px solid var(--accent-border)', borderRadius: 20, padding: '6px 12px', cursor: 'pointer', marginTop: 4 }}>
+            <DumbbellSparkleIcon size={18}/>
+          </button>
+        </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {plan.map((day, i) => {
-          const isToday = i === todayIdx && viewingWeek === currentWeek
-          const actionable = isDayActionable(viewingWeek, i)
-          const completed = completions.has(`${viewingWeek}-${i}`)
-          const isRest = day.type === 'rest'
-          return (
-            <div key={day.day} style={{ background: isToday ? (TYPE_BG[day.type] ?? 'var(--surface)') : 'var(--surface)', border: `1px solid ${isToday ? (TYPE_BORDER[day.type] ?? 'var(--border)') : 'var(--border)'}`, borderRadius: 12, padding: '14px 16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, minWidth: 28, letterSpacing: '0.04em', color: TYPE_COLOR[day.type] ?? 'var(--text-dim)' }}>{day.day}</span>
-                  <span style={{ fontWeight: 700, fontSize: 14 }}>{day.label}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {completed && !isRest && <span style={{ fontSize: 12, fontWeight: 800, color: '#4ec97a' }}>✓</span>}
-                  <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{day.duration}</span>
-                </div>
+        <div className={`plan-grid${showRightPanel ? ' has-sidebar' : ''}`}>
+          <div className="plan-left">
+
+            <div style={{ marginTop: 12, marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Week {viewingWeek} of {TOTAL_WEEKS}</span>
+                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{progress}%</span>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: actionable && !isRest && !completed ? 10 : 0 }}>
-                {day.movements.map((m, mi) => {
-                  const detail = exerciseLibrary[normalizeExerciseName(parseExerciseName(m))]
-                  return (
-                    <button key={mi} onClick={() => detail && setSelectedExercise(detail)} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-mid)', cursor: detail ? 'pointer' : 'default', fontFamily: 'inherit' }}>
-                      {m}
-                    </button>
-                  )
-                })}
+              <div style={{ height: 5, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${progress}%`, background: phaseColor, borderRadius: 4, transition: 'width 0.4s ease' }} />
               </div>
-              {actionable && !isRest && !completed && (
-                <button onClick={() => handleCompleteDay(viewingWeek, i)} disabled={completing} style={{ width: '100%', padding: '9px', borderRadius: 8, border: '1px solid rgba(78,201,122,0.3)', background: 'rgba(78,201,122,0.08)', color: '#4ec97a', fontWeight: 700, fontSize: 12, cursor: completing ? 'default' : 'pointer', fontFamily: 'inherit', letterSpacing: '0.04em' }}>
-                  {completing ? '…' : '✓  Complete Day'}
-                </button>
-              )}
             </div>
-          )
-        })}
-      </div>
 
-      {viewingWeek === TOTAL_WEEKS && plan.length > 0 && (
-        <div style={{ marginTop: 24, padding: '20px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, textAlign: 'center' }}>
-          <p style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Final week incoming 🏁</p>
-          <p style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 16, lineHeight: 1.5 }}>You&apos;re almost there. After this week, choose your next move.</p>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={continueProgram} style={{ flex: 1, padding: '12px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Continue 3 More Months</button>
-            <button onClick={restartProgram} style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Fresh Start</button>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, padding: '10px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12 }}>
+              <button onClick={() => navigateWeek(-1)} disabled={viewingWeek <= 1} style={{ fontSize: 13, fontWeight: 600, color: viewingWeek <= 1 ? 'var(--text-dim)' : 'var(--accent)', background: 'none', border: 'none', cursor: viewingWeek <= 1 ? 'default' : 'pointer', padding: '4px 8px' }}>
+                ← Week {viewingWeek - 1 > 0 ? viewingWeek - 1 : ''}
+              </button>
+              <div style={{ textAlign: 'center' }}>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>Week {viewingWeek}</span>
+                {viewingWeek === currentWeek && <div style={{ fontSize: 10, color: phaseColor, fontWeight: 700, marginTop: 1 }}>CURRENT</div>}
+              </div>
+              <button onClick={() => navigateWeek(1)} disabled={viewingWeek >= TOTAL_WEEKS} style={{ fontSize: 13, fontWeight: 600, color: viewingWeek >= TOTAL_WEEKS ? 'var(--text-dim)' : 'var(--accent)', background: 'none', border: 'none', cursor: viewingWeek >= TOTAL_WEEKS ? 'default' : 'pointer', padding: '4px 8px' }}>
+                Week {viewingWeek + 1 <= TOTAL_WEEKS ? viewingWeek + 1 : ''} →
+              </button>
+            </div>
+
+            {error && <div style={{ padding: '12px 16px', background: 'var(--orange-bg)', border: '1px solid var(--orange-border)', borderRadius: 10, marginBottom: 16, fontSize: 13 }}>{error}</div>}
+
+            <div style={{ display: 'flex', gap: 8, marginBottom: 20, overflowX: 'auto', paddingBottom: 4 }}>
+              {DAYS.map((d, i) => (
+                <div key={d} style={{ flexShrink: 0, width: 42, height: 42, borderRadius: 10, background: i === todayIdx && viewingWeek === currentWeek ? 'var(--accent)' : 'var(--surface)', border: `1px solid ${i === todayIdx && viewingWeek === currentWeek ? 'var(--accent)' : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: i === todayIdx && viewingWeek === currentWeek ? '#fff' : 'var(--text-dim)' }}>{d}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {plan.map((day, i) => {
+                const isToday = i === todayIdx && viewingWeek === currentWeek
+                const actionable = isDayActionable(viewingWeek, i)
+                const completed = completions.has(`${viewingWeek}-${i}`)
+                const isRest = day.type === 'rest'
+                return (
+                  <div key={day.day} style={{ background: isToday ? (TYPE_BG[day.type] ?? 'var(--surface)') : 'var(--surface)', border: `1px solid ${isToday ? (TYPE_BORDER[day.type] ?? 'var(--border)') : 'var(--border)'}`, borderRadius: 12, padding: '14px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, minWidth: 28, letterSpacing: '0.04em', color: TYPE_COLOR[day.type] ?? 'var(--text-dim)' }}>{day.day}</span>
+                        <span style={{ fontWeight: 700, fontSize: 14 }}>{day.label}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {completed && !isRest && <span style={{ fontSize: 12, fontWeight: 800, color: '#4ec97a' }}>✓</span>}
+                        <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{day.duration}</span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: actionable && !isRest && !completed ? 10 : 0 }}>
+                      {day.movements.map((m, mi) => {
+                        const detail = exerciseLibrary[normalizeExerciseName(parseExerciseName(m))]
+                        return (
+                          <button key={mi} onClick={() => detail && setSelectedExercise(detail)} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-mid)', cursor: detail ? 'pointer' : 'default', fontFamily: 'inherit' }}>
+                            {m}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    {actionable && !isRest && !completed && (
+                      <button onClick={() => handleCompleteDay(viewingWeek, i)} disabled={completing} style={{ width: '100%', padding: '9px', borderRadius: 8, border: '1px solid rgba(78,201,122,0.3)', background: 'rgba(78,201,122,0.08)', color: '#4ec97a', fontWeight: 700, fontSize: 12, cursor: completing ? 'default' : 'pointer', fontFamily: 'inherit', letterSpacing: '0.04em' }}>
+                        {completing ? '…' : '✓  Complete Day'}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {viewingWeek === TOTAL_WEEKS && plan.length > 0 && (
+              <div style={{ marginTop: 24, padding: '20px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, textAlign: 'center' }}>
+                <p style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Final week incoming 🏁</p>
+                <p style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 16, lineHeight: 1.5 }}>You&apos;re almost there. After this week, choose your next move.</p>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button onClick={continueProgram} style={{ flex: 1, padding: '12px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Continue 3 More Months</button>
+                  <button onClick={restartProgram} style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Fresh Start</button>
+                </div>
+              </div>
+            )}
+
           </div>
+
+          {showRightPanel && (
+            <div className="plan-right">
+              <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 12 }}>Programs</p>
+              <div style={{ background: 'linear-gradient(145deg, rgba(0,12,40,0.96) 0%, rgba(0,6,22,0.99) 100%)', border: '1px solid rgba(0,180,255,0.2)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 4px 32px rgba(0,180,255,0.07), inset 0 1px 0 rgba(0,180,255,0.08)' }}>
+                <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(0,180,255,0.1)', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg, rgba(0,180,255,0.2) 0%, rgba(0,100,200,0.12) 100%)', border: '1px solid rgba(0,180,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#00b4ff' }}>
+                    <DumbbellSparkleIcon size={18}/>
+                  </div>
+                  <div>
+                    <p style={{ fontWeight: 800, fontSize: 14, color: '#dff0ff', marginBottom: 2 }}>AX2 Athlean-X</p>
+                    <p style={{ fontSize: 10, color: 'rgba(0,180,255,0.6)', fontWeight: 600, letterSpacing: '0.03em' }}>12 Weeks · Phase-Based</p>
+                  </div>
+                </div>
+                <div style={{ padding: '14px 16px 18px' }}>
+                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 12 }}>
+                    {['Strength', 'Athletic', 'Hypertrophy'].map(tag => (
+                      <span key={tag} style={{ fontSize: 9, padding: '3px 8px', borderRadius: 20, background: 'rgba(0,180,255,0.07)', border: '1px solid rgba(0,180,255,0.15)', color: 'rgba(0,180,255,0.7)', fontWeight: 700, letterSpacing: '0.03em' }}>{tag}</span>
+                    ))}
+                  </div>
+                  <p style={{ fontSize: 12, color: '#4a8aaa', lineHeight: 1.65, marginBottom: 14 }}>
+                    Phase-based training with progressive mechanical stimulus. Athletic movements, weekly benchmarks, and HIIT conditioning built in.
+                  </p>
+                  <button style={{ width: '100%', padding: '10px', borderRadius: 10, border: '1px solid rgba(0,180,255,0.25)', background: 'rgba(0,180,255,0.08)', color: 'rgba(0,180,255,0.5)', fontWeight: 700, fontSize: 12, cursor: 'not-allowed', fontFamily: 'inherit', letterSpacing: '0.02em' }}>
+                    Coming Soon
+                  </button>
+                  <p style={{ fontSize: 9, color: 'rgba(90,154,184,0.4)', textAlign: 'center', marginTop: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Admin · F&F Access</p>
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
-      )}
+      </div>
 
       {/* Exercise detail modal */}
       {selectedExercise && (
@@ -511,6 +563,6 @@ export default function PlanPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }

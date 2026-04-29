@@ -165,6 +165,7 @@ export default function AccountPage() {
         const tiers = {
           admin: { label: 'Admin', color: 'var(--orange)', bg: 'rgba(255,150,50,0.1)', border: 'rgba(255,150,50,0.25)' },
           beta:  { label: 'Beta Access', color: 'var(--green)', bg: 'rgba(78,201,122,0.1)', border: 'rgba(78,201,122,0.25)' },
+          ff:    { label: 'F&F Beta', color: '#00b4ff', bg: 'rgba(0,180,255,0.1)', border: 'rgba(0,180,255,0.25)' },
           free:  { label: 'Free Plan', color: 'var(--accent)', bg: 'var(--accent-bg)', border: 'var(--accent-border)' },
         }
         const tier = tiers[role] ?? tiers.free

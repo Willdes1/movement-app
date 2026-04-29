@@ -8,7 +8,7 @@ type AuthContextType = {
   session: Session | null
   loading: boolean
   isAdmin: boolean
-  role: 'admin' | 'beta' | 'free'
+  role: 'admin' | 'beta' | 'free' | 'ff'
   signOut: () => Promise<void>
 }
 
@@ -26,7 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
-  const [role, setRole] = useState<'admin' | 'beta' | 'free'>('free')
+  const [role, setRole] = useState<'admin' | 'beta' | 'free' | 'ff'>('free')
 
   async function fetchUserStatus(userId: string) {
     const { data } = await supabase
