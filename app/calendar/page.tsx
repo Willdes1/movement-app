@@ -1,6 +1,6 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, useCallback, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { supabase } from '@/lib/supabase'
@@ -17,6 +17,12 @@ type RecoveryPhase = {
 type RecoveryPlan = {
   id: string; injury: string; phases: RecoveryPhase[]
   current_phase: number; activated_at: string | null; completed_at: string | null
+}
+
+type TrainDailyBlock = { label: string; duration: string; exercises: string[]; tip?: string }
+type TrainDailySession = {
+  morning?: TrainDailyBlock; warmup?: TrainDailyBlock; workout?: TrainDailyBlock
+  abs?: TrainDailyBlock; cooldown?: TrainDailyBlock; evening?: TrainDailyBlock
 }
 
 const REC_BLOCK_ORDER = ['morning', 'warmup', 'workout', 'abs', 'cooldown', 'evening'] as const
@@ -38,6 +44,7 @@ type DayPlan = {
   focus?: string
   rest?: { between_sets: string; between_rounds: string }
   coaching?: string
+  daily_session?: TrainDailySession
 }
 
 type Program = {
@@ -120,14 +127,17 @@ function planDayToDate(startDate: string, weekNum: number, dayIndex: number): Da
   return d
 }
 
-export default function CalendarPage() {
+function CalendarInner() {
   const { user, loading: authLoading } = useAuth()
   const { activeRecovery } = useTheme()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const dateParam = searchParams.get('date')
 
   const [program, setProgram] = useState<Program | null>(null)
   const [recoveryPlan, setRecoveryPlan] = useState<RecoveryPlan | null>(null)
   const [expandedRecovBlock, setExpandedRecovBlock] = useState<string | null>('morning')
+  const [expandedTrainBlock, setExpandedTrainBlock] = useState<string | null>(null)
   const [weekPlans, setWeekPlans] = useState<Record<number, DayPlan[]>>({})
   const [loading, setLoading] = useState(true)
   const [viewMonth, setViewMonth] = useState(new Date())
@@ -204,6 +214,13 @@ export default function CalendarPage() {
   }, [user, activeRecovery?.planId])
 
   useEffect(() => {
+    if (!dateParam) return
+    setSelectedKey(dateParam)
+    const d = new Date(dateParam + 'T12:00:00')
+    setViewMonth(new Date(d.getFullYear(), d.getMonth(), 1))
+  }, [dateParam])
+
+  useEffect(() => {
     setLastLog(null)
     if (!selectedExercise || !user) return
     supabase
@@ -225,6 +242,22 @@ export default function CalendarPage() {
       { onConflict: 'user_id,program_id,week_number,day_index' }
     )
     setCompletions(prev => new Set([...prev, `${weekNum}-${dayIdx}`]))
+    setCompleting(false)
+  }
+
+  async function undoCompletion(weekNum: number, dayIdx: number) {
+    if (!program || !user || completing) return
+    setCompleting(true)
+    await supabase.from('day_completions').delete()
+      .eq('user_id', user.id)
+      .eq('program_id', program.id)
+      .eq('week_number', weekNum)
+      .eq('day_index', dayIdx)
+    setCompletions(prev => {
+      const next = new Set(prev)
+      next.delete(`${weekNum}-${dayIdx}`)
+      return next
+    })
     setCompleting(false)
   }
 
@@ -480,25 +513,61 @@ export default function CalendarPage() {
               style={{ background: 'none', border: 'none', fontSize: 20, color: 'var(--text-dim)', cursor: 'pointer', padding: '0 0 0 12px', lineHeight: 1 }}
             >×</button>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: selectedEntry.day.type !== 'rest' ? 12 : 0 }}>
-            {selectedEntry.day.movements.map((m, i) => {
-              const detail = exerciseLibrary[normalizeExerciseName(parseExerciseName(m))]
-              return (
-                <button
-                  key={i}
-                  onClick={() => setSelectedExercise(detail ?? fallbackDetail(m, selectedEntry.day))}
-                  style={{
-                    fontSize: 11, padding: '4px 10px', borderRadius: 20,
-                    background: 'var(--surface)', border: '1px solid var(--border)',
-                    color: 'var(--text-mid)', cursor: 'pointer',
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  {m}
-                </button>
-              )
-            })}
-          </div>
+          {selectedEntry.day.daily_session ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
+              {REC_BLOCK_ORDER.map(bk => {
+                const block = selectedEntry.day.daily_session![bk]
+                if (!block) return null
+                const meta = REC_BLOCK_META[bk]
+                const isExpanded = expandedTrainBlock === bk
+                return (
+                  <div key={bk} style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                    <button onClick={() => setExpandedTrainBlock(isExpanded ? null : bk)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--surface)', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                      <div style={{ width: 38, height: 38, borderRadius: 8, background: meta.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, flexShrink: 0 }}>{meta.icon}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 9, fontWeight: 800, color: meta.color, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 1 }}>{meta.label}</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{block.label}</div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                        <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{block.duration}</span>
+                        <span style={{ fontSize: 12, color: 'var(--text-dim)', transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', display: 'inline-block' }}>▶</span>
+                      </div>
+                    </button>
+                    {isExpanded && (
+                      <div style={{ background: 'var(--surface2)', borderTop: '1px solid var(--border)', padding: '10px 12px' }}>
+                        {block.tip && (
+                          <p style={{ fontSize: 11, color: '#3b82f6', fontStyle: 'italic', marginBottom: 8, lineHeight: 1.5 }}>💡 {block.tip}</p>
+                        )}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                          {block.exercises.map((ex, ei) => {
+                            const detail = exerciseLibrary[normalizeExerciseName(parseExerciseName(ex))]
+                            return (
+                              <button key={ei} onClick={() => setSelectedExercise(detail ?? fallbackDetail(ex, selectedEntry.day))} style={{ fontSize: 10, padding: '3px 9px', borderRadius: 20, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-mid)', cursor: 'pointer', fontFamily: 'inherit' }}>{ex}</button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: selectedEntry.day.type !== 'rest' ? 12 : 0 }}>
+              {selectedEntry.day.movements.map((m, i) => {
+                const detail = exerciseLibrary[normalizeExerciseName(parseExerciseName(m))]
+                return (
+                  <button
+                    key={i}
+                    onClick={() => setSelectedExercise(detail ?? fallbackDetail(m, selectedEntry.day))}
+                    style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-mid)', cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    {m}
+                  </button>
+                )
+              })}
+            </div>
+          )}
           {(() => {
             if (!selectedEntry || selectedEntry.day.type === 'rest') return null
             const { dayIdx } = selectedEntry
@@ -507,7 +576,16 @@ export default function CalendarPage() {
             const isPastOrToday = selectedKey! <= dateKey(new Date())
             if (!isPastOrToday) return null
             return done ? (
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#4ec97a' }}>✓ Completed</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#4ec97a' }}>✓ Completed</div>
+                <button
+                  onClick={() => undoCompletion(selectedEntry.weekNum, dayIdx)}
+                  disabled={completing}
+                  style={{ fontSize: 11, padding: '4px 12px', borderRadius: 20, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text-dim)', cursor: completing ? 'default' : 'pointer', fontFamily: 'inherit', fontWeight: 600 }}
+                >
+                  {completing ? '…' : 'Undo'}
+                </button>
+              </div>
             ) : (
               <button
                 onClick={() => completeDay(selectedEntry.weekNum, dayIdx)}
@@ -531,7 +609,7 @@ export default function CalendarPage() {
       {/* Exercise detail modal */}
       {selectedExercise && (
         <div
-          onClick={() => setSelectedExercise(null)}
+          onClick={() => { setSelectedExercise(null) }}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000 }}
         >
           <div
@@ -585,5 +663,13 @@ export default function CalendarPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function CalendarPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: 32, textAlign: 'center', color: 'var(--text-dim)' }}>Loading...</div>}>
+      <CalendarInner />
+    </Suspense>
   )
 }

@@ -1,10 +1,13 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 
-type DayPlan = { day: string; label: string; type: string; movements: string[]; duration: string; focus?: string; rest?: { between_sets: string; between_rounds: string }; coaching?: string }
+type DailyBlock = { label: string; duration: string; exercises: string[]; tip?: string }
+type DailySession = { morning?: DailyBlock; warmup?: DailyBlock; workout?: DailyBlock; abs?: DailyBlock; cooldown?: DailyBlock; evening?: DailyBlock }
+type DayPlan = { day: string; label: string; type: string; movements: string[]; duration: string; focus?: string; rest?: { between_sets: string; between_rounds: string }; coaching?: string; daily_session?: DailySession }
 type Program = { id: string; startDate: string; totalWeeks: number; status: string }
 type ExerciseDetail = { name_normalized: string; name_display: string; how: string; breathing: string; core: string; tip: string }
 type WorkoutLog = { id: string; exercise_normalized: string; logged_at: string; sets: number | null; reps: number | null; weight: number | null; weight_unit: string }
@@ -45,6 +48,23 @@ const TYPE_COLOR: Record<string, string> = { workout: 'var(--accent)', warmup: '
 const TYPE_BG: Record<string, string> = { workout: 'var(--accent-bg)', warmup: 'var(--orange-bg)', cooldown: 'var(--yellow-bg)', morning: 'var(--green-bg)', abs: 'var(--accent-bg)', evening: 'var(--orange-bg)', rest: 'rgba(120,130,148,0.06)' }
 const TYPE_BORDER: Record<string, string> = { workout: 'var(--accent-border)', warmup: 'var(--orange-border)', cooldown: 'var(--yellow-border)', morning: 'var(--green-border)', abs: 'var(--accent-border)', evening: 'var(--orange-border)', rest: 'var(--border)' }
 
+const PLAN_BLOCK_ORDER = ['morning', 'warmup', 'workout', 'abs', 'cooldown', 'evening'] as const
+const PLAN_BLOCK_META: Record<string, { icon: string; label: string; color: string }> = {
+  morning:  { icon: '☀️', label: 'MORNING',  color: 'var(--orange)' },
+  warmup:   { icon: '⚡', label: 'WARMUP',   color: '#3b82f6' },
+  workout:  { icon: '💪', label: 'WORKOUT',  color: 'var(--green)' },
+  abs:      { icon: '⚙️', label: 'ABS',      color: 'var(--orange)' },
+  cooldown: { icon: '❄️', label: 'COOLDOWN', color: '#8b5cf6' },
+  evening:  { icon: '🌙', label: 'EVENING',  color: '#6366f1' },
+}
+
+function getDayCalendarDate(startDate: string, weekNum: number, dayIdx: number): string {
+  const start = new Date(startDate)
+  const d = new Date(start)
+  d.setDate(d.getDate() + (weekNum - 1) * 7 + dayIdx)
+  return d.toISOString().split('T')[0]
+}
+
 function getPhaseInfo(week: number) {
   if (week <= 4) return { phase: 'foundation', label: 'Foundation Phase', color: 'var(--green)', intensity: 'RPE 6-7. Build base fitness and movement quality. Focus on form over load.' }
   if (week <= 8) return { phase: 'build', label: 'Build Phase', color: 'var(--accent)', intensity: 'RPE 7-8. Increase volume and load progressively each week. Challenge yourself.' }
@@ -67,6 +87,23 @@ function DumbbellSparkleIcon({ size = 20 }: { size?: number }) {
       <path d="M20 1.5 L20.7 3.3 L22.5 4 L20.7 4.7 L20 6.5 L19.3 4.7 L17.5 4 L19.3 3.3 Z"/>
       <path d="M5 1.5 L5.45 2.55 L6.5 3 L5.45 3.45 L5 4.5 L4.55 3.45 L3.5 3 L4.55 2.55 Z"/>
       <circle cx="22" cy="8" r="0.9"/>
+    </svg>
+  )
+}
+
+function AIIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+      {/* Flexed bicep arm silhouette — wider at bicep, tapers to forearm */}
+      <path d="M6,20 C4,16 3,10 5,6 C7,2 11,1 15,2 C19,3 22,6 21,11 C20,15 18,19 16,21 C13,22 9,22 7,21 C7,21 6,21 6,20Z"/>
+      {/* Gear badge — same style as the loading screen, placed at lower-right (fist/elbow area) */}
+      <g transform="translate(11.8, 11.5) scale(0.152)">
+        <path d="M27 2h10l2 8a22 22 0 0 1 6.6 2.7l7.6-3.4 7 7-3.4 7.6A22 22 0 0 1 59.8 30L68 32v-1H56a24 24 0 1 0 0 2h12v1l-8.2 2a22 22 0 0 1-2.7 6.6l3.4 7.6-7 7-7.6-3.4A22 22 0 0 1 39 57.8L37 66H27l-2-8.2A22 22 0 0 1 18.4 55l-7.6 3.4-7-7 3.4-7.6A22 22 0 0 1 4.2 37L2 35V29l2.2-2A22 22 0 0 1 7 20.4L3.8 12.8l7-7 7.6 3.4A22 22 0 0 1 25 6.2L27 2zM32 22a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"/>
+      </g>
+      {/* Sparkle star top-right */}
+      <path d="M20,1 L20.7,2.8 L22.5,3.5 L20.7,4.2 L20,6 L19.3,4.2 L17.5,3.5 L19.3,2.8Z"/>
+      {/* Sparkle dot */}
+      <circle cx="22.5" cy="8" r="0.72"/>
     </svg>
   )
 }
@@ -104,6 +141,7 @@ export default function PlanPage() {
   const [missedDays, setMissedDays] = useState<string[]>([])
   const [pendingComplete, setPendingComplete] = useState<{ weekNum: number; dayIdx: number } | null>(null)
   const [completing, setCompleting] = useState(false)
+  const [generatingProgress, setGeneratingProgress] = useState<{ current: number; total: number } | null>(null)
   const [selectedDayIdx, setSelectedDayIdx] = useState(todayIdx)
   const [completionMsg, setCompletionMsg] = useState<string | null>(null)
 
@@ -164,7 +202,7 @@ export default function PlanPage() {
     }
   }, [fetchProfile, user, populateLibrary])
 
-  const startProgram = useCallback(async () => {
+  const startProgram = useCallback(async (numWeeks = 13) => {
     if (!user) return
     setGenerating(true)
     const today = new Date().toISOString().split('T')[0]
@@ -172,7 +210,12 @@ export default function PlanPage() {
     if (!newProg) { setGenerating(false); return }
     const prog: Program = { id: newProg.id, startDate: newProg.start_date, totalWeeks: newProg.total_weeks, status: newProg.status }
     setProgram(prog); setCurrentWeek(1); setViewingWeek(1)
-    await generateWeek(prog, 1)
+    setGenerating(false)
+    for (let w = 1; w <= numWeeks; w++) {
+      setGeneratingProgress({ current: w, total: numWeeks })
+      await generateWeek(prog, w, true)
+    }
+    setGeneratingProgress(null)
   }, [user, generateWeek])
 
   const initProgram = useCallback(async () => {
@@ -205,6 +248,17 @@ export default function PlanPage() {
   useEffect(() => { if (user) initProgram() }, [user, initProgram])
   useEffect(() => { const plan = weekPlans[viewingWeek]; if (plan) populateLibrary(plan) }, [viewingWeek, weekPlans, populateLibrary])
   useEffect(() => { setSelectedDayIdx(viewingWeek === currentWeek ? todayIdx : 0) }, [viewingWeek, currentWeek, todayIdx])
+
+  useEffect(() => {
+    if (!user || !program) return
+    const refetch = () => {
+      supabase.from('day_completions').select('week_number, day_index')
+        .eq('program_id', program.id).eq('user_id', user.id)
+        .then(({ data }) => { if (data) setCompletions(new Set(data.map(r => `${r.week_number}-${r.day_index}`))) })
+    }
+    window.addEventListener('focus', refetch)
+    return () => window.removeEventListener('focus', refetch)
+  }, [user, program])
 
   useEffect(() => {
     setLastLog(null); setLogWeight(''); setLogSets(''); setLogReps(''); setLogSaved(false)
@@ -318,6 +372,27 @@ export default function PlanPage() {
 
   if (authLoading || dataLoading) return <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-dim)' }}>Loading...</div>
 
+  if (generatingProgress) {
+    const pct = generatingProgress.total > 0 ? Math.round((generatingProgress.current / generatingProgress.total) * 100) : 0
+    const { label, color } = getPhaseInfo(generatingProgress.current)
+    return (
+      <div style={{ padding: '60px 32px 80px', textAlign: 'center', maxWidth: 480, margin: '0 auto' }}>
+        <div style={{ fontSize: 40, marginBottom: 24 }}>⚡</div>
+        <p style={{ fontWeight: 900, fontSize: 22, marginBottom: 6, letterSpacing: '-0.02em' }}>Building Your Program</p>
+        <p style={{ fontSize: 13, color, fontWeight: 700, marginBottom: 28, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+          Week {generatingProgress.current} of {generatingProgress.total} — {label}
+        </p>
+        <div style={{ height: 6, background: 'var(--border)', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
+          <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 4, transition: 'width 0.6s ease' }} />
+        </div>
+        <p style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 28 }}>{pct}% complete</p>
+        <p style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.7, maxWidth: 300, margin: '0 auto' }}>
+          Your AI coach is designing {generatingProgress.total} weeks of personalized training — exercises, rest times, coaching cues, and phase progression.
+        </p>
+      </div>
+    )
+  }
+
   if (generating && !weekPlans[viewingWeek]) {
     const { label, color } = getPhaseInfo(viewingWeek)
     return (
@@ -332,30 +407,41 @@ export default function PlanPage() {
             100% { opacity: 0; transform: translateY(-80px) scale(1.1); }
           }
           @keyframes pulse { 0%,100% { opacity: 0.5 } 50% { opacity: 1 } }
+          @keyframes bicepFlex {
+            0%, 100% { transform: scale(1) translateY(0px); }
+            35%  { transform: scale(1.10) translateY(-5px); }
+            65%  { transform: scale(1.06) translateY(-3px); }
+          }
         `}</style>
         <div style={{ padding: '60px 32px 80px', textAlign: 'center', maxWidth: 480, margin: '0 auto', position: 'relative' }}>
 
-          {/* Gear rig */}
-          <div style={{ position: 'relative', width: 120, height: 100, margin: '0 auto 32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {/* Large gear */}
-            <div style={{ position: 'absolute', left: 0, top: 10, animation: 'spinCW 2.4s linear infinite', color }}>
-              <svg width="72" height="72" viewBox="0 0 64 64" fill="currentColor" opacity={0.9}>
-                <path d="M27 2h10l2 8a22 22 0 0 1 6.6 2.7l7.6-3.4 7 7-3.4 7.6A22 22 0 0 1 59.8 30L68 32l0 0v-1H56a24 24 0 1 0 0 2h12v1l-8.2 2a22 22 0 0 1-2.7 6.6l3.4 7.6-7 7-7.6-3.4A22 22 0 0 1 39 57.8L37 66H27l-2-8.2A22 22 0 0 1 18.4 55l-7.6 3.4-7-7 3.4-7.6A22 22 0 0 1 4.2 37L2 35 2 29l2.2-2A22 22 0 0 1 7 20.4L3.8 12.8l7-7 7.6 3.4A22 22 0 0 1 25 6.2L27 2zM32 22a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"/>
+          {/* Bicep + Gear rig */}
+          <div style={{ position: 'relative', width: 164, height: 112, margin: '0 auto 32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {/* Large gear — left */}
+            <div style={{ position: 'absolute', left: 0, top: 16, animation: 'spinCW 2.4s linear infinite', color }}>
+              <svg width="72" height="72" viewBox="0 0 64 64" fill="currentColor" opacity={0.85}>
+                <path d="M27 2h10l2 8a22 22 0 0 1 6.6 2.7l7.6-3.4 7 7-3.4 7.6A22 22 0 0 1 59.8 30L68 32v-1H56a24 24 0 1 0 0 2h12v1l-8.2 2a22 22 0 0 1-2.7 6.6l3.4 7.6-7 7-7.6-3.4A22 22 0 0 1 39 57.8L37 66H27l-2-8.2A22 22 0 0 1 18.4 55l-7.6 3.4-7-7 3.4-7.6A22 22 0 0 1 4.2 37L2 35V29l2.2-2A22 22 0 0 1 7 20.4L3.8 12.8l7-7 7.6 3.4A22 22 0 0 1 25 6.2L27 2zM32 22a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"/>
               </svg>
             </div>
-            {/* Small gear */}
-            <div style={{ position: 'absolute', right: 4, top: 0, animation: 'spinCCW 1.6s linear infinite', color: 'var(--accent2, #9333ea)' }}>
-              <svg width="48" height="48" viewBox="0 0 64 64" fill="currentColor" opacity={0.75}>
-                <path d="M27 2h10l2 8a22 22 0 0 1 6.6 2.7l7.6-3.4 7 7-3.4 7.6A22 22 0 0 1 59.8 30L68 32l0 0v-1H56a24 24 0 1 0 0 2h12v1l-8.2 2a22 22 0 0 1-2.7 6.6l3.4 7.6-7 7-7.6-3.4A22 22 0 0 1 39 57.8L37 66H27l-2-8.2A22 22 0 0 1 18.4 55l-7.6 3.4-7-7 3.4-7.6A22 22 0 0 1 4.2 37L2 35 2 29l2.2-2A22 22 0 0 1 7 20.4L3.8 12.8l7-7 7.6 3.4A22 22 0 0 1 25 6.2L27 2zM32 22a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"/>
+            {/* Bicep — static centering wrapper + inner animation wrapper */}
+            <div style={{ position: 'absolute', left: '50%', top: 8, transform: 'translateX(-50%)', zIndex: 2 }}>
+              <div style={{ animation: 'bicepFlex 1.9s ease-in-out infinite', color }}>
+                <AIIcon size={68}/>
+              </div>
+            </div>
+            {/* Small gear — right */}
+            <div style={{ position: 'absolute', right: 0, top: 4, animation: 'spinCCW 1.6s linear infinite', color: 'var(--accent2, #9333ea)' }}>
+              <svg width="50" height="50" viewBox="0 0 64 64" fill="currentColor" opacity={0.75}>
+                <path d="M27 2h10l2 8a22 22 0 0 1 6.6 2.7l7.6-3.4 7 7-3.4 7.6A22 22 0 0 1 59.8 30L68 32v-1H56a24 24 0 1 0 0 2h12v1l-8.2 2a22 22 0 0 1-2.7 6.6l3.4 7.6-7 7-7.6-3.4A22 22 0 0 1 39 57.8L37 66H27l-2-8.2A22 22 0 0 1 18.4 55l-7.6 3.4-7-7 3.4-7.6A22 22 0 0 1 4.2 37L2 35V29l2.2-2A22 22 0 0 1 7 20.4L3.8 12.8l7-7 7.6 3.4A22 22 0 0 1 25 6.2L27 2zM32 22a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"/>
               </svg>
             </div>
-            {/* Sparkles */}
+            {/* Stars floating up */}
             {[
-              { left: 20, delay: '0s',    dur: '2.1s' },
-              { left: 55, delay: '0.7s',  dur: '1.8s' },
-              { left: 88, delay: '1.3s',  dur: '2.4s' },
-              { left: 38, delay: '0.4s',  dur: '1.6s' },
-              { left: 72, delay: '1.0s',  dur: '2.0s' },
+              { left: 14,  delay: '0s',   dur: '2.1s' },
+              { left: 50,  delay: '0.7s', dur: '1.8s' },
+              { left: 100, delay: '1.3s', dur: '2.4s' },
+              { left: 34,  delay: '0.4s', dur: '1.6s' },
+              { left: 130, delay: '1.0s', dur: '2.0s' },
             ].map((s, i) => (
               <div key={i} style={{ position: 'absolute', bottom: 0, left: s.left, animation: `floatUp ${s.dur} ${s.delay} ease-in-out infinite`, fontSize: 13, color, opacity: 0 }}>✦</div>
             ))}
@@ -401,11 +487,20 @@ export default function PlanPage() {
             : 'Tell your AI coach about your sport, goals, and schedule so it can build the right program for you.'}
         </p>
         {profileReady ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 320, margin: '0 auto' }}>
-            <button onClick={startProgram} disabled={generating} style={{ padding: '15px 28px', borderRadius: 12, border: 'none', background: generating ? 'var(--surface2)' : 'var(--accent)', color: generating ? 'var(--text-dim)' : '#fff', fontWeight: 800, fontSize: 15, cursor: generating ? 'default' : 'pointer' }}>
-              {generating ? 'Building Week 1…' : 'Generate My 3-Month Plan →'}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 340, margin: '0 auto' }}>
+            <button onClick={() => startProgram(13)} disabled={generating} style={{ padding: '15px 20px', borderRadius: 12, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer', textAlign: 'left' }}>
+              <div>⭐ 3 Months — Full Program</div>
+              <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.8, marginTop: 3 }}>Recommended · All 13 weeks generated now</div>
             </button>
-            <button onClick={() => router.push('/profile')} style={{ padding: '11px 28px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-mid)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+            <button onClick={() => startProgram(8)} disabled={generating} style={{ padding: '13px 20px', borderRadius: 12, border: '1px solid var(--accent-border)', background: 'var(--accent-bg)', color: 'var(--accent)', fontWeight: 700, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>
+              <div>2 Months (8 weeks)</div>
+              <div style={{ fontSize: 11, fontWeight: 500, opacity: 0.8, marginTop: 2 }}>Foundation + Build phases</div>
+            </button>
+            <button onClick={() => startProgram(4)} disabled={generating} style={{ padding: '13px 20px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontWeight: 700, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>
+              <div>1 Month (4 weeks)</div>
+              <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-dim)', marginTop: 2 }}>Foundation phase only</div>
+            </button>
+            <button onClick={() => router.push('/profile')} style={{ padding: '11px 20px', borderRadius: 12, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-dim)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
               Edit Profile First
             </button>
           </div>
@@ -423,6 +518,12 @@ export default function PlanPage() {
   const progress = Math.round((viewingWeek / TOTAL_WEEKS) * 100)
   const plan = weekPlans[viewingWeek] ?? []
 
+  const weekStartDate = program ? getDayCalendarDate(program.startDate, viewingWeek, 0) : null
+  const weekEndDate = program ? getDayCalendarDate(program.startDate, viewingWeek, 6) : null
+  const weekRange = weekStartDate && weekEndDate
+    ? `${new Date(weekStartDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${new Date(weekEndDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+    : ''
+
   return (
     <>
       <style>{`
@@ -435,6 +536,41 @@ export default function PlanPage() {
           .plan-grid.has-sidebar .plan-left { flex: 1; min-width: 0; }
           .plan-grid.has-sidebar .plan-right { flex: 0 0 300px; }
         }
+        @keyframes rainbowShift {
+          0%   { background-position: 0% 50%; }
+          50%  { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        .ai-gen-btn {
+          display: flex; align-items: center; gap: 6px;
+          padding: 7px 14px; border: none; border-radius: 100px;
+          background: linear-gradient(90deg, #ff2d78, #ff6b35, #ffd700, #00cf88, #00b4ff, #8b5cf6, #ff2d78);
+          background-size: 300% 100%;
+          animation: rainbowShift 4s linear infinite;
+          color: #fff; font-weight: 800; font-size: 13px; letter-spacing: 0.03em;
+          cursor: pointer; font-family: inherit; white-space: nowrap;
+          box-shadow: 0 2px 14px rgba(139,92,246,0.4), 0 1px 4px rgba(0,0,0,0.35);
+          transition: transform 0.15s, box-shadow 0.15s;
+          position: relative;
+        }
+        .ai-gen-btn:hover {
+          transform: scale(1.05);
+          box-shadow: 0 4px 22px rgba(139,92,246,0.6), 0 2px 8px rgba(0,0,0,0.4);
+        }
+        .ai-gen-btn:active { transform: scale(0.96); }
+        .ai-gen-wrap { position: relative; }
+        .ai-gen-tip {
+          display: none; position: absolute; top: calc(100% + 7px); right: 0;
+          background: rgba(10,10,20,0.92); color: #e0e0f0;
+          font-size: 11px; font-weight: 500; padding: 6px 11px;
+          border-radius: 8px; white-space: nowrap; z-index: 200;
+          border: 1px solid rgba(139,92,246,0.3);
+          box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+          pointer-events: none;
+        }
+        @media (hover: hover) {
+          .ai-gen-wrap:hover .ai-gen-tip { display: block; }
+        }
       `}</style>
       <div className={`plan-outer${showRightPanel ? ' with-sidebar' : ''}`}>
 
@@ -443,9 +579,13 @@ export default function PlanPage() {
             <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 2 }}>Your Plan</h1>
             <p style={{ fontSize: 12, color: phaseColor, fontWeight: 700, letterSpacing: '0.04em' }}>{phaseLabel}</p>
           </div>
-          <button onClick={() => setShowRegenModal(true)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', background: 'none', border: '1px solid var(--accent-border)', borderRadius: 20, padding: '6px 12px', cursor: 'pointer', marginTop: 4 }}>
-            <DumbbellSparkleIcon size={18}/>
-          </button>
+          <div className="ai-gen-wrap" style={{ marginTop: 4 }}>
+            <button className="ai-gen-btn" onClick={() => setShowRegenModal(true)}>
+              <AIIcon size={17}/>
+              AI Generate
+            </button>
+            <div className="ai-gen-tip">Rebuild this week&apos;s plan with AI</div>
+          </div>
         </div>
 
         <div className={`plan-grid${showRightPanel ? ' has-sidebar' : ''}`}>
@@ -453,8 +593,8 @@ export default function PlanPage() {
 
             <div style={{ marginTop: 12, marginBottom: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Week {viewingWeek} of {TOTAL_WEEKS}</span>
-                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{progress}%</span>
+                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Week {viewingWeek} of {TOTAL_WEEKS} · {phaseLabel}</span>
+                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{completions.size} day{completions.size !== 1 ? 's' : ''} done</span>
               </div>
               <div style={{ height: 5, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${progress}%`, background: phaseColor, borderRadius: 4, transition: 'width 0.4s ease' }} />
@@ -467,6 +607,7 @@ export default function PlanPage() {
               </button>
               <div style={{ textAlign: 'center' }}>
                 <span style={{ fontSize: 13, fontWeight: 700 }}>Week {viewingWeek}</span>
+                {weekRange && <div style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 600, marginTop: 2 }}>{weekRange}</div>}
                 {viewingWeek === currentWeek && <div style={{ fontSize: 10, color: phaseColor, fontWeight: 700, marginTop: 1 }}>CURRENT</div>}
               </div>
               <button onClick={() => navigateWeek(1)} disabled={viewingWeek >= TOTAL_WEEKS} style={{ fontSize: 13, fontWeight: 600, color: viewingWeek >= TOTAL_WEEKS ? 'var(--text-dim)' : 'var(--accent)', background: 'none', border: 'none', cursor: viewingWeek >= TOTAL_WEEKS ? 'default' : 'pointer', padding: '4px 8px' }}>
@@ -481,10 +622,12 @@ export default function PlanPage() {
                 const isSelected = i === selectedDayIdx
                 const isToday = i === todayIdx && viewingWeek === currentWeek
                 const chipCompleted = completions.has(`${viewingWeek}-${i}`) && plan[i]?.type !== 'rest'
+                const chipDate = program ? new Date(getDayCalendarDate(program.startDate, viewingWeek, i) + 'T12:00:00').getDate() : null
                 return (
-                  <button key={d} onClick={() => setSelectedDayIdx(i)} style={{ flexShrink: 0, width: 42, height: 48, borderRadius: 10, background: isSelected ? 'var(--accent)' : isToday ? 'var(--accent-bg)' : 'var(--surface)', border: `1px solid ${isSelected ? 'var(--accent)' : isToday ? 'var(--accent-border)' : 'var(--border)'}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  <button key={d} onClick={() => setSelectedDayIdx(i)} style={{ flexShrink: 0, width: 44, height: 56, borderRadius: 10, background: isSelected ? 'var(--accent)' : isToday ? 'var(--accent-bg)' : 'var(--surface)', border: `1px solid ${isSelected ? 'var(--accent)' : isToday ? 'var(--accent-border)' : 'var(--border)'}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, cursor: 'pointer', fontFamily: 'inherit' }}>
                     <span style={{ fontSize: 10, fontWeight: 700, color: isSelected ? '#fff' : isToday ? 'var(--accent)' : 'var(--text-dim)' }}>{d}</span>
-                    {chipCompleted && <span style={{ fontSize: 8, lineHeight: 1, color: isSelected ? 'rgba(255,255,255,0.85)' : '#4ec97a' }}>✓</span>}
+                    {chipDate !== null && <span style={{ fontSize: 11, fontWeight: 800, color: isSelected ? 'rgba(255,255,255,0.9)' : isToday ? 'var(--accent)' : 'var(--text)', lineHeight: 1 }}>{chipDate}</span>}
+                    {chipCompleted && <span style={{ fontSize: 7, lineHeight: 1, color: isSelected ? 'rgba(255,255,255,0.85)' : '#4ec97a' }}>✓</span>}
                   </button>
                 )
               })}
@@ -502,19 +645,24 @@ export default function PlanPage() {
               if (!day) return null
               const i = selectedDayIdx
               const isToday = i === todayIdx && viewingWeek === currentWeek
-              const actionable = isDayActionable(viewingWeek, i)
               const completed = completions.has(`${viewingWeek}-${i}`)
               const isRest = day.type === 'rest'
+              const calDate = program ? getDayCalendarDate(program.startDate, viewingWeek, i) : null
+              const href = calDate ? `/calendar?date=${calDate}` : '/calendar'
               return (
-                <div style={{ background: isToday ? (TYPE_BG[day.type] ?? 'var(--surface)') : 'var(--surface)', border: `1px solid ${isToday ? (TYPE_BORDER[day.type] ?? 'var(--border)') : 'var(--border)'}`, borderRadius: 12, padding: '14px 16px' }}>
+                <Link href={href} style={{ display: 'block', textDecoration: 'none', color: 'inherit', background: isToday ? (TYPE_BG[day.type] ?? 'var(--surface)') : 'var(--surface)', border: `1px solid ${isToday ? (TYPE_BORDER[day.type] ?? 'var(--border)') : 'var(--border)'}`, borderRadius: 12, padding: '14px 16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: (!isRest && (day.focus || day.coaching)) ? 6 : 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, minWidth: 28, letterSpacing: '0.04em', color: TYPE_COLOR[day.type] ?? 'var(--text-dim)' }}>{day.day}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 38 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', color: TYPE_COLOR[day.type] ?? 'var(--text-dim)' }}>{day.day}</span>
+                        {calDate && <span style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 600 }}>{new Date(calDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
+                      </div>
                       <span style={{ fontWeight: 700, fontSize: 14 }}>{day.label}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {completed && !isRest && <span style={{ fontSize: 12, fontWeight: 800, color: '#4ec97a' }}>✓ Done</span>}
+                      {completed && !isRest && <span style={{ fontSize: 12, fontWeight: 800, color: '#4ec97a' }}>✓</span>}
                       <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{day.duration}</span>
+                      <span style={{ fontSize: 18, color: 'var(--accent)', fontWeight: 300, lineHeight: 1 }}>›</span>
                     </div>
                   </div>
 
@@ -536,23 +684,26 @@ export default function PlanPage() {
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: actionable && !isRest && !completed ? 10 : 0 }}>
-                    {day.movements.map((m, mi) => {
-                      const detail = exerciseLibrary[normalizeExerciseName(parseExerciseName(m))]
-                      return (
-                        <button key={mi} onClick={() => setSelectedExercise(detail ?? fallbackDetail(m, day))} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-mid)', cursor: 'pointer', fontFamily: 'inherit' }}>
-                          {m}
-                        </button>
-                      )
-                    })}
-                  </div>
-
-                  {actionable && !isRest && !completed && (
-                    <button onClick={() => handleCompleteDay(viewingWeek, i)} disabled={completing} style={{ width: '100%', padding: '9px', borderRadius: 8, border: '1px solid rgba(78,201,122,0.3)', background: 'rgba(78,201,122,0.08)', color: '#4ec97a', fontWeight: 700, fontSize: 12, cursor: completing ? 'default' : 'pointer', fontFamily: 'inherit', letterSpacing: '0.04em' }}>
-                      {completing ? '…' : '✓  Complete Day'}
-                    </button>
+                  {day.daily_session ? (
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      {PLAN_BLOCK_ORDER.map(bk => {
+                        const block = day.daily_session![bk]
+                        if (!block) return null
+                        const meta = PLAN_BLOCK_META[bk]
+                        return (
+                          <div key={bk} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+                            <span style={{ fontSize: 14, flexShrink: 0 }}>{meta.icon}</span>
+                            <span style={{ fontSize: 8, fontWeight: 800, color: meta.color, letterSpacing: '0.06em', width: 54, flexShrink: 0, textTransform: 'uppercase' }}>{meta.label}</span>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{block.label}</span>
+                            <span style={{ fontSize: 10, color: 'var(--text-dim)', flexShrink: 0 }}>{block.duration}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: 12, color: 'var(--text-dim)', fontStyle: 'italic', marginTop: 4 }}>Tap to open in Calendar →</p>
                   )}
-                </div>
+                </Link>
               )
             })()}
 
