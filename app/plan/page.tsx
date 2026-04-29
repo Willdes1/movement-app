@@ -31,6 +31,16 @@ function extractDisplayNames(plan: DayPlan[]) {
 
 const TOTAL_WEEKS = 13
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const COMPLETION_MESSAGES = [
+  'You crushed it. Every rep counts.',
+  'Built different. Keep going.',
+  'Records were made for breaking.',
+  'Another day, another win.',
+  'You hit your numbers. Respect.',
+  'Consistency is the cheat code.',
+  "That's what champions do.",
+  'One more day closer to your best.',
+]
 const TYPE_COLOR: Record<string, string> = { workout: 'var(--accent)', warmup: 'var(--orange)', cooldown: 'var(--yellow)', morning: 'var(--green)', abs: 'var(--accent)', evening: 'var(--orange)', rest: 'var(--text-dim)' }
 const TYPE_BG: Record<string, string> = { workout: 'var(--accent-bg)', warmup: 'var(--orange-bg)', cooldown: 'var(--yellow-bg)', morning: 'var(--green-bg)', abs: 'var(--accent-bg)', evening: 'var(--orange-bg)', rest: 'rgba(120,130,148,0.06)' }
 const TYPE_BORDER: Record<string, string> = { workout: 'var(--accent-border)', warmup: 'var(--orange-border)', cooldown: 'var(--yellow-border)', morning: 'var(--green-border)', abs: 'var(--accent-border)', evening: 'var(--orange-border)', rest: 'var(--border)' }
@@ -94,6 +104,8 @@ export default function PlanPage() {
   const [missedDays, setMissedDays] = useState<string[]>([])
   const [pendingComplete, setPendingComplete] = useState<{ weekNum: number; dayIdx: number } | null>(null)
   const [completing, setCompleting] = useState(false)
+  const [selectedDayIdx, setSelectedDayIdx] = useState(todayIdx)
+  const [completionMsg, setCompletionMsg] = useState<string | null>(null)
 
   useEffect(() => {
     if (!authLoading && !user) router.replace('/auth')
@@ -192,6 +204,7 @@ export default function PlanPage() {
 
   useEffect(() => { if (user) initProgram() }, [user, initProgram])
   useEffect(() => { const plan = weekPlans[viewingWeek]; if (plan) populateLibrary(plan) }, [viewingWeek, weekPlans, populateLibrary])
+  useEffect(() => { setSelectedDayIdx(viewingWeek === currentWeek ? todayIdx : 0) }, [viewingWeek, currentWeek, todayIdx])
 
   useEffect(() => {
     setLastLog(null); setLogWeight(''); setLogSets(''); setLogReps(''); setLogSaved(false)
@@ -214,6 +227,9 @@ export default function PlanPage() {
     await supabase.from('day_completions').upsert({ user_id: user.id, program_id: program.id, week_number: weekNum, day_index: dayIdx, skipped: false }, { onConflict: 'user_id,program_id,week_number,day_index' })
     setCompletions(prev => new Set([...prev, `${weekNum}-${dayIdx}`]))
     setCompleting(false)
+    const msg = COMPLETION_MESSAGES[Math.floor(Math.random() * COMPLETION_MESSAGES.length)]
+    setCompletionMsg(msg)
+    setTimeout(() => setCompletionMsg(null), 4000)
   }
 
   async function handleCompleteDay(weekNum: number, dayIdx: number) {
@@ -417,73 +433,84 @@ export default function PlanPage() {
             {error && <div style={{ padding: '12px 16px', background: 'var(--orange-bg)', border: '1px solid var(--orange-border)', borderRadius: 10, marginBottom: 16, fontSize: 13 }}>{error}</div>}
 
             <div style={{ display: 'flex', gap: 8, marginBottom: 20, overflowX: 'auto', paddingBottom: 4 }}>
-              {DAYS.map((d, i) => (
-                <div key={d} style={{ flexShrink: 0, width: 42, height: 42, borderRadius: 10, background: i === todayIdx && viewingWeek === currentWeek ? 'var(--accent)' : 'var(--surface)', border: `1px solid ${i === todayIdx && viewingWeek === currentWeek ? 'var(--accent)' : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: i === todayIdx && viewingWeek === currentWeek ? '#fff' : 'var(--text-dim)' }}>{d}</span>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {plan.map((day, i) => {
+              {DAYS.map((d, i) => {
+                const isSelected = i === selectedDayIdx
                 const isToday = i === todayIdx && viewingWeek === currentWeek
-                const actionable = isDayActionable(viewingWeek, i)
-                const completed = completions.has(`${viewingWeek}-${i}`)
-                const isRest = day.type === 'rest'
+                const chipCompleted = completions.has(`${viewingWeek}-${i}`) && plan[i]?.type !== 'rest'
                 return (
-                  <div key={day.day} style={{ background: isToday ? (TYPE_BG[day.type] ?? 'var(--surface)') : 'var(--surface)', border: `1px solid ${isToday ? (TYPE_BORDER[day.type] ?? 'var(--border)') : 'var(--border)'}`, borderRadius: 12, padding: '14px 16px' }}>
-                    {/* Header row */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: (!isRest && (day.focus || day.coaching)) ? 6 : 8 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, minWidth: 28, letterSpacing: '0.04em', color: TYPE_COLOR[day.type] ?? 'var(--text-dim)' }}>{day.day}</span>
-                        <span style={{ fontWeight: 700, fontSize: 14 }}>{day.label}</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        {completed && !isRest && <span style={{ fontSize: 12, fontWeight: 800, color: '#4ec97a' }}>✓</span>}
-                        <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{day.duration}</span>
-                      </div>
-                    </div>
-
-                    {/* Focus, rest protocol, coaching note */}
-                    {!isRest && (day.focus || day.rest || day.coaching) && (
-                      <div style={{ marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
-                        {day.focus && (
-                          <p style={{ fontSize: 11, fontWeight: 700, color: TYPE_COLOR[day.type] ?? 'var(--text-dim)', marginBottom: 4, letterSpacing: '0.02em' }}>{day.focus}</p>
-                        )}
-                        {day.rest && day.rest.between_sets !== '—' && (
-                          <p style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: day.coaching ? 6 : 0 }}>
-                            ⏱ {day.rest.between_sets} between sets · {day.rest.between_rounds} between rounds
-                          </p>
-                        )}
-                        {day.coaching && (
-                          <p style={{ fontSize: 12, color: 'var(--text-mid)', fontStyle: 'italic', lineHeight: 1.55, borderLeft: '2px solid var(--border)', paddingLeft: 8 }}>
-                            {day.coaching}
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Movement tags */}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: actionable && !isRest && !completed ? 10 : 0 }}>
-                      {day.movements.map((m, mi) => {
-                        const detail = exerciseLibrary[normalizeExerciseName(parseExerciseName(m))]
-                        return (
-                          <button key={mi} onClick={() => setSelectedExercise(detail ?? fallbackDetail(m, day))} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-mid)', cursor: 'pointer', fontFamily: 'inherit' }}>
-                            {m}
-                          </button>
-                        )
-                      })}
-                    </div>
-
-                    {actionable && !isRest && !completed && (
-                      <button onClick={() => handleCompleteDay(viewingWeek, i)} disabled={completing} style={{ width: '100%', padding: '9px', borderRadius: 8, border: '1px solid rgba(78,201,122,0.3)', background: 'rgba(78,201,122,0.08)', color: '#4ec97a', fontWeight: 700, fontSize: 12, cursor: completing ? 'default' : 'pointer', fontFamily: 'inherit', letterSpacing: '0.04em' }}>
-                        {completing ? '…' : '✓  Complete Day'}
-                      </button>
-                    )}
-                  </div>
+                  <button key={d} onClick={() => setSelectedDayIdx(i)} style={{ flexShrink: 0, width: 42, height: 48, borderRadius: 10, background: isSelected ? 'var(--accent)' : isToday ? 'var(--accent-bg)' : 'var(--surface)', border: `1px solid ${isSelected ? 'var(--accent)' : isToday ? 'var(--accent-border)' : 'var(--border)'}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: isSelected ? '#fff' : isToday ? 'var(--accent)' : 'var(--text-dim)' }}>{d}</span>
+                    {chipCompleted && <span style={{ fontSize: 8, lineHeight: 1, color: isSelected ? 'rgba(255,255,255,0.85)' : '#4ec97a' }}>✓</span>}
+                  </button>
                 )
               })}
             </div>
+
+            {completionMsg && (
+              <div style={{ padding: '14px 16px', background: 'rgba(78,201,122,0.1)', border: '1px solid rgba(78,201,122,0.3)', borderRadius: 12, marginBottom: 12, textAlign: 'center' }}>
+                <p style={{ fontSize: 13, fontWeight: 800, color: '#4ec97a', marginBottom: 3 }}>✓ Day Complete!</p>
+                <p style={{ fontSize: 13, color: 'var(--text-mid)' }}>{completionMsg}</p>
+              </div>
+            )}
+
+            {(() => {
+              const day = plan[selectedDayIdx]
+              if (!day) return null
+              const i = selectedDayIdx
+              const isToday = i === todayIdx && viewingWeek === currentWeek
+              const actionable = isDayActionable(viewingWeek, i)
+              const completed = completions.has(`${viewingWeek}-${i}`)
+              const isRest = day.type === 'rest'
+              return (
+                <div style={{ background: isToday ? (TYPE_BG[day.type] ?? 'var(--surface)') : 'var(--surface)', border: `1px solid ${isToday ? (TYPE_BORDER[day.type] ?? 'var(--border)') : 'var(--border)'}`, borderRadius: 12, padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: (!isRest && (day.focus || day.coaching)) ? 6 : 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, minWidth: 28, letterSpacing: '0.04em', color: TYPE_COLOR[day.type] ?? 'var(--text-dim)' }}>{day.day}</span>
+                      <span style={{ fontWeight: 700, fontSize: 14 }}>{day.label}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {completed && !isRest && <span style={{ fontSize: 12, fontWeight: 800, color: '#4ec97a' }}>✓ Done</span>}
+                      <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{day.duration}</span>
+                    </div>
+                  </div>
+
+                  {!isRest && (day.focus || day.rest || day.coaching) && (
+                    <div style={{ marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
+                      {day.focus && (
+                        <p style={{ fontSize: 11, fontWeight: 700, color: TYPE_COLOR[day.type] ?? 'var(--text-dim)', marginBottom: 4, letterSpacing: '0.02em' }}>{day.focus}</p>
+                      )}
+                      {day.rest && day.rest.between_sets !== '—' && (
+                        <p style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: day.coaching ? 6 : 0 }}>
+                          ⏱ {day.rest.between_sets} between sets · {day.rest.between_rounds} between rounds
+                        </p>
+                      )}
+                      {day.coaching && (
+                        <p style={{ fontSize: 12, color: 'var(--text-mid)', fontStyle: 'italic', lineHeight: 1.55, borderLeft: '2px solid var(--border)', paddingLeft: 8 }}>
+                          {day.coaching}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: actionable && !isRest && !completed ? 10 : 0 }}>
+                    {day.movements.map((m, mi) => {
+                      const detail = exerciseLibrary[normalizeExerciseName(parseExerciseName(m))]
+                      return (
+                        <button key={mi} onClick={() => setSelectedExercise(detail ?? fallbackDetail(m, day))} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-mid)', cursor: 'pointer', fontFamily: 'inherit' }}>
+                          {m}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {actionable && !isRest && !completed && (
+                    <button onClick={() => handleCompleteDay(viewingWeek, i)} disabled={completing} style={{ width: '100%', padding: '9px', borderRadius: 8, border: '1px solid rgba(78,201,122,0.3)', background: 'rgba(78,201,122,0.08)', color: '#4ec97a', fontWeight: 700, fontSize: 12, cursor: completing ? 'default' : 'pointer', fontFamily: 'inherit', letterSpacing: '0.04em' }}>
+                      {completing ? '…' : '✓  Complete Day'}
+                    </button>
+                  )}
+                </div>
+              )
+            })()}
 
             {viewingWeek === TOTAL_WEEKS && plan.length > 0 && (
               <div style={{ marginTop: 24, padding: '20px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, textAlign: 'center' }}>
