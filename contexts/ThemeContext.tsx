@@ -4,7 +4,7 @@ import { getActiveRecovery, setActiveRecovery, clearActiveRecovery, type ActiveR
 
 type ThemeContextType = {
   activeRecovery: ActiveRecovery | null
-  setRecovery: (playbook: string, phase: number) => void
+  setRecovery: (playbook: string, phase: number, extra?: Partial<Pick<ActiveRecovery, 'planId' | 'injury' | 'totalPhases'>>) => void
   clearRecovery: () => void
 }
 
@@ -31,8 +31,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [activeRecovery])
 
-  const setRecovery = useCallback((playbook: string, phase: number) => {
-    const r = { playbook, phase }
+  const setRecovery = useCallback((playbook: string, phase: number, extra?: Partial<Pick<ActiveRecovery, 'planId' | 'injury' | 'totalPhases'>>) => {
+    const r = { playbook, phase, ...extra }
     setActiveRecovery(r)
     setActiveRecoveryState(r)
   }, [])

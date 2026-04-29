@@ -149,9 +149,13 @@ export default function TodayPage() {
 
         {isRecovering && (
           <>
-            <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 4 }}>SI Joint Recovery</div>
-            <div style={{ fontSize: 12, color: 'var(--text-mid)', lineHeight: 1.5, marginBottom: 14 }}>Phase {activeRecovery.phase} · Continue where you left off</div>
-            <Link href="/recovery/si-joint" style={{ display: 'block', padding: '14px', borderRadius: 12, background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%)', color: '#fff', fontWeight: 900, fontSize: 14, textAlign: 'center', textDecoration: 'none', letterSpacing: '0.03em', textTransform: 'uppercase', boxShadow: '0 6px 24px var(--accent-shadow)' }}>
+            <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 4 }}>
+              {activeRecovery.planId ? (activeRecovery.injury ?? 'Injury Recovery') : 'SI Joint Recovery'}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-mid)', lineHeight: 1.5, marginBottom: 14 }}>
+              Phase {activeRecovery.phase}{activeRecovery.totalPhases ? ` of ${activeRecovery.totalPhases}` : ''} · Continue where you left off
+            </div>
+            <Link href={activeRecovery.planId ? '/recovery/return-to-sport' : '/recovery/si-joint'} style={{ display: 'block', padding: '14px', borderRadius: 12, background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%)', color: '#fff', fontWeight: 900, fontSize: 14, textAlign: 'center', textDecoration: 'none', letterSpacing: '0.03em', textTransform: 'uppercase', boxShadow: '0 6px 24px var(--accent-shadow)' }}>
               ▶ Resume Session
             </Link>
           </>

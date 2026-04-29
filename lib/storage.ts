@@ -54,7 +54,13 @@ export function setGateChecks(checks: boolean[]) {
 }
 
 // Active recovery tracking
-export type ActiveRecovery = { playbook: string; phase: number }
+export type ActiveRecovery = {
+  playbook: string
+  phase: number
+  planId?: string
+  injury?: string
+  totalPhases?: number
+}
 export function getActiveRecovery(): ActiveRecovery | null {
   const raw = safeGet('mv_active_recovery')
   if (!raw) return null
