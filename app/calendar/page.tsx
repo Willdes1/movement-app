@@ -50,6 +50,19 @@ function normalizeExerciseName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '_')
 }
 
+function fallbackDetail(m: string, day: DayPlan): ExerciseDetail {
+  const name = parseExerciseName(m)
+  const restNote = day.rest && day.rest.between_sets !== '—' ? ` Rest ${day.rest.between_sets} between sets.` : ''
+  return {
+    name_normalized: normalizeExerciseName(name),
+    name_display: name,
+    how: 'Detailed coaching for this exercise is still loading. Check back in a few seconds, or navigate to Your Plan to see full instructions.',
+    breathing: 'Exhale on exertion — the push, pull, or drive phase. Inhale slowly and controlled on the return.',
+    core: 'Brace your core before every rep. Think of pulling your navel toward your spine throughout the set.',
+    tip: (day.coaching ?? 'Focus on controlled form over speed.') + restNote,
+  }
+}
+
 const TOTAL_WEEKS = 13
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -180,14 +193,17 @@ export default function CalendarPage() {
     setCompleting(false)
   }
 
-  // Build date → plan day map from all generated weeks
-  const dayMap: Record<string, { day: DayPlan; weekNum: number }> = {}
+  // Build date → plan day map using day-of-week alignment (matches plan page's day_index convention)
+  const dayMap: Record<string, { day: DayPlan; weekNum: number; dayIdx: number }> = {}
   if (program) {
     Object.entries(weekPlans).forEach(([weekStr, plan]) => {
       const weekNum = Number(weekStr)
-      plan.forEach((day, idx) => {
-        const key = dateKey(planDayToDate(program.startDate, weekNum, idx))
-        dayMap[key] = { day, weekNum }
+      plan.forEach((_, seqIdx) => {
+        const calDate = planDayToDate(program.startDate, weekNum, seqIdx)
+        const key = dateKey(calDate)
+        // Use actual day-of-week (Mon=0) to index into the plan — same as plan page's todayIdx
+        const dowIdx = (calDate.getDay() + 6) % 7
+        dayMap[key] = { day: plan[dowIdx] ?? plan[seqIdx], weekNum, dayIdx: dowIdx }
       })
     })
   }
@@ -365,11 +381,11 @@ export default function CalendarPage() {
               return (
                 <button
                   key={i}
-                  onClick={() => detail && setSelectedExercise(detail)}
+                  onClick={() => setSelectedExercise(detail ?? fallbackDetail(m, selectedEntry.day))}
                   style={{
                     fontSize: 11, padding: '4px 10px', borderRadius: 20,
                     background: 'var(--surface)', border: '1px solid var(--border)',
-                    color: 'var(--text-mid)', cursor: detail ? 'pointer' : 'default',
+                    color: 'var(--text-mid)', cursor: 'pointer',
                     fontFamily: 'inherit',
                   }}
                 >
@@ -380,14 +396,7 @@ export default function CalendarPage() {
           </div>
           {(() => {
             if (!selectedEntry || selectedEntry.day.type === 'rest') return null
-            const dayIdx = (() => {
-              if (!program || !selectedKey) return -1
-              const cellDate = new Date(selectedKey + 'T12:00:00')
-              const start = new Date(program.startDate)
-              const diffDays = Math.floor((cellDate.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-              return diffDays % 7
-            })()
-            if (dayIdx < 0) return null
+            const { dayIdx } = selectedEntry
             const compKey = `${selectedEntry.weekNum}-${dayIdx}`
             const done = completions.has(compKey)
             const isPastOrToday = selectedKey! <= dateKey(new Date())
