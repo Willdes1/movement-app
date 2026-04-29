@@ -321,12 +321,56 @@ export default function PlanPage() {
   if (generating && !weekPlans[viewingWeek]) {
     const { label, color } = getPhaseInfo(viewingWeek)
     return (
-      <div style={{ padding: '80px 32px', textAlign: 'center', maxWidth: 600, margin: '0 auto' }}>
-        <div style={{ fontSize: 40, marginBottom: 20 }}>⚡</div>
-        <p style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>Building Week {viewingWeek}…</p>
-        <p style={{ fontSize: 13, color, fontWeight: 600, marginBottom: 12 }}>{label}</p>
-        <p style={{ color: 'var(--text-dim)', fontSize: 14, lineHeight: 1.6 }}>Your 3-month program generates week by week — each week is built fresh when you need it. Takes about 10 seconds.</p>
-      </div>
+      <>
+        <style>{`
+          @keyframes spinCW  { from { transform: rotate(0deg) }   to { transform: rotate(360deg) } }
+          @keyframes spinCCW { from { transform: rotate(0deg) }   to { transform: rotate(-360deg) } }
+          @keyframes floatUp {
+            0%   { opacity: 0; transform: translateY(0px) scale(0.6); }
+            20%  { opacity: 1; }
+            80%  { opacity: 0.7; }
+            100% { opacity: 0; transform: translateY(-80px) scale(1.1); }
+          }
+          @keyframes pulse { 0%,100% { opacity: 0.5 } 50% { opacity: 1 } }
+        `}</style>
+        <div style={{ padding: '60px 32px 80px', textAlign: 'center', maxWidth: 480, margin: '0 auto', position: 'relative' }}>
+
+          {/* Gear rig */}
+          <div style={{ position: 'relative', width: 120, height: 100, margin: '0 auto 32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {/* Large gear */}
+            <div style={{ position: 'absolute', left: 0, top: 10, animation: 'spinCW 2.4s linear infinite', color }}>
+              <svg width="72" height="72" viewBox="0 0 64 64" fill="currentColor" opacity={0.9}>
+                <path d="M27 2h10l2 8a22 22 0 0 1 6.6 2.7l7.6-3.4 7 7-3.4 7.6A22 22 0 0 1 59.8 30L68 32l0 0v-1H56a24 24 0 1 0 0 2h12v1l-8.2 2a22 22 0 0 1-2.7 6.6l3.4 7.6-7 7-7.6-3.4A22 22 0 0 1 39 57.8L37 66H27l-2-8.2A22 22 0 0 1 18.4 55l-7.6 3.4-7-7 3.4-7.6A22 22 0 0 1 4.2 37L2 35 2 29l2.2-2A22 22 0 0 1 7 20.4L3.8 12.8l7-7 7.6 3.4A22 22 0 0 1 25 6.2L27 2zM32 22a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"/>
+              </svg>
+            </div>
+            {/* Small gear */}
+            <div style={{ position: 'absolute', right: 4, top: 0, animation: 'spinCCW 1.6s linear infinite', color: 'var(--accent2, #9333ea)' }}>
+              <svg width="48" height="48" viewBox="0 0 64 64" fill="currentColor" opacity={0.75}>
+                <path d="M27 2h10l2 8a22 22 0 0 1 6.6 2.7l7.6-3.4 7 7-3.4 7.6A22 22 0 0 1 59.8 30L68 32l0 0v-1H56a24 24 0 1 0 0 2h12v1l-8.2 2a22 22 0 0 1-2.7 6.6l3.4 7.6-7 7-7.6-3.4A22 22 0 0 1 39 57.8L37 66H27l-2-8.2A22 22 0 0 1 18.4 55l-7.6 3.4-7-7 3.4-7.6A22 22 0 0 1 4.2 37L2 35 2 29l2.2-2A22 22 0 0 1 7 20.4L3.8 12.8l7-7 7.6 3.4A22 22 0 0 1 25 6.2L27 2zM32 22a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"/>
+              </svg>
+            </div>
+            {/* Sparkles */}
+            {[
+              { left: 20, delay: '0s',    dur: '2.1s' },
+              { left: 55, delay: '0.7s',  dur: '1.8s' },
+              { left: 88, delay: '1.3s',  dur: '2.4s' },
+              { left: 38, delay: '0.4s',  dur: '1.6s' },
+              { left: 72, delay: '1.0s',  dur: '2.0s' },
+            ].map((s, i) => (
+              <div key={i} style={{ position: 'absolute', bottom: 0, left: s.left, animation: `floatUp ${s.dur} ${s.delay} ease-in-out infinite`, fontSize: 13, color, opacity: 0 }}>✦</div>
+            ))}
+          </div>
+
+          {/* Text */}
+          <p style={{ fontWeight: 900, fontSize: 20, marginBottom: 6, letterSpacing: '-0.02em', animation: 'pulse 2s ease-in-out infinite' }}>
+            Building Week {viewingWeek}…
+          </p>
+          <p style={{ fontSize: 12, color, fontWeight: 700, marginBottom: 16, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{label}</p>
+          <p style={{ color: 'var(--text-dim)', fontSize: 13, lineHeight: 1.7, maxWidth: 320, margin: '0 auto' }}>
+            Your AI coach is designing this week&apos;s workouts — exercise selection, rest times, coaching cues, and phase intensity. Takes about 10 seconds.
+          </p>
+        </div>
+      </>
     )
   }
 
