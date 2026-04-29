@@ -7,22 +7,22 @@ import LaunchpadTab from '@/components/admin/LaunchpadTab'
 
 // ─── PALETTE ─────────────────────────────────────────────────────────────────
 const C = {
-  bg: '#020208',
-  surface: 'rgba(0,15,50,0.85)',
-  surface2: 'rgba(0,25,70,0.6)',
-  border: 'rgba(0,180,255,0.13)',
-  accent: '#00b4ff',
-  accentDim: 'rgba(0,180,255,0.1)',
-  accentBorder: 'rgba(0,180,255,0.28)',
-  green: '#00ff88',
-  greenDim: 'rgba(0,255,136,0.08)',
-  amber: '#ffb340',
-  amberDim: 'rgba(255,179,64,0.1)',
-  red: '#ff4466',
-  purple: '#c084fc',
-  text: '#dff0ff',
-  textMid: '#5a9ab8',
-  textDim: '#2e6880',
+  bg: '#0d1117',
+  surface: '#161b22',
+  surface2: '#21262d',
+  border: '#30363d',
+  accent: '#3b82f6',
+  accentDim: 'rgba(59,130,246,0.12)',
+  accentBorder: 'rgba(59,130,246,0.3)',
+  green: '#22c55e',
+  greenDim: 'rgba(34,197,94,0.1)',
+  amber: '#f59e0b',
+  amberDim: 'rgba(245,158,11,0.1)',
+  red: '#ef4444',
+  purple: '#a78bfa',
+  text: '#e6edf3',
+  textMid: '#b1bac4',
+  textDim: '#6e7681',
 }
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -58,8 +58,8 @@ function RoleBadge({ role }: { role: string }) {
   const cfg: Record<string, { bg: string; color: string }> = {
     admin: { bg: C.amberDim, color: C.amber },
     beta: { bg: C.greenDim, color: C.green },
-    ff:   { bg: 'rgba(0,180,255,0.12)', color: '#00b4ff' },
-    free: { bg: 'rgba(0,180,255,0.06)', color: C.textMid },
+    ff:   { bg: 'rgba(168,85,247,0.1)', color: '#a855f7' },
+    free: { bg: 'rgba(110,118,129,0.1)', color: C.textDim },
   }
   const s = cfg[role] ?? cfg.free
   return <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', background: s.bg, color: s.color, border: `1px solid ${s.color}30`, fontFamily: 'monospace' }}>{role}</span>
@@ -69,21 +69,21 @@ function SectionHead({ title, sub }: { title: string; sub?: string }) {
   return (
     <div style={{ marginBottom: 20 }}>
       <h2 style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.01em', color: C.text, marginBottom: sub ? 4 : 0 }}>{title}</h2>
-      {sub && <p style={{ fontSize: 12, color: C.textDim, fontFamily: 'monospace', letterSpacing: '0.04em' }}>{sub}</p>}
+      {sub && <p style={{ fontSize: 13, color: C.textDim }}>{sub}</p>}
     </div>
   )
 }
 
 function TableHeader({ cols }: { cols: { label: string; width?: string | number }[] }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: cols.map(c => c.width ?? '1fr').join(' '), padding: '10px 20px', borderBottom: `1px solid ${C.border}`, background: 'rgba(0,180,255,0.04)' }}>
-      {cols.map(c => <span key={c.label} style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: C.textDim, fontFamily: 'monospace' }}>{c.label}</span>)}
+    <div style={{ display: 'grid', gridTemplateColumns: cols.map(c => c.width ?? '1fr').join(' '), padding: '10px 20px', borderBottom: `1px solid ${C.border}`, background: C.surface2 }}>
+      {cols.map(c => <span key={c.label} style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: C.textDim }}>{c.label}</span>)}
     </div>
   )
 }
 
 function Panel({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', backdropFilter: 'blur(8px)', ...style }}>{children}</div>
+  return <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', ...style }}>{children}</div>
 }
 
 function EmptyState({ msg }: { msg: string }) {
@@ -125,10 +125,9 @@ function OverviewTab({ users, events, kpis, isMobile }: {
             border: `1px solid ${C.border}`,
             borderRadius: 10,
             borderTop: `2px solid ${k.accent}`,
-            backdropFilter: 'blur(8px)',
-            boxShadow: `0 0 20px ${k.accent}08`,
+            boxShadow: `0 1px 3px rgba(0,0,0,0.2)`,
           }}>
-            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: C.textDim, marginBottom: 10, fontFamily: 'monospace' }}>{k.label}</p>
+            <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: C.textDim, marginBottom: 10 }}>{k.label}</p>
             <p style={{ fontSize: 36, fontWeight: 800, letterSpacing: '-0.04em', color: k.accent, marginBottom: 4, textShadow: `0 0 20px ${k.accent}60` }}>{k.value}</p>
             <p style={{ fontSize: 11, color: String(k.sub).startsWith('↑') ? C.green : C.textDim, fontFamily: 'monospace' }}>{k.sub}</p>
           </div>
@@ -159,12 +158,12 @@ function OverviewTab({ users, events, kpis, isMobile }: {
           </div>
           {users.map((u, i) => (
             <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 20px', borderBottom: i < users.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-              <div style={{ width: 28, height: 28, borderRadius: '50%', background: u.role === 'admin' ? C.accentDim : 'rgba(0,25,60,0.8)', border: `1px solid ${u.role === 'admin' ? C.accentBorder : C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 11, color: u.role === 'admin' ? C.accent : C.textMid, flexShrink: 0, fontFamily: 'monospace' }}>
+              <div style={{ width: 28, height: 28, borderRadius: '50%', background: u.role === 'admin' ? C.accentDim : C.surface2, border: `1px solid ${u.role === 'admin' ? C.accentBorder : C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 11, color: u.role === 'admin' ? C.accent : C.textMid, flexShrink: 0 }}>
                 {displayName(u)[0]?.toUpperCase() ?? '?'}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: C.text }}>{u.email}</p>
-                <p style={{ fontSize: 10, color: C.textDim, fontFamily: 'monospace' }}>{u.hasProgram ? `${u.weeksGenerated}w · ${u.daysCompleted} days` : 'No plan'}</p>
+                <p style={{ fontSize: 10, color: C.textDim }}>{u.hasProgram ? `${u.weeksGenerated}w · ${u.daysCompleted} days` : 'No plan'}</p>
               </div>
               <RoleBadge role={u.role} />
             </div>
@@ -446,7 +445,7 @@ function PromosTab({ promos, onRefresh }: { promos: PromoRow[]; onRefresh: () =>
             <span style={{ fontWeight: 800, letterSpacing: '0.1em', fontFamily: 'monospace', fontSize: 14, color: C.accent, textShadow: `0 0 12px ${C.accent}60` }}>{p.code}</span>
             <RoleBadge role={p.role ?? 'beta'} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ flex: 1, height: 3, background: 'rgba(0,180,255,0.1)', borderRadius: 2, maxWidth: 140 }}>
+              <div style={{ flex: 1, height: 3, background: C.surface2, borderRadius: 2, maxWidth: 140 }}>
                 <div style={{ height: '100%', borderRadius: 2, background: C.accent, width: `${Math.min(((p.uses ?? 0) / (p.max_uses ?? 10)) * 100, 100)}%`, boxShadow: `0 0 6px ${C.accent}` }} />
               </div>
               <span style={{ fontSize: 11, color: C.textDim, fontFamily: 'monospace' }}>{p.uses ?? 0} / {p.max_uses ?? '∞'}</span>
@@ -470,7 +469,7 @@ function PlaceholderTab({ label, bullets }: { label: string; bullets: string[] }
       <p style={{ fontWeight: 700, fontSize: 17, color: C.text }}>{label}</p>
       <p style={{ fontSize: 12, color: C.textDim, textAlign: 'center', maxWidth: 300, lineHeight: 1.6, fontFamily: 'monospace' }}>This section is coming in the next build phase.</p>
       {bullets.length > 0 && (
-        <div style={{ marginTop: 8, padding: '16px 20px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, maxWidth: 360, width: '100%', backdropFilter: 'blur(8px)' }}>
+        <div style={{ marginTop: 8, padding: '16px 20px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, maxWidth: 360, width: '100%' }}>
           {bullets.map(b => (
             <div key={b} style={{ display: 'flex', gap: 10, marginBottom: 8, alignItems: 'flex-start' }}>
               <span style={{ color: C.accent, fontSize: 12, flexShrink: 0, marginTop: 1 }}>→</span>
@@ -663,8 +662,8 @@ export default function AdminPage() {
 
   if (authLoading || (!isAdmin && !authLoading)) {
     return (
-      <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#020208', color: '#2e6880', fontSize: 13, fontFamily: 'monospace', letterSpacing: '0.06em' }}>
-        {authLoading ? '// AUTHENTICATING…' : '// ACCESS DENIED'}
+      <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.bg, color: C.textDim, fontSize: 14 }}>
+        {authLoading ? 'Loading…' : 'Access denied'}
       </div>
     )
   }
@@ -677,51 +676,36 @@ export default function AdminPage() {
   }
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, display: 'flex', overflow: 'hidden',
-      background: '#020208',
-      backgroundImage: 'linear-gradient(rgba(0,180,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(0,180,255,0.025) 1px, transparent 1px)',
-      backgroundSize: '48px 48px',
-      color: C.text,
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      zIndex: 50,
-    }}>
+    <div style={{ position: 'fixed', inset: 0, display: 'flex', overflow: 'hidden', background: C.bg, color: C.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', zIndex: 50 }}>
 
       {/* Mobile backdrop */}
       {isMobile && sidebarOpen && (
-        <div
-          onClick={() => setSidebarOpen(false)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 59 }}
-        />
+        <div onClick={() => setSidebarOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 59 }} />
       )}
 
       {/* ── Sidebar ── */}
       <aside style={{
-        width: 220,
-        background: 'rgba(0,8,28,0.96)',
-        borderRight: `1px solid rgba(0,180,255,0.18)`,
+        width: 220, background: C.surface, borderRight: `1px solid ${C.border}`,
         display: 'flex', flexDirection: 'column',
-        backdropFilter: 'blur(12px)',
         ...(isMobile ? {
           position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 60,
           transform: sidebarOpen ? 'translateX(0)' : 'translateX(-220px)',
           transition: 'transform 0.25s ease',
-          boxShadow: sidebarOpen ? '4px 0 48px rgba(0,0,0,0.9)' : 'none',
+          boxShadow: sidebarOpen ? '4px 0 32px rgba(0,0,0,0.7)' : 'none',
         } : {
           flexShrink: 0, height: '100%',
-          boxShadow: 'inset -1px 0 0 rgba(0,180,255,0.06)',
         }),
       }}>
 
         {/* Logo */}
-        <div style={{ padding: '22px 20px 18px', borderBottom: `1px solid rgba(0,180,255,0.12)` }}>
+        <div style={{ padding: '22px 20px 18px', borderBottom: `1px solid ${C.border}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: C.accentDim, border: `1px solid ${C.accentBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 0 16px ${C.accent}30` }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill={C.accent}><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            <div style={{ width: 30, height: 30, borderRadius: 8, background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
             </div>
             <div>
-              <p style={{ fontWeight: 800, fontSize: 13, color: C.text, letterSpacing: '0.02em' }}>Movement OS</p>
-              <p style={{ fontSize: 9, color: C.textDim, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'monospace' }}>Admin Portal</p>
+              <p style={{ fontWeight: 800, fontSize: 14, color: C.text }}>Movement OS</p>
+              <p style={{ fontSize: 10, color: C.textDim, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Admin Portal</p>
             </div>
           </div>
         </div>
@@ -730,24 +714,16 @@ export default function AdminPage() {
         <nav style={{ padding: '10px 10px', flex: 1, overflowY: 'auto' }}>
           {NAV_GROUPS.map(group => (
             <div key={group.label} style={{ marginBottom: 18 }}>
-              <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: C.textDim, padding: '4px 10px 6px', fontFamily: 'monospace' }}>{group.label}</p>
+              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.textDim, padding: '4px 10px 6px' }}>{group.label}</p>
               {group.items.map(item => {
                 const active = tab === item.id
                 const badge = item.id === 'todos' ? (activeTodoCount > 0 ? activeTodoCount : null)
                            : item.id === 'ideas' ? (ideas.length > 0 ? ideas.length : null)
                            : null
                 return (
-                  <button key={item.id} onClick={() => selectTab(item.id)} style={{
-                    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '8px 10px', borderRadius: 6, border: 'none',
-                    background: active ? 'rgba(0,180,255,0.1)' : 'none',
-                    color: active ? C.accent : C.textMid,
-                    fontWeight: active ? 700 : 400, fontSize: 13, cursor: 'pointer', marginBottom: 2, textAlign: 'left',
-                    transition: 'all 0.15s', fontFamily: 'inherit',
-                    boxShadow: active ? `inset 0 0 0 1px rgba(0,180,255,0.2)` : 'none',
-                  }}>
+                  <button key={item.id} onClick={() => selectTab(item.id)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', borderRadius: 6, border: 'none', background: active ? C.accentDim : 'none', color: active ? C.accent : C.textMid, fontWeight: active ? 600 : 400, fontSize: 13, cursor: 'pointer', marginBottom: 2, textAlign: 'left', transition: 'all 0.1s', fontFamily: 'inherit' }}>
                     <span>{item.label}</span>
-                    {badge && <span style={{ fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 10, background: active ? 'rgba(0,180,255,0.2)' : 'rgba(0,180,255,0.07)', color: active ? C.accent : C.textDim, fontFamily: 'monospace' }}>{badge}</span>}
+                    {badge && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: active ? C.accentBorder : C.surface2, color: active ? C.accent : C.textDim }}>{badge}</span>}
                   </button>
                 )
               })}
@@ -756,12 +732,12 @@ export default function AdminPage() {
         </nav>
 
         {/* Footer */}
-        <div style={{ padding: '14px 20px', borderTop: `1px solid rgba(0,180,255,0.12)` }}>
+        <div style={{ padding: '14px 20px', borderTop: `1px solid ${C.border}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <div style={{ width: 7, height: 7, borderRadius: '50%', background: C.green, boxShadow: `0 0 8px ${C.green}` }} />
-            <span style={{ fontSize: 10, color: C.textDim, fontFamily: 'monospace', letterSpacing: '0.04em' }}>All systems operational</span>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.green, boxShadow: `0 0 6px ${C.green}` }} />
+            <span style={{ fontSize: 11, color: C.textDim }}>All systems operational</span>
           </div>
-          <button onClick={() => router.push('/today')} style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: `1px solid rgba(0,180,255,0.12)`, background: 'none', color: C.textMid, fontSize: 12, cursor: 'pointer', fontFamily: 'monospace', textAlign: 'left', letterSpacing: '0.04em' }}>
+          <button onClick={() => router.push('/today')} style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'none', color: C.textDim, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
             ← Back to App
           </button>
         </div>
@@ -771,36 +747,21 @@ export default function AdminPage() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', minWidth: 0 }}>
 
         {/* Top bar */}
-        <header style={{
-          height: 56, borderBottom: `1px solid rgba(0,180,255,0.12)`,
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: isMobile ? '0 16px' : '0 28px',
-          background: 'rgba(0,5,20,0.9)',
-          backdropFilter: 'blur(12px)',
-          flexShrink: 0,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <header style={{ height: 56, borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '0 16px' : '0 28px', background: C.surface, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {isMobile && (
-              <button
-                onClick={() => setSidebarOpen(o => !o)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: 6, color: C.textMid, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              >
+              <button onClick={() => setSidebarOpen(o => !o)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: 6, color: C.textMid, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                   <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
                 </svg>
               </button>
             )}
             <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{NAV_GROUPS.flatMap(g => g.items).find(i => i.id === tab)?.label}</span>
-            {dataLoading && <span style={{ fontSize: 10, color: C.textDim, fontFamily: 'monospace', letterSpacing: '0.06em' }}>· syncing…</span>}
+            {dataLoading && <span style={{ fontSize: 11, color: C.textDim }}>· loading…</span>}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {!isMobile && (
-              <span style={{ fontSize: 9, fontFamily: 'monospace', fontWeight: 800, letterSpacing: '0.1em', color: C.textDim }}>
-                // SYSTEM ACTIVE
-              </span>
-            )}
-            {!isMobile && <span style={{ fontSize: 10, padding: '4px 10px', borderRadius: 6, background: C.accentDim, border: `1px solid ${C.accentBorder}`, color: C.accent, fontWeight: 800, letterSpacing: '0.08em', fontFamily: 'monospace' }}>ADMIN</span>}
-            <div style={{ width: 30, height: 30, borderRadius: '50%', background: C.accentDim, border: `1px solid ${C.accentBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, color: C.accent, flexShrink: 0, fontFamily: 'monospace', boxShadow: `0 0 12px ${C.accent}30` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {!isMobile && <span style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: C.accentDim, border: `1px solid ${C.accentBorder}`, color: C.accent, fontWeight: 700, letterSpacing: '0.06em' }}>ADMIN</span>}
+            <div style={{ width: 30, height: 30, borderRadius: '50%', background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, color: '#fff', flexShrink: 0 }}>
               {user?.email?.[0]?.toUpperCase() ?? 'A'}
             </div>
           </div>
