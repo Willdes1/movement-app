@@ -2,7 +2,32 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { useTheme } from '@/contexts/ThemeContext'
 import { supabase } from '@/lib/supabase'
+
+type RecoveryDailyBlock = { label: string; duration: string; exercises: string[] }
+type RecoveryDailySession = {
+  morning: RecoveryDailyBlock; warmup: RecoveryDailyBlock; workout: RecoveryDailyBlock
+  abs: RecoveryDailyBlock; cooldown: RecoveryDailyBlock; evening: RecoveryDailyBlock
+}
+type RecoveryPhase = {
+  phase: number; title: string; description: string; duration_days: number
+  daily_session?: RecoveryDailySession; coaching: string; readiness_check: string
+}
+type RecoveryPlan = {
+  id: string; injury: string; phases: RecoveryPhase[]
+  current_phase: number; activated_at: string | null; completed_at: string | null
+}
+
+const REC_BLOCK_ORDER = ['morning', 'warmup', 'workout', 'abs', 'cooldown', 'evening'] as const
+const REC_BLOCK_META: Record<string, { icon: string; label: string; color: string; iconBg: string }> = {
+  morning:  { icon: '☀️', label: 'MORNING',  color: 'var(--orange)', iconBg: 'rgba(255,140,0,0.18)' },
+  warmup:   { icon: '⚡', label: 'WARMUP',   color: '#3b82f6',       iconBg: 'rgba(59,130,246,0.18)' },
+  workout:  { icon: '💪', label: 'WORKOUT',  color: 'var(--green)',  iconBg: 'rgba(0,200,80,0.15)' },
+  abs:      { icon: '⚙️', label: 'ABS',      color: 'var(--orange)', iconBg: 'rgba(255,140,0,0.18)' },
+  cooldown: { icon: '❄️', label: 'COOLDOWN', color: '#8b5cf6',       iconBg: 'rgba(139,92,246,0.18)' },
+  evening:  { icon: '🌙', label: 'EVENING',  color: '#6366f1',       iconBg: 'rgba(99,102,241,0.18)' },
+}
 
 type DayPlan = {
   day: string
@@ -97,9 +122,12 @@ function planDayToDate(startDate: string, weekNum: number, dayIndex: number): Da
 
 export default function CalendarPage() {
   const { user, loading: authLoading } = useAuth()
+  const { activeRecovery } = useTheme()
   const router = useRouter()
 
   const [program, setProgram] = useState<Program | null>(null)
+  const [recoveryPlan, setRecoveryPlan] = useState<RecoveryPlan | null>(null)
+  const [expandedRecovBlock, setExpandedRecovBlock] = useState<string | null>('morning')
   const [weekPlans, setWeekPlans] = useState<Record<number, DayPlan[]>>({})
   const [loading, setLoading] = useState(true)
   const [viewMonth, setViewMonth] = useState(new Date())
@@ -169,6 +197,13 @@ export default function CalendarPage() {
   }, [user, loadData])
 
   useEffect(() => {
+    if (!user || !activeRecovery?.planId) { setRecoveryPlan(null); return }
+    supabase.from('recovery_plans').select('id, injury, phases, current_phase, activated_at, completed_at')
+      .eq('id', activeRecovery.planId).single()
+      .then(({ data }) => { if (data) setRecoveryPlan(data as RecoveryPlan) })
+  }, [user, activeRecovery?.planId])
+
+  useEffect(() => {
     setLastLog(null)
     if (!selectedExercise || !user) return
     supabase
@@ -206,6 +241,13 @@ export default function CalendarPage() {
         dayMap[key] = { day: plan[dowIdx] ?? plan[seqIdx], weekNum, dayIdx: dowIdx }
       })
     })
+  }
+
+  function isRecoveryDay(key: string): boolean {
+    if (!recoveryPlan?.activated_at) return false
+    const start = recoveryPlan.activated_at.split('T')[0]
+    const end = recoveryPlan.completed_at?.split('T')[0] ?? '9999-12-31'
+    return key >= start && key <= end
   }
 
   const year = viewMonth.getFullYear()
@@ -291,8 +333,9 @@ export default function CalendarPage() {
           const isSelected = key === selectedKey
           const inProgram = programEnd && cellDate >= new Date(program.startDate) && cellDate <= programEnd
           const isPast = cellDate < new Date() && !isToday
-          const typeColor = entry ? (TYPE_COLOR[entry.day.type] ?? 'var(--text-dim)') : null
-          const typeBg = entry ? (TYPE_BG[entry.day.type] ?? 'var(--surface)') : 'var(--surface)'
+          const isRecovDay = isRecoveryDay(key)
+          const typeColor = isRecovDay ? 'var(--orange)' : entry ? (TYPE_COLOR[entry.day.type] ?? 'var(--text-dim)') : null
+          const typeBg = isRecovDay ? 'rgba(255,140,0,0.07)' : entry ? (TYPE_BG[entry.day.type] ?? 'var(--surface)') : 'var(--surface)'
 
           return (
             <button
@@ -301,22 +344,27 @@ export default function CalendarPage() {
               style={{
                 minHeight: 54,
                 borderRadius: 8,
-                border: `1.5px solid ${isSelected ? typeColor ?? 'var(--accent)' : isToday ? 'var(--accent)' : 'var(--border)'}`,
-                background: isSelected || (isToday && !entry) ? 'var(--accent-bg)' : entry ? typeBg : 'var(--surface)',
+                border: `1.5px solid ${isSelected ? (typeColor ?? 'var(--accent)') : isToday ? 'var(--accent)' : isRecovDay ? 'rgba(255,140,0,0.3)' : 'var(--border)'}`,
+                background: isSelected || (isToday && !entry && !isRecovDay) ? 'var(--accent-bg)' : typeBg,
                 cursor: 'pointer',
                 padding: '5px 2px',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 gap: 2,
-                opacity: !inProgram ? 0.28 : isPast && entry?.day.type === 'rest' ? 0.45 : isPast ? 0.65 : 1,
+                opacity: !inProgram && !isRecovDay ? 0.28 : isPast && entry?.day.type === 'rest' && !isRecovDay ? 0.45 : isPast && !isRecovDay ? 0.65 : 1,
                 transition: 'opacity 0.1s, border-color 0.1s',
               }}
             >
               <span style={{ fontSize: 10, fontWeight: isToday ? 800 : 500, color: isToday ? 'var(--accent)' : 'var(--text)' }}>
                 {dateNum}
               </span>
-              {entry && (
+              {isRecovDay ? (
+                <>
+                  <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--orange)', flexShrink: 0 }} />
+                  <span style={{ fontSize: 7, fontWeight: 700, color: 'var(--orange)', textAlign: 'center', lineHeight: 1.2 }}>Rcvy</span>
+                </>
+              ) : entry ? (
                 <>
                   <div style={{ width: 5, height: 5, borderRadius: '50%', background: typeColor ?? 'var(--text-dim)', flexShrink: 0 }} />
                   {entry.day.type !== 'rest' && (
@@ -325,7 +373,7 @@ export default function CalendarPage() {
                     </span>
                   )}
                 </>
-              )}
+              ) : null}
             </button>
           )
         })}
@@ -346,8 +394,65 @@ export default function CalendarPage() {
         ))}
       </div>
 
-      {/* Selected day detail */}
-      {selectedEntry && selectedKey && (
+      {/* Selected day detail — recovery mode */}
+      {selectedKey && isRecoveryDay(selectedKey) && recoveryPlan && (() => {
+        const phase = recoveryPlan.phases.find(p => p.phase === recoveryPlan.current_phase)
+        const session = phase?.daily_session
+        return (
+          <div style={{ marginTop: 20, padding: '18px', background: 'rgba(255,140,0,0.08)', border: '1.5px solid rgba(255,140,0,0.28)', borderRadius: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+              <div>
+                <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 3 }}>
+                  {new Date(selectedKey + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                </p>
+                <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--orange)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 2 }}>Recovery Mode · Phase {recoveryPlan.current_phase} of {recoveryPlan.phases.length}</div>
+                <p style={{ fontWeight: 800, fontSize: 17, marginBottom: 0 }}>{phase?.title ?? recoveryPlan.injury}</p>
+              </div>
+              <button onClick={() => setSelectedKey(null)} style={{ background: 'none', border: 'none', fontSize: 20, color: 'var(--text-dim)', cursor: 'pointer', padding: '0 0 0 12px', lineHeight: 1 }}>×</button>
+            </div>
+            {session ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 14 }}>
+                {REC_BLOCK_ORDER.map(key => {
+                  const block = session[key]
+                  if (!block) return null
+                  const meta = REC_BLOCK_META[key]
+                  const isExpanded = expandedRecovBlock === key
+                  return (
+                    <div key={key} style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                      <button onClick={() => setExpandedRecovBlock(isExpanded ? null : key)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--surface)', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                        <div style={{ width: 38, height: 38, borderRadius: 8, background: meta.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, flexShrink: 0 }}>{meta.icon}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 9, fontWeight: 800, color: meta.color, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 1 }}>{meta.label}</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{block.label}</div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                          <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{block.duration}</span>
+                          <span style={{ fontSize: 12, color: 'var(--text-dim)', transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', display: 'inline-block' }}>▶</span>
+                        </div>
+                      </button>
+                      {isExpanded && (
+                        <div style={{ background: 'var(--surface2)', borderTop: '1px solid var(--border)', padding: '10px 12px', display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                          {block.exercises.map((ex, i) => (
+                            <span key={i} style={{ fontSize: 10, padding: '3px 9px', borderRadius: 20, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-mid)' }}>{ex}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '0 0 12px' }}>
+                This plan was generated in an older format. Regenerate for the full 6-block daily session.
+              </p>
+            )}
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', textAlign: 'center' }}>Log your progress from the Recovery tab</div>
+          </div>
+        )
+      })()}
+
+      {/* Selected day detail — training plan */}
+      {selectedEntry && selectedKey && !isRecoveryDay(selectedKey) && (
         <div style={{
           marginTop: 20,
           padding: '18px',

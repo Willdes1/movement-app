@@ -6,12 +6,28 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { supabase } from '@/lib/supabase'
 
+type DailyBlock = {
+  label: string
+  duration: string
+  exercises: string[]
+}
+
+type DailySession = {
+  morning: DailyBlock
+  warmup: DailyBlock
+  workout: DailyBlock
+  abs: DailyBlock
+  cooldown: DailyBlock
+  evening: DailyBlock
+}
+
 type RecoveryPhase = {
   phase: number
   title: string
   description: string
   duration_days: number
-  exercises: string[]
+  daily_session?: DailySession
+  exercises?: string[] // legacy format
   coaching: string
   readiness_check: string
 }
@@ -41,7 +57,18 @@ const O = 'var(--orange)'
 const O_DIM = 'rgba(255,140,0,0.1)'
 const O_BORDER = 'rgba(255,140,0,0.22)'
 
-// Keyword map for template cache matching
+const BLOCK_ORDER = ['morning', 'warmup', 'workout', 'abs', 'cooldown', 'evening'] as const
+type BlockKey = typeof BLOCK_ORDER[number]
+
+const BLOCK_META: Record<BlockKey, { icon: string; typeLabel: string; color: string; iconBg: string }> = {
+  morning:  { icon: '☀️', typeLabel: 'MORNING',  color: 'var(--orange)',  iconBg: 'rgba(255,140,0,0.18)' },
+  warmup:   { icon: '⚡', typeLabel: 'WARMUP',   color: '#3b82f6',        iconBg: 'rgba(59,130,246,0.18)' },
+  workout:  { icon: '💪', typeLabel: 'WORKOUT',  color: 'var(--green)',   iconBg: 'rgba(0,200,80,0.15)' },
+  abs:      { icon: '⚙️', typeLabel: 'ABS',      color: 'var(--orange)',  iconBg: 'rgba(255,140,0,0.18)' },
+  cooldown: { icon: '❄️', typeLabel: 'COOLDOWN', color: '#8b5cf6',        iconBg: 'rgba(139,92,246,0.18)' },
+  evening:  { icon: '🌙', typeLabel: 'EVENING',  color: '#6366f1',        iconBg: 'rgba(99,102,241,0.18)' },
+}
+
 const INJURY_KEYWORDS: Record<string, string[]> = {
   'hamstring':  ['hamstring', 'hammy', 'biceps femoris', 'back of thigh'],
   'si-joint':   ['si joint', 'sacroiliac', 'sacrum', 'si dysfunction'],
@@ -65,15 +92,52 @@ function extractInjuryKey(injury: string): string | null {
   return null
 }
 
+function getPhaseExercises(phase: RecoveryPhase): string[] {
+  return phase.daily_session?.workout?.exercises ?? phase.exercises ?? []
+}
+
 const PAIN_OPTIONS = [
-  { label: 'Significant pain', sub: '7–10 out of 10', phase: 1 },
-  { label: 'Moderate discomfort', sub: '4–6 out of 10', phase: 2 },
-  { label: 'Minimal soreness', sub: '1–3 out of 10', phase: 3 },
-  { label: 'No pain at all', sub: '0 — feeling good', phase: 4 },
+  { label: 'Significant pain',    sub: '7–10 out of 10',    phase: 1 },
+  { label: 'Moderate discomfort', sub: '4–6 out of 10',     phase: 2 },
+  { label: 'Minimal soreness',    sub: '1–3 out of 10',     phase: 3 },
+  { label: 'No pain at all',      sub: '0 — feeling good',  phase: 4 },
 ]
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function SessionBlock({ blockKey, block, expanded, onToggle }: {
+  blockKey: BlockKey; block: DailyBlock; expanded: boolean; onToggle: () => void
+}) {
+  const meta = BLOCK_META[blockKey]
+  return (
+    <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)' }}>
+      <button
+        onClick={onToggle}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: 'var(--surface)', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+      >
+        <div style={{ width: 44, height: 44, borderRadius: 10, background: meta.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
+          {meta.icon}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: meta.color, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 2 }}>{meta.typeLabel}</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{block.label}</div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{block.duration}</span>
+          <span style={{ fontSize: 13, color: 'var(--text-dim)', transform: expanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', display: 'inline-block' }}>▶</span>
+        </div>
+      </button>
+      {expanded && (
+        <div style={{ background: 'var(--surface2)', borderTop: '1px solid var(--border)', padding: '12px 14px', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {block.exercises.map((ex, i) => (
+            <span key={i} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-mid)' }}>{ex}</span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function ReturnToSportPage() {
@@ -88,6 +152,7 @@ export default function ReturnToSportPage() {
 
   const [intake, setIntake] = useState({ injury: '', doctorVisit: false, doctorRecs: '' })
   const [showIntake, setShowIntake] = useState(false)
+  const [expandedBlock, setExpandedBlock] = useState<string | null>('morning')
 
   const [loading, setLoading] = useState(true)
   const [showConfirm, setShowConfirm] = useState(false)
@@ -123,7 +188,6 @@ export default function ReturnToSportPage() {
 
   useEffect(() => { if (user) loadData() }, [user, loadData])
 
-  // Derived plan states
   const activePlan = allPlans.find(p => !!p.activated_at && !p.completed_at) ?? null
   const pendingPlan = allPlans.find(p => !p.activated_at && !p.completed_at) ?? null
   const completedPlan = !activePlan && !pendingPlan && allPlans.length > 0 ? allPlans[0] : null
@@ -140,26 +204,19 @@ export default function ReturnToSportPage() {
     setGenerating(true)
     setGenErr(false)
     setTemplateHit(false)
-
     try {
       let phases: RecoveryPhase[] | null = null
       const injuryKey = extractInjuryKey(intake.injury)
 
-      // 1. Check template cache
       if (injuryKey) {
-        const { data: tmpl } = await supabase
-          .from('recovery_templates')
-          .select('phases')
-          .eq('injury_key', injuryKey)
-          .limit(1)
-          .maybeSingle()
-        if (tmpl?.phases) {
+        const { data: tmpl } = await supabase.from('recovery_templates').select('phases').eq('injury_key', injuryKey).limit(1).maybeSingle()
+        // Only use template if it has the new daily_session structure
+        if (tmpl?.phases && (tmpl.phases as RecoveryPhase[])[0]?.daily_session) {
           phases = tmpl.phases as RecoveryPhase[]
           setTemplateHit(true)
         }
       }
 
-      // 2. Call AI if no template
       if (!phases) {
         const res = await fetch('/api/generate-recovery-plan', {
           method: 'POST',
@@ -170,14 +227,12 @@ export default function ReturnToSportPage() {
         if (!data.phases) throw new Error('No phases')
         phases = data.phases
 
-        // 3. Save to template cache for future users
         if (injuryKey) {
           const { data: existing } = await supabase.from('recovery_templates').select('id').eq('injury_key', injuryKey).limit(1).maybeSingle()
           if (!existing) await supabase.from('recovery_templates').insert({ injury_key: injuryKey, phases })
         }
       }
 
-      // 4. Save user's plan
       const payload = {
         user_id: user!.id, sport: sport || null,
         injury: intake.injury, doctor_visit: intake.doctorVisit,
@@ -196,6 +251,7 @@ export default function ReturnToSportPage() {
 
       if (saved) setAllPlans(prev => [saved!, ...prev.filter(p => p.id !== saved!.id)])
       setShowIntake(false)
+      setExpandedBlock('morning')
     } catch {
       setGenErr(true)
     } finally {
@@ -241,8 +297,8 @@ export default function ReturnToSportPage() {
     if (updated) setAllPlans(prev => prev.map(p => p.id === activePlan.id ? updated as RecoveryPlan : p))
     setCheckinOpen(false)
     setAdvancing(false)
-
     if (response === 'progress') {
+      setExpandedBlock('morning')
       flash(completedAt ? 'Recovery complete. Welcome back to full training.' : `Phase ${newPhase} unlocked: ${activePlan.phases[newPhase - 1]?.title}`)
     }
   }
@@ -257,6 +313,7 @@ export default function ReturnToSportPage() {
       setRecovery('custom', clamped, { planId: modal.plan.id, injury: modal.plan.injury, totalPhases: modal.plan.phases.length })
     }
     setRestartModal(null)
+    setExpandedBlock('morning')
     flash(`Restarting at Phase ${clamped}: ${modal.plan.phases[clamped - 1]?.title ?? modal.plan.injury}`)
   }
 
@@ -289,7 +346,7 @@ export default function ReturnToSportPage() {
             <button onClick={deactivatePlan} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px', fontSize: 11, color: 'var(--text-dim)', cursor: 'pointer', fontWeight: 700 }}>Deactivate</button>
           )}
           {!showingIntake && (
-            <button onClick={() => { setShowIntake(true); setIntake({ injury: '', doctorVisit: false, doctorRecs: '' }) }} style={{ background: 'none', border: `1px solid ${O_BORDER}`, borderRadius: 8, padding: '6px 10px', fontSize: 11, color: O, cursor: 'pointer', fontWeight: 700 }}>+ New Plan</button>
+            <button onClick={() => { setShowIntake(true); setIntake({ injury: '', doctorVisit: false, doctorRecs: '' }) }} style={{ background: 'none', border: `1px solid ${O_BORDER}`, borderRadius: 8, padding: '6px 10px', fontSize: 11, color: O, cursor: 'pointer', fontWeight: 700 }}>+ New</button>
           )}
         </div>
       </div>
@@ -304,11 +361,7 @@ export default function ReturnToSportPage() {
       {/* ─── INTAKE FORM ─── */}
       {showingIntake && !generating && (
         <div style={{ padding: '0 16px 24px', animation: 'slideUp 0.2s ease' }}>
-          {!plan && (
-            <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, marginBottom: 20 }}>
-              Tell us about your injury. Movement AI will build a phase-by-phase recovery protocol and get you back to full training.
-            </div>
-          )}
+          {!plan && <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, marginBottom: 20 }}>Tell us about your injury. Movement AI will build a phase-by-phase 6-block daily recovery protocol and get you back to full training.</div>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
               <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 6 }}>What did you hurt? *</label>
@@ -325,7 +378,7 @@ export default function ReturnToSportPage() {
             {intake.doctorVisit && (
               <div style={{ animation: 'slideUp 0.2s ease' }}>
                 <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 6 }}>What did they recommend?</label>
-                <textarea value={intake.doctorRecs} onChange={e => setIntake(i => ({ ...i, doctorRecs: e.target.value }))} placeholder="e.g. No weight bearing 2 weeks, avoid rotation, ice 3x daily, start PT after swelling reduces..." rows={3} style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px', fontSize: 13, color: 'var(--text)', resize: 'none', outline: 'none', boxSizing: 'border-box', lineHeight: 1.5 }} />
+                <textarea value={intake.doctorRecs} onChange={e => setIntake(i => ({ ...i, doctorRecs: e.target.value }))} placeholder="e.g. No weight bearing 2 weeks, avoid rotation, start PT after swelling reduces..." rows={3} style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px', fontSize: 13, color: 'var(--text)', resize: 'none', outline: 'none', boxSizing: 'border-box', lineHeight: 1.5 }} />
               </div>
             )}
             {sport && (
@@ -350,7 +403,7 @@ export default function ReturnToSportPage() {
         <div style={{ padding: '48px 32px', textAlign: 'center' }}>
           <div style={{ fontSize: 40, marginBottom: 16, animation: 'pulse 1.5s ease-in-out infinite' }}>🩺</div>
           <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 6 }}>Movement AI is building your plan</div>
-          <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6 }}>Analyzing your injury and goals to build a phased recovery protocol...</div>
+          <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6 }}>Building a 6-block daily session for each phase, tailored to your injury...</div>
         </div>
       )}
 
@@ -358,14 +411,14 @@ export default function ReturnToSportPage() {
       {!showingIntake && !generating && pendingPlan && !activePlan && (
         <div style={{ padding: '0 16px 8px', animation: 'slideUp 0.25s ease' }}>
           {templateHit && (
-            <div style={{ padding: '8px 12px', background: 'rgba(0,200,100,0.08)', border: '1px solid rgba(0,200,100,0.2)', borderRadius: 8, fontSize: 11, color: '#00c864', fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ padding: '8px 12px', background: 'rgba(0,200,100,0.08)', border: '1px solid rgba(0,200,100,0.2)', borderRadius: 8, fontSize: 11, color: '#00c864', fontWeight: 700, marginBottom: 12 }}>
               ⚡ Loaded from template — no tokens used
             </div>
           )}
           <div style={{ padding: '14px 16px', background: O_DIM, border: `1px solid ${O_BORDER}`, borderRadius: 12, marginBottom: 16 }}>
             <div style={{ fontSize: 10, fontWeight: 800, color: O, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 2 }}>Your Recovery Plan</div>
             <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 2 }}>{pendingPlan.injury}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{pendingPlan.phases.length} phases · activate to begin tracking</div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{pendingPlan.phases.length} phases · 6 daily blocks per phase</div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
             {pendingPlan.phases.map((phase, i) => (
@@ -379,9 +432,10 @@ export default function ReturnToSportPage() {
                 </div>
                 <p style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.5, margin: '0 0 8px' }}>{phase.description}</p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                  {phase.exercises.map((ex, j) => (
+                  {getPhaseExercises(phase).slice(0, 4).map((ex, j) => (
                     <span key={j} style={{ fontSize: 10, padding: '3px 9px', borderRadius: 20, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-mid)' }}>{ex}</span>
                   ))}
+                  {phase.daily_session && <span style={{ fontSize: 10, padding: '3px 9px', borderRadius: 20, background: O_DIM, border: `1px solid ${O_BORDER}`, color: O }}>+5 more blocks</span>}
                 </div>
               </div>
             ))}
@@ -393,10 +447,11 @@ export default function ReturnToSportPage() {
         </div>
       )}
 
-      {/* ─── ACTIVE PLAN — daily session view ─── */}
+      {/* ─── ACTIVE PLAN — 6-block daily session ─── */}
       {!showingIntake && !generating && activePlan && currentPhaseData && (
         <div style={{ padding: '0 16px 8px', animation: 'slideUp 0.25s ease' }}>
-          <div style={{ marginBottom: 20 }}>
+          {/* Progress bar */}
+          <div style={{ marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 6, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               <span>Recovery Progress</span>
               <span style={{ color: O }}>Phase {activePlan.current_phase} of {activePlan.phases.length}</span>
@@ -406,24 +461,49 @@ export default function ReturnToSportPage() {
             </div>
           </div>
 
-          <div style={{ background: O_DIM, border: `1px solid ${O_BORDER}`, borderRadius: 16, padding: '18px', marginBottom: 12 }}>
-            <div style={{ fontSize: 10, fontWeight: 800, color: O, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 4 }}>Phase {currentPhaseData.phase} · {currentPhaseData.duration_days}+ days</div>
-            <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 6 }}>{currentPhaseData.title}</div>
-            <p style={{ fontSize: 12, color: 'var(--text-mid)', lineHeight: 1.55, margin: '0 0 14px' }}>{currentPhaseData.description}</p>
-            <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>Today&apos;s Exercises</div>
+          {/* Phase header */}
+          <div style={{ padding: '12px 14px', background: O_DIM, border: `1px solid ${O_BORDER}`, borderRadius: 12, marginBottom: 12 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: O, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 2 }}>Phase {currentPhaseData.phase} · {currentPhaseData.duration_days}+ days</div>
+            <div style={{ fontSize: 17, fontWeight: 900, marginBottom: 4 }}>{currentPhaseData.title}</div>
+            <p style={{ fontSize: 12, color: 'var(--text-mid)', lineHeight: 1.5, margin: 0 }}>{currentPhaseData.description}</p>
+          </div>
+
+          {/* 6 session blocks */}
+          {currentPhaseData.daily_session ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 14 }}>
+              {BLOCK_ORDER.map(key => {
+                const block = currentPhaseData.daily_session![key]
+                if (!block) return null
+                return (
+                  <SessionBlock
+                    key={key}
+                    blockKey={key}
+                    block={block}
+                    expanded={expandedBlock === key}
+                    onToggle={() => setExpandedBlock(prev => prev === key ? null : key)}
+                  />
+                )
+              })}
+            </div>
+          ) : (
+            // Legacy flat exercise list
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
-              {currentPhaseData.exercises.map((ex, i) => (
+              {(currentPhaseData.exercises ?? []).map((ex, i) => (
                 <span key={i} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, background: O_DIM, border: `1px solid ${O_BORDER}`, color: O }}>{ex}</span>
               ))}
             </div>
-            <div style={{ padding: '10px 12px', background: 'rgba(0,0,0,0.2)', borderRadius: 10, marginBottom: 14 }}>
-              <div style={{ fontSize: 9, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 4 }}>Coaching Note</div>
-              <div style={{ fontSize: 12, color: 'var(--text-mid)', lineHeight: 1.5 }}>{currentPhaseData.coaching}</div>
-            </div>
-            <button onClick={() => setCheckinOpen(true)} disabled={hasCheckedInToday} style={{ width: '100%', padding: '13px', borderRadius: 12, border: 'none', background: hasCheckedInToday ? 'var(--surface2)' : `linear-gradient(135deg, ${O} 0%, #e06000 100%)`, color: hasCheckedInToday ? 'var(--text-dim)' : '#fff', fontWeight: 900, fontSize: 14, cursor: hasCheckedInToday ? 'default' : 'pointer', letterSpacing: '0.03em', textTransform: 'uppercase' }}>
-              {hasCheckedInToday ? '✓ Logged today — come back tomorrow' : '▶ Log Today\'s Session'}
-            </button>
+          )}
+
+          {/* Coaching note */}
+          <div style={{ padding: '10px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, marginBottom: 14 }}>
+            <div style={{ fontSize: 9, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 4 }}>Coaching Note</div>
+            <div style={{ fontSize: 12, color: 'var(--text-mid)', lineHeight: 1.5 }}>{currentPhaseData.coaching}</div>
           </div>
+
+          {/* Log button */}
+          <button onClick={() => setCheckinOpen(true)} disabled={hasCheckedInToday} style={{ width: '100%', padding: '13px', borderRadius: 12, border: 'none', background: hasCheckedInToday ? 'var(--surface2)' : `linear-gradient(135deg, ${O} 0%, #e06000 100%)`, color: hasCheckedInToday ? 'var(--text-dim)' : '#fff', fontWeight: 900, fontSize: 14, cursor: hasCheckedInToday ? 'default' : 'pointer', letterSpacing: '0.03em', textTransform: 'uppercase', marginBottom: 20 }}>
+            {hasCheckedInToday ? '✓ Logged today — come back tomorrow' : '▶ Log Today\'s Session'}
+          </button>
 
           {/* Phase timeline */}
           <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 8 }}>All Phases</div>
@@ -465,7 +545,6 @@ export default function ReturnToSportPage() {
             <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.07em', textTransform: 'uppercase', flex: 1 }}>Previous Plans ({prevPlans.length})</span>
             <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{prevOpen ? '▲' : '▼'}</span>
           </button>
-
           {prevOpen && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8, animation: 'slideUp 0.2s ease' }}>
               {prevPlans.map(p => (
@@ -494,15 +573,15 @@ export default function ReturnToSportPage() {
         </div>
       )}
 
-      {/* ─── CONFIRM GENERATE MODAL ─── */}
+      {/* ─── CONFIRM MODAL ─── */}
       {showConfirm && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 80, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 16 }} onClick={() => setShowConfirm(false)}>
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 20, padding: '24px', width: '100%', maxWidth: 440, animation: 'slideUp 0.25s ease' }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 11, fontWeight: 800, color: O, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 8 }}>Movement AI</div>
             <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 8 }}>Build recovery plan?</div>
             <p style={{ fontSize: 13, color: 'var(--text-mid)', lineHeight: 1.6, marginBottom: 20 }}>
-              AI will generate a custom phase-by-phase protocol for <strong style={{ color: 'var(--text)' }}>{intake.injury}</strong>.
-              {extractInjuryKey(intake.injury) ? ' We\'ll check our template library first — may be instant.' : ' Takes about 10 seconds.'}
+              AI will generate morning mobility, warm-up, main workout, core, cool-down, and evening mobility for each phase — custom to <strong style={{ color: 'var(--text)' }}>{intake.injury}</strong>.
+              {extractInjuryKey(intake.injury) ? " We'll check our template library first — may be instant." : ' Takes about 15 seconds.'}
             </p>
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => setShowConfirm(false)} style={{ flex: 1, padding: '13px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text-dim)', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Cancel</button>
@@ -533,35 +612,26 @@ export default function ReturnToSportPage() {
       {restartModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 80, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 16 }} onClick={() => setRestartModal(null)}>
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 20, padding: '24px', width: '100%', maxWidth: 440, animation: 'slideUp 0.25s ease' }} onClick={e => e.stopPropagation()}>
-
             {restartModal.step === 'confirm' && (
               <>
                 <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 8 }}>Restart this plan?</div>
-                <p style={{ fontSize: 13, color: 'var(--text-mid)', lineHeight: 1.6, marginBottom: 20 }}>
-                  This will clear your progress on <strong style={{ color: 'var(--text)' }}>{restartModal.plan.injury}</strong> and put you back on a phase based on where you&apos;re at right now.
-                </p>
+                <p style={{ fontSize: 13, color: 'var(--text-mid)', lineHeight: 1.6, marginBottom: 20 }}>This will clear your progress on <strong style={{ color: 'var(--text)' }}>{restartModal.plan.injury}</strong> and set you back to a phase based on where you&apos;re at right now.</p>
                 <div style={{ display: 'flex', gap: 10 }}>
                   <button onClick={() => setRestartModal(null)} style={{ flex: 1, padding: '13px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text-dim)', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Cancel</button>
                   <button onClick={() => setRestartModal(m => m ? { ...m, step: 'reinjured' } : null)} style={{ flex: 2, padding: '13px', borderRadius: 12, border: 'none', background: `linear-gradient(135deg, ${O} 0%, #e06000 100%)`, color: '#fff', fontWeight: 900, fontSize: 14, cursor: 'pointer' }}>Yes, restart →</button>
                 </div>
               </>
             )}
-
             {restartModal.step === 'reinjured' && (
               <>
                 <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 4 }}>Did you get hurt again?</div>
                 <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 20 }}>Or is this the same issue flaring back up?</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <button onClick={() => doRestart(restartModal, 1)} style={{ padding: '15px', borderRadius: 12, border: '1px solid rgba(255,100,100,0.25)', background: 'rgba(255,100,100,0.08)', color: '#ff8080', fontWeight: 700, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>
-                    Fresh injury — start from Phase 1
-                  </button>
-                  <button onClick={() => setRestartModal(m => m ? { ...m, step: 'pain', reinjured: false } : null)} style={{ padding: '15px', borderRadius: 12, border: `1px solid ${O_BORDER}`, background: O_DIM, color: O, fontWeight: 700, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>
-                    Same issue — assess my current pain →
-                  </button>
+                  <button onClick={() => doRestart(restartModal, 1)} style={{ padding: '15px', borderRadius: 12, border: '1px solid rgba(255,100,100,0.25)', background: 'rgba(255,100,100,0.08)', color: '#ff8080', fontWeight: 700, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>Fresh injury — start from Phase 1</button>
+                  <button onClick={() => setRestartModal(m => m ? { ...m, step: 'pain', reinjured: false } : null)} style={{ padding: '15px', borderRadius: 12, border: `1px solid ${O_BORDER}`, background: O_DIM, color: O, fontWeight: 700, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>Same issue — assess my current pain →</button>
                 </div>
               </>
             )}
-
             {restartModal.step === 'pain' && (
               <>
                 <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 4 }}>Where&apos;s your pain at right now?</div>
