@@ -13,6 +13,18 @@ type CompletionInsert = { user_id: string; program_id: string; week_number: numb
 function parseExerciseName(m: string) { return m.replace(/\s+\d+[×x]\d+.*$/i, '').replace(/\s+\d+\s+sets?.*$/i, '').trim() }
 function normalizeExerciseName(n: string) { return n.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '_') }
 const REST_MOVEMENTS = new Set(['Full rest', 'Light walk optional', 'Sleep 8+ hours'])
+function fallbackDetail(m: string, day: DayPlan): ExerciseDetail {
+  const name = parseExerciseName(m)
+  const restNote = day.rest && day.rest.between_sets !== '—' ? ` Rest ${day.rest.between_sets} between sets.` : ''
+  return {
+    name_normalized: normalizeExerciseName(name),
+    name_display: name,
+    how: 'Detailed coaching for this exercise is still loading. Tap again in a few seconds, or regenerate the week to refresh.',
+    breathing: 'Exhale on exertion — the push, pull, or drive phase. Inhale slowly and controlled on the return.',
+    core: 'Brace your core before every rep. Think of pulling your navel toward your spine throughout the set.',
+    tip: (day.coaching ?? 'Focus on controlled form over speed.') + restNote,
+  }
+}
 function extractDisplayNames(plan: DayPlan[]) {
   return [...new Set(plan.filter(d => d.type !== 'rest').flatMap(d => d.movements).map(parseExerciseName).filter(n => n && !REST_MOVEMENTS.has(n)))]
 }
@@ -456,7 +468,7 @@ export default function PlanPage() {
                       {day.movements.map((m, mi) => {
                         const detail = exerciseLibrary[normalizeExerciseName(parseExerciseName(m))]
                         return (
-                          <button key={mi} onClick={() => detail && setSelectedExercise(detail)} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-mid)', cursor: detail ? 'pointer' : 'default', fontFamily: 'inherit' }}>
+                          <button key={mi} onClick={() => setSelectedExercise(detail ?? fallbackDetail(m, day))} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-mid)', cursor: 'pointer', fontFamily: 'inherit' }}>
                             {m}
                           </button>
                         )
