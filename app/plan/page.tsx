@@ -94,16 +94,13 @@ function DumbbellSparkleIcon({ size = 20 }: { size?: number }) {
 function AIIcon({ size = 22 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
-      {/* Flexed bicep arm silhouette — wider at bicep, tapers to forearm */}
-      <path d="M6,20 C4,16 3,10 5,6 C7,2 11,1 15,2 C19,3 22,6 21,11 C20,15 18,19 16,21 C13,22 9,22 7,21 C7,21 6,21 6,20Z"/>
-      {/* Gear badge — same style as the loading screen, placed at lower-right (fist/elbow area) */}
-      <g transform="translate(11.8, 11.5) scale(0.152)">
-        <path d="M27 2h10l2 8a22 22 0 0 1 6.6 2.7l7.6-3.4 7 7-3.4 7.6A22 22 0 0 1 59.8 30L68 32v-1H56a24 24 0 1 0 0 2h12v1l-8.2 2a22 22 0 0 1-2.7 6.6l3.4 7.6-7 7-7.6-3.4A22 22 0 0 1 39 57.8L37 66H27l-2-8.2A22 22 0 0 1 18.4 55l-7.6 3.4-7-7 3.4-7.6A22 22 0 0 1 4.2 37L2 35V29l2.2-2A22 22 0 0 1 7 20.4L3.8 12.8l7-7 7.6 3.4A22 22 0 0 1 25 6.2L27 2zM32 22a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"/>
+      {/* Material Design settings gear — crisp at any size, scaled to leave top-right for sparkle */}
+      <g transform="scale(0.82) translate(1.5, 1.5)">
+        <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
       </g>
-      {/* Sparkle star top-right */}
-      <path d="M20,1 L20.7,2.8 L22.5,3.5 L20.7,4.2 L20,6 L19.3,4.2 L17.5,3.5 L19.3,2.8Z"/>
-      {/* Sparkle dot */}
-      <circle cx="22.5" cy="8" r="0.72"/>
+      {/* Sparkle star — top-right corner, clear of gear */}
+      <path d="M21.5,1 L22.1,2.6 L23.7,3.2 L22.1,3.8 L21.5,5.4 L20.9,3.8 L19.3,3.2 L20.9,2.6Z"/>
+      <circle cx="23.4" cy="6.4" r="0.65"/>
     </svg>
   )
 }
@@ -407,41 +404,30 @@ export default function PlanPage() {
             100% { opacity: 0; transform: translateY(-80px) scale(1.1); }
           }
           @keyframes pulse { 0%,100% { opacity: 0.5 } 50% { opacity: 1 } }
-          @keyframes bicepFlex {
-            0%, 100% { transform: scale(1) translateY(0px); }
-            35%  { transform: scale(1.10) translateY(-5px); }
-            65%  { transform: scale(1.06) translateY(-3px); }
-          }
         `}</style>
         <div style={{ padding: '60px 32px 80px', textAlign: 'center', maxWidth: 480, margin: '0 auto', position: 'relative' }}>
 
-          {/* Bicep + Gear rig */}
-          <div style={{ position: 'relative', width: 164, height: 112, margin: '0 auto 32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {/* Large gear — left */}
-            <div style={{ position: 'absolute', left: 0, top: 16, animation: 'spinCW 2.4s linear infinite', color }}>
-              <svg width="72" height="72" viewBox="0 0 64 64" fill="currentColor" opacity={0.85}>
+          {/* Gear rig */}
+          <div style={{ position: 'relative', width: 120, height: 100, margin: '0 auto 32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {/* Large gear */}
+            <div style={{ position: 'absolute', left: 0, top: 10, animation: 'spinCW 2.4s linear infinite', color }}>
+              <svg width="72" height="72" viewBox="0 0 64 64" fill="currentColor" opacity={0.9}>
                 <path d="M27 2h10l2 8a22 22 0 0 1 6.6 2.7l7.6-3.4 7 7-3.4 7.6A22 22 0 0 1 59.8 30L68 32v-1H56a24 24 0 1 0 0 2h12v1l-8.2 2a22 22 0 0 1-2.7 6.6l3.4 7.6-7 7-7.6-3.4A22 22 0 0 1 39 57.8L37 66H27l-2-8.2A22 22 0 0 1 18.4 55l-7.6 3.4-7-7 3.4-7.6A22 22 0 0 1 4.2 37L2 35V29l2.2-2A22 22 0 0 1 7 20.4L3.8 12.8l7-7 7.6 3.4A22 22 0 0 1 25 6.2L27 2zM32 22a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"/>
               </svg>
             </div>
-            {/* Bicep — static centering wrapper + inner animation wrapper */}
-            <div style={{ position: 'absolute', left: '50%', top: 8, transform: 'translateX(-50%)', zIndex: 2 }}>
-              <div style={{ animation: 'bicepFlex 1.9s ease-in-out infinite', color }}>
-                <AIIcon size={68}/>
-              </div>
-            </div>
-            {/* Small gear — right */}
-            <div style={{ position: 'absolute', right: 0, top: 4, animation: 'spinCCW 1.6s linear infinite', color: 'var(--accent2, #9333ea)' }}>
-              <svg width="50" height="50" viewBox="0 0 64 64" fill="currentColor" opacity={0.75}>
+            {/* Small gear */}
+            <div style={{ position: 'absolute', right: 4, top: 0, animation: 'spinCCW 1.6s linear infinite', color: 'var(--accent2, #9333ea)' }}>
+              <svg width="48" height="48" viewBox="0 0 64 64" fill="currentColor" opacity={0.75}>
                 <path d="M27 2h10l2 8a22 22 0 0 1 6.6 2.7l7.6-3.4 7 7-3.4 7.6A22 22 0 0 1 59.8 30L68 32v-1H56a24 24 0 1 0 0 2h12v1l-8.2 2a22 22 0 0 1-2.7 6.6l3.4 7.6-7 7-7.6-3.4A22 22 0 0 1 39 57.8L37 66H27l-2-8.2A22 22 0 0 1 18.4 55l-7.6 3.4-7-7 3.4-7.6A22 22 0 0 1 4.2 37L2 35V29l2.2-2A22 22 0 0 1 7 20.4L3.8 12.8l7-7 7.6 3.4A22 22 0 0 1 25 6.2L27 2zM32 22a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"/>
               </svg>
             </div>
-            {/* Stars floating up */}
+            {/* Sparkles */}
             {[
-              { left: 14,  delay: '0s',   dur: '2.1s' },
-              { left: 50,  delay: '0.7s', dur: '1.8s' },
-              { left: 100, delay: '1.3s', dur: '2.4s' },
-              { left: 34,  delay: '0.4s', dur: '1.6s' },
-              { left: 130, delay: '1.0s', dur: '2.0s' },
+              { left: 20, delay: '0s',   dur: '2.1s' },
+              { left: 55, delay: '0.7s', dur: '1.8s' },
+              { left: 88, delay: '1.3s', dur: '2.4s' },
+              { left: 38, delay: '0.4s', dur: '1.6s' },
+              { left: 72, delay: '1.0s', dur: '2.0s' },
             ].map((s, i) => (
               <div key={i} style={{ position: 'absolute', bottom: 0, left: s.left, animation: `floatUp ${s.dur} ${s.delay} ease-in-out infinite`, fontSize: 13, color, opacity: 0 }}>✦</div>
             ))}
@@ -541,32 +527,38 @@ export default function PlanPage() {
           50%  { background-position: 100% 50%; }
           100% { background-position: 0% 50%; }
         }
+        /* Wrapper is the rainbow border ring — 2px padding shows through as border */
+        .ai-gen-wrap {
+          position: relative; display: inline-flex;
+          border-radius: 100px; padding: 2px;
+          background: var(--accent-border);
+          transition: background 0.25s;
+        }
+        /* Inner button covers center, leaving wrapper's 2px ring as the border */
         .ai-gen-btn {
           display: flex; align-items: center; gap: 6px;
-          padding: 7px 14px; border: none; border-radius: 100px;
-          background: linear-gradient(90deg, #ff2d78, #ff6b35, #ffd700, #00cf88, #00b4ff, #8b5cf6, #ff2d78);
-          background-size: 300% 100%;
-          animation: rainbowShift 4s linear infinite;
-          color: #fff; font-weight: 800; font-size: 13px; letter-spacing: 0.03em;
+          padding: 6px 13px; border: none; border-radius: 98px;
+          background: var(--surface); color: var(--accent);
+          font-weight: 800; font-size: 13px; letter-spacing: 0.02em;
           cursor: pointer; font-family: inherit; white-space: nowrap;
-          box-shadow: 0 2px 14px rgba(139,92,246,0.4), 0 1px 4px rgba(0,0,0,0.35);
-          transition: transform 0.15s, box-shadow 0.15s;
-          position: relative;
+          transition: color 0.25s, transform 0.15s;
         }
-        .ai-gen-btn:hover {
-          transform: scale(1.05);
-          box-shadow: 0 4px 22px rgba(139,92,246,0.6), 0 2px 8px rgba(0,0,0,0.4);
+        .ai-gen-btn:active { transform: scale(0.95); }
+        /* Rainbow border + white text on hover — desktop only */
+        @media (hover: hover) {
+          .ai-gen-wrap:hover {
+            background: linear-gradient(90deg, #ff2d78, #ff6b35, #ffd700, #00cf88, #00b4ff, #8b5cf6, #ff2d78);
+            background-size: 300% 100%;
+            animation: rainbowShift 2.5s linear infinite;
+          }
+          .ai-gen-wrap:hover .ai-gen-btn { color: var(--text); }
         }
-        .ai-gen-btn:active { transform: scale(0.96); }
-        .ai-gen-wrap { position: relative; }
         .ai-gen-tip {
           display: none; position: absolute; top: calc(100% + 7px); right: 0;
           background: rgba(10,10,20,0.92); color: #e0e0f0;
           font-size: 11px; font-weight: 500; padding: 6px 11px;
           border-radius: 8px; white-space: nowrap; z-index: 200;
-          border: 1px solid rgba(139,92,246,0.3);
-          box-shadow: 0 4px 14px rgba(0,0,0,0.4);
-          pointer-events: none;
+          border: 1px solid rgba(139,92,246,0.3); pointer-events: none;
         }
         @media (hover: hover) {
           .ai-gen-wrap:hover .ai-gen-tip { display: block; }
