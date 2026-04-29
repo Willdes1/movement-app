@@ -103,7 +103,7 @@ export default function CalendarPage() {
   const [weekPlans, setWeekPlans] = useState<Record<number, DayPlan[]>>({})
   const [loading, setLoading] = useState(true)
   const [viewMonth, setViewMonth] = useState(new Date())
-  const [selectedKey, setSelectedKey] = useState<string | null>(null)
+  const [selectedKey, setSelectedKey] = useState<string | null>(() => new Date().toISOString().split('T')[0])
   const [exerciseLibrary, setExerciseLibrary] = useState<Record<string, ExerciseDetail>>({})
   const [selectedExercise, setSelectedExercise] = useState<ExerciseDetail | null>(null)
   const [lastLog, setLastLog] = useState<WorkoutLog | null>(null)
