@@ -7,22 +7,22 @@ import LaunchpadTab from '@/components/admin/LaunchpadTab'
 
 // ─── PALETTE ─────────────────────────────────────────────────────────────────
 const C = {
-  bg: '#0d1117',
-  surface: '#161b22',
-  surface2: '#21262d',
-  border: '#30363d',
-  accent: '#3b82f6',
-  accentDim: 'rgba(59,130,246,0.12)',
-  accentBorder: 'rgba(59,130,246,0.3)',
-  green: '#22c55e',
-  greenDim: 'rgba(34,197,94,0.1)',
-  amber: '#f59e0b',
-  amberDim: 'rgba(245,158,11,0.1)',
-  red: '#ef4444',
-  purple: '#a78bfa',
-  text: '#e6edf3',
-  textMid: '#b1bac4',
-  textDim: '#6e7681',
+  bg: '#020208',
+  surface: 'rgba(0,15,50,0.85)',
+  surface2: 'rgba(0,25,70,0.6)',
+  border: 'rgba(0,180,255,0.13)',
+  accent: '#00b4ff',
+  accentDim: 'rgba(0,180,255,0.1)',
+  accentBorder: 'rgba(0,180,255,0.28)',
+  green: '#00ff88',
+  greenDim: 'rgba(0,255,136,0.08)',
+  amber: '#ffb340',
+  amberDim: 'rgba(255,179,64,0.1)',
+  red: '#ff4466',
+  purple: '#c084fc',
+  text: '#dff0ff',
+  textMid: '#5a9ab8',
+  textDim: '#2e6880',
 }
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -58,44 +58,44 @@ function RoleBadge({ role }: { role: string }) {
   const cfg: Record<string, { bg: string; color: string }> = {
     admin: { bg: C.amberDim, color: C.amber },
     beta: { bg: C.greenDim, color: C.green },
-    free: { bg: 'rgba(110,118,129,0.1)', color: C.textDim },
+    free: { bg: 'rgba(0,180,255,0.06)', color: C.textMid },
   }
   const s = cfg[role] ?? cfg.free
-  return <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', background: s.bg, color: s.color }}>{role}</span>
+  return <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', background: s.bg, color: s.color, border: `1px solid ${s.color}30`, fontFamily: 'monospace' }}>{role}</span>
 }
 
 function SectionHead({ title, sub }: { title: string; sub?: string }) {
   return (
     <div style={{ marginBottom: 20 }}>
-      <h2 style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', color: C.text, marginBottom: sub ? 4 : 0 }}>{title}</h2>
-      {sub && <p style={{ fontSize: 13, color: C.textDim }}>{sub}</p>}
+      <h2 style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.01em', color: C.text, marginBottom: sub ? 4 : 0 }}>{title}</h2>
+      {sub && <p style={{ fontSize: 12, color: C.textDim, fontFamily: 'monospace', letterSpacing: '0.04em' }}>{sub}</p>}
     </div>
   )
 }
 
 function TableHeader({ cols }: { cols: { label: string; width?: string | number }[] }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: cols.map(c => c.width ?? '1fr').join(' '), padding: '10px 20px', borderBottom: `1px solid ${C.border}`, background: C.surface2 }}>
-      {cols.map(c => <span key={c.label} style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: C.textDim }}>{c.label}</span>)}
+    <div style={{ display: 'grid', gridTemplateColumns: cols.map(c => c.width ?? '1fr').join(' '), padding: '10px 20px', borderBottom: `1px solid ${C.border}`, background: 'rgba(0,180,255,0.04)' }}>
+      {cols.map(c => <span key={c.label} style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: C.textDim, fontFamily: 'monospace' }}>{c.label}</span>)}
     </div>
   )
 }
 
 function Panel({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', ...style }}>{children}</div>
+  return <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', backdropFilter: 'blur(8px)', ...style }}>{children}</div>
 }
 
 function EmptyState({ msg }: { msg: string }) {
-  return <p style={{ fontSize: 13, color: C.textDim, padding: '32px 20px', textAlign: 'center' }}>{msg}</p>
+  return <p style={{ fontSize: 12, color: C.textDim, padding: '32px 20px', textAlign: 'center', fontFamily: 'monospace' }}>{msg}</p>
 }
 
 function Flash({ msg }: { msg: string }) {
   if (!msg) return null
-  return <div style={{ padding: '10px 14px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: 8, fontSize: 13, color: C.green, marginBottom: 16 }}>{msg}</div>
+  return <div style={{ padding: '10px 14px', background: 'rgba(0,255,136,0.08)', border: '1px solid rgba(0,255,136,0.25)', borderRadius: 8, fontSize: 13, color: C.green, marginBottom: 16, fontFamily: 'monospace' }}>{msg}</div>
 }
 
-const inputSt: React.CSSProperties = { padding: '9px 12px', borderRadius: 7, border: `1px solid ${C.border}`, background: C.surface2, color: C.text, fontSize: 13, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }
-const addBtnSt: React.CSSProperties = { padding: '9px 16px', borderRadius: 7, border: 'none', background: C.accent, color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }
+const inputSt: React.CSSProperties = { padding: '9px 12px', borderRadius: 7, border: `1px solid ${C.border}`, background: 'rgba(0,20,60,0.7)', color: C.text, fontSize: 13, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }
+const addBtnSt: React.CSSProperties = { padding: '9px 16px', borderRadius: 7, border: `1px solid ${C.accentBorder}`, background: C.accentDim, color: C.accent, fontWeight: 700, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit', letterSpacing: '0.04em' }
 const deleteBtnSt: React.CSSProperties = { background: 'none', border: 'none', color: C.textDim, cursor: 'pointer', fontSize: 13, padding: '2px 6px', borderRadius: 4, fontFamily: 'inherit' }
 
 // ─── OVERVIEW TAB ─────────────────────────────────────────────────────────────
@@ -111,17 +111,25 @@ function OverviewTab({ users, events, kpis, isMobile }: {
   return (
     <>
       <div style={{ marginBottom: 24 }}>
-        <p style={{ fontSize: 11, color: C.textDim, marginBottom: 4 }}>{now}</p>
-        <h2 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em' }}>Platform Overview</h2>
+        <p style={{ fontSize: 10, color: C.textDim, marginBottom: 4, fontFamily: 'monospace', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{now}</p>
+        <h2 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.01em', color: C.text }}>Platform Overview</h2>
       </div>
 
       {/* KPI grid */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
         {kpis.map(k => (
-          <div key={k.label} style={{ padding: '20px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, borderTop: `2px solid ${k.accent}` }}>
-            <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: C.textDim, marginBottom: 10 }}>{k.label}</p>
-            <p style={{ fontSize: 36, fontWeight: 800, letterSpacing: '-0.04em', color: C.text, marginBottom: 4 }}>{k.value}</p>
-            <p style={{ fontSize: 12, color: String(k.sub).startsWith('↑') ? C.green : C.textDim }}>{k.sub}</p>
+          <div key={k.label} style={{
+            padding: '20px',
+            background: C.surface,
+            border: `1px solid ${C.border}`,
+            borderRadius: 10,
+            borderTop: `2px solid ${k.accent}`,
+            backdropFilter: 'blur(8px)',
+            boxShadow: `0 0 20px ${k.accent}08`,
+          }}>
+            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: C.textDim, marginBottom: 10, fontFamily: 'monospace' }}>{k.label}</p>
+            <p style={{ fontSize: 36, fontWeight: 800, letterSpacing: '-0.04em', color: k.accent, marginBottom: 4, textShadow: `0 0 20px ${k.accent}60` }}>{k.value}</p>
+            <p style={{ fontSize: 11, color: String(k.sub).startsWith('↑') ? C.green : C.textDim, fontFamily: 'monospace' }}>{k.sub}</p>
           </div>
         ))}
       </div>
@@ -130,32 +138,32 @@ function OverviewTab({ users, events, kpis, isMobile }: {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         <Panel>
           <div style={{ padding: '14px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <p style={{ fontWeight: 600, fontSize: 13 }}>Recent Activity</p>
+            <p style={{ fontWeight: 700, fontSize: 12, color: C.accent, fontFamily: 'monospace', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Recent Activity</p>
           </div>
           {events.length === 0 && <EmptyState msg="No activity yet" />}
           {events.slice(0, 8).map(e => (
             <div key={e.key} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 20px', borderBottom: `1px solid ${C.border}` }}>
-              <div style={{ width: 7, height: 7, borderRadius: '50%', background: ACTIVITY_COLOR[e.type] ?? C.textDim, flexShrink: 0, marginTop: 5 }} />
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: ACTIVITY_COLOR[e.type] ?? C.textDim, flexShrink: 0, marginTop: 5, boxShadow: `0 0 6px ${ACTIVITY_COLOR[e.type] ?? C.textDim}` }} />
               <div style={{ flex: 1 }}>
-                <p style={{ fontSize: 13 }}><strong style={{ fontWeight: 700 }}>{e.userName}</strong> — {e.detail}</p>
+                <p style={{ fontSize: 13 }}><strong style={{ fontWeight: 700, color: C.text }}>{e.userName}</strong><span style={{ color: C.textMid }}> — {e.detail}</span></p>
               </div>
-              <span style={{ fontSize: 11, color: C.textDim, flexShrink: 0 }}>{fmtRelative(e.timestamp)}</span>
+              <span style={{ fontSize: 10, color: C.textDim, flexShrink: 0, fontFamily: 'monospace' }}>{fmtRelative(e.timestamp)}</span>
             </div>
           ))}
         </Panel>
 
         <Panel>
           <div style={{ padding: '14px 20px', borderBottom: `1px solid ${C.border}` }}>
-            <p style={{ fontWeight: 600, fontSize: 13 }}>Users</p>
+            <p style={{ fontWeight: 700, fontSize: 12, color: C.accent, fontFamily: 'monospace', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Users</p>
           </div>
           {users.map((u, i) => (
             <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 20px', borderBottom: i < users.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-              <div style={{ width: 28, height: 28, borderRadius: '50%', background: u.role === 'admin' ? C.accentDim : C.surface2, border: `1px solid ${u.role === 'admin' ? C.accentBorder : C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 11, color: u.role === 'admin' ? C.accent : C.textMid, flexShrink: 0 }}>
+              <div style={{ width: 28, height: 28, borderRadius: '50%', background: u.role === 'admin' ? C.accentDim : 'rgba(0,25,60,0.8)', border: `1px solid ${u.role === 'admin' ? C.accentBorder : C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 11, color: u.role === 'admin' ? C.accent : C.textMid, flexShrink: 0, fontFamily: 'monospace' }}>
                 {displayName(u)[0]?.toUpperCase() ?? '?'}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</p>
-                <p style={{ fontSize: 11, color: C.textDim }}>{u.hasProgram ? `${u.weeksGenerated}w · ${u.daysCompleted} days` : 'No plan'}</p>
+                <p style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: C.text }}>{u.email}</p>
+                <p style={{ fontSize: 10, color: C.textDim, fontFamily: 'monospace' }}>{u.hasProgram ? `${u.weeksGenerated}w · ${u.daysCompleted} days` : 'No plan'}</p>
               </div>
               <RoleBadge role={u.role} />
             </div>
@@ -190,26 +198,26 @@ function UsersTab({ users, onRoleChange }: { users: UserStat[]; onRoleChange: (i
         {users.map((u, i) => (
           <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '2fr 90px 70px 70px 60px 60px 100px 90px 110px', padding: '13px 20px', borderBottom: i < users.length - 1 ? `1px solid ${C.border}` : 'none', alignItems: 'center', gap: 0 }}>
             <div>
-              <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>{displayName(u)}</p>
-              <p style={{ fontSize: 11, color: C.textDim, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }}>{u.email}</p>
+              <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 2, color: C.text }}>{displayName(u)}</p>
+              <p style={{ fontSize: 10, color: C.textDim, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220, fontFamily: 'monospace' }}>{u.email}</p>
             </div>
             <RoleBadge role={u.role} />
-            <span style={{ fontSize: 12, color: u.hasProgram ? C.green : C.textDim, fontWeight: u.hasProgram ? 700 : 400 }}>{u.hasProgram ? 'Active' : '—'}</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: u.weeksGenerated > 0 ? C.text : C.textDim }}>{u.weeksGenerated || '—'}</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: u.daysCompleted > 0 ? C.text : C.textDim }}>{u.daysCompleted || '—'}</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: u.exerciseLogs > 0 ? C.text : C.textDim }}>{u.exerciseLogs || '—'}</span>
-            <span style={{ fontSize: 11, color: C.textDim }}>{u.lastActive ? fmtRelative(u.lastActive) : fmtDate(u.created_at)}</span>
-            <span style={{ fontSize: 12, color: C.textDim }}>{fmtDate(u.created_at)}</span>
+            <span style={{ fontSize: 11, color: u.hasProgram ? C.green : C.textDim, fontWeight: u.hasProgram ? 700 : 400, fontFamily: 'monospace' }}>{u.hasProgram ? 'Active' : '—'}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: u.weeksGenerated > 0 ? C.accent : C.textDim, fontFamily: 'monospace' }}>{u.weeksGenerated || '—'}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: u.daysCompleted > 0 ? C.text : C.textDim, fontFamily: 'monospace' }}>{u.daysCompleted || '—'}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: u.exerciseLogs > 0 ? C.text : C.textDim, fontFamily: 'monospace' }}>{u.exerciseLogs || '—'}</span>
+            <span style={{ fontSize: 10, color: C.textDim, fontFamily: 'monospace' }}>{u.lastActive ? fmtRelative(u.lastActive) : fmtDate(u.created_at)}</span>
+            <span style={{ fontSize: 11, color: C.textDim, fontFamily: 'monospace' }}>{fmtDate(u.created_at)}</span>
             {u.role === 'free' ? (
-              <button onClick={() => onRoleChange(u.id, 'beta')} style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${C.accentBorder}`, background: C.accentDim, color: C.accent, fontWeight: 700, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>
+              <button onClick={() => onRoleChange(u.id, 'beta')} style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${C.accentBorder}`, background: C.accentDim, color: C.accent, fontWeight: 700, fontSize: 11, cursor: 'pointer', fontFamily: 'monospace', letterSpacing: '0.04em' }}>
                 → Beta
               </button>
             ) : u.role === 'beta' ? (
-              <button onClick={() => onRoleChange(u.id, 'free')} style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'none', color: C.textDim, fontWeight: 600, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>
+              <button onClick={() => onRoleChange(u.id, 'free')} style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'none', color: C.textDim, fontWeight: 600, fontSize: 11, cursor: 'pointer', fontFamily: 'monospace' }}>
                 Revoke
               </button>
             ) : (
-              <span style={{ fontSize: 11, color: C.textDim }}>Admin</span>
+              <span style={{ fontSize: 10, color: C.amber, fontFamily: 'monospace' }}>Admin</span>
             )}
           </div>
         ))}
@@ -231,16 +239,16 @@ function ActivityTab({ events }: { events: ActivityEvent[] }) {
         {events.map((e, i) => (
           <div key={e.key} style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 24px', borderBottom: i < events.length - 1 ? `1px solid ${C.border}` : 'none' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, paddingTop: 3 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: TYPE_COLOR[e.type] ?? C.textDim }} />
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: TYPE_COLOR[e.type] ?? C.textDim, boxShadow: `0 0 8px ${TYPE_COLOR[e.type] ?? C.textDim}` }} />
               {i < events.length - 1 && <div style={{ width: 1, height: 26, background: C.border, marginTop: 4 }} />}
             </div>
-            <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', padding: '3px 6px', borderRadius: 4, background: `${TYPE_COLOR[e.type]}18`, color: TYPE_COLOR[e.type] ?? C.textDim, border: `1px solid ${TYPE_COLOR[e.type]}30`, flexShrink: 0, marginTop: 1, minWidth: 36, textAlign: 'center' }}>
+            <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', padding: '3px 6px', borderRadius: 4, background: `${TYPE_COLOR[e.type]}14`, color: TYPE_COLOR[e.type] ?? C.textDim, border: `1px solid ${TYPE_COLOR[e.type]}30`, flexShrink: 0, marginTop: 1, minWidth: 36, textAlign: 'center', fontFamily: 'monospace' }}>
               {TYPE_LABEL[e.type] ?? '—'}
             </span>
             <div style={{ flex: 1 }}>
-              <p style={{ fontSize: 13 }}><strong style={{ fontWeight: 700 }}>{e.userName}</strong> — {e.detail}</p>
+              <p style={{ fontSize: 13 }}><strong style={{ fontWeight: 700, color: C.text }}>{e.userName}</strong><span style={{ color: C.textMid }}> — {e.detail}</span></p>
             </div>
-            <span style={{ fontSize: 12, color: C.textDim, flexShrink: 0 }}>{fmtRelative(e.timestamp)}</span>
+            <span style={{ fontSize: 11, color: C.textDim, flexShrink: 0, fontFamily: 'monospace' }}>{fmtRelative(e.timestamp)}</span>
           </div>
         ))}
       </Panel>
@@ -300,8 +308,8 @@ function TodosTab({ todos, onRefresh }: { todos: TodoRow[]; onRefresh: () => voi
             <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: i < active.length - 1 ? `1px solid ${C.border}` : 'none' }}>
               <button onClick={() => toggleTodo(t)} style={{ width: 22, height: 22, borderRadius: 5, border: `2px solid ${C.border}`, background: 'none', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.textDim, fontFamily: 'inherit' }}>○</button>
               <span style={{ flex: 1, fontSize: 13, color: C.text }}>{t.content}</span>
-              {t.priority === 'high' && <span style={{ fontSize: 10, fontWeight: 700, color: C.red, letterSpacing: '0.06em', textTransform: 'uppercase' }}>High</span>}
-              <span style={{ fontSize: 11, color: C.textDim }}>{fmtDate(t.created_at)}</span>
+              {t.priority === 'high' && <span style={{ fontSize: 9, fontWeight: 800, color: C.red, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: 'monospace' }}>High</span>}
+              <span style={{ fontSize: 10, color: C.textDim, fontFamily: 'monospace' }}>{fmtDate(t.created_at)}</span>
               <button onClick={() => deleteTodo(t.id)} style={deleteBtnSt}>✕</button>
             </div>
           ))}
@@ -311,7 +319,7 @@ function TodosTab({ todos, onRefresh }: { todos: TodoRow[]; onRefresh: () => voi
 
       {done.length > 0 && (
         <>
-          <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: C.textDim, marginBottom: 10, marginTop: 8 }}>Done ({done.length})</p>
+          <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: C.textDim, marginBottom: 10, marginTop: 8, fontFamily: 'monospace' }}>Done ({done.length})</p>
           <Panel>
             {done.map((t, i) => (
               <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: i < done.length - 1 ? `1px solid ${C.border}` : 'none', opacity: 0.45 }}>
@@ -367,9 +375,9 @@ function IdeasTab({ ideas, onRefresh }: { ideas: IdeaRow[]; onRefresh: () => voi
         {ideas.length === 0 && <EmptyState msg="No ideas yet" />}
         {ideas.map((idea, i) => (
           <div key={idea.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: i < ideas.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-            <span style={{ fontSize: 10, fontWeight: 700, color: C.accent, letterSpacing: '0.06em', textTransform: 'uppercase', minWidth: 76 }}>{idea.category}</span>
+            <span style={{ fontSize: 9, fontWeight: 800, color: C.accent, letterSpacing: '0.08em', textTransform: 'uppercase', minWidth: 76, fontFamily: 'monospace' }}>{idea.category}</span>
             <span style={{ flex: 1, fontSize: 13, color: C.text }}>{idea.content}</span>
-            <span style={{ fontSize: 11, color: C.textDim, marginRight: 4 }}>{fmtDate(idea.created_at)}</span>
+            <span style={{ fontSize: 10, color: C.textDim, marginRight: 4, fontFamily: 'monospace' }}>{fmtDate(idea.created_at)}</span>
             <button onClick={() => deleteIdea(idea.id)} style={deleteBtnSt}>✕</button>
           </div>
         ))}
@@ -409,7 +417,7 @@ function PromosTab({ promos, onRefresh }: { promos: PromoRow[]; onRefresh: () =>
       <SectionHead title="Promo Codes" sub="Distribute beta access" />
       <Flash msg={msg} />
       <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-        <input value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="CODE (e.g. BETA2026)" style={{ ...inputSt, flex: 2, minWidth: 160, letterSpacing: '0.08em' }} />
+        <input value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="CODE (e.g. BETA2026)" style={{ ...inputSt, flex: 2, minWidth: 160, letterSpacing: '0.08em', fontFamily: 'monospace' }} />
         <select value={role} onChange={e => setRole(e.target.value)} style={{ ...inputSt, width: 120 }}>
           <option value="beta">Beta Access</option>
           <option value="admin">Admin</option>
@@ -417,7 +425,7 @@ function PromosTab({ promos, onRefresh }: { promos: PromoRow[]; onRefresh: () =>
         <input value={maxUses} onChange={e => setMaxUses(e.target.value)} placeholder="Max uses (blank = 10)" type="number" style={{ ...inputSt, flex: 1, minWidth: 140 }} />
         <button onClick={addPromo} disabled={saving} style={addBtnSt}>Create</button>
       </div>
-      <p style={{ fontSize: 12, color: C.textDim, marginBottom: 20 }}>Each user can only redeem one code. Codes are case-insensitive.</p>
+      <p style={{ fontSize: 11, color: C.textDim, marginBottom: 20, fontFamily: 'monospace' }}>Each user can only redeem one code. Codes are case-insensitive.</p>
 
       <Panel>
         <TableHeader cols={[
@@ -430,15 +438,15 @@ function PromosTab({ promos, onRefresh }: { promos: PromoRow[]; onRefresh: () =>
         {promos.length === 0 && <EmptyState msg="No promo codes yet" />}
         {promos.map((p, i) => (
           <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 1.5fr 100px 40px', padding: '14px 20px', borderBottom: i < promos.length - 1 ? `1px solid ${C.border}` : 'none', alignItems: 'center' }}>
-            <span style={{ fontWeight: 800, letterSpacing: '0.08em', fontFamily: 'monospace', fontSize: 14, color: C.accent }}>{p.code}</span>
+            <span style={{ fontWeight: 800, letterSpacing: '0.1em', fontFamily: 'monospace', fontSize: 14, color: C.accent, textShadow: `0 0 12px ${C.accent}60` }}>{p.code}</span>
             <RoleBadge role={p.role ?? 'beta'} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ flex: 1, height: 4, background: C.surface2, borderRadius: 2, maxWidth: 140 }}>
-                <div style={{ height: '100%', borderRadius: 2, background: C.accent, width: `${Math.min(((p.uses ?? 0) / (p.max_uses ?? 10)) * 100, 100)}%` }} />
+              <div style={{ flex: 1, height: 3, background: 'rgba(0,180,255,0.1)', borderRadius: 2, maxWidth: 140 }}>
+                <div style={{ height: '100%', borderRadius: 2, background: C.accent, width: `${Math.min(((p.uses ?? 0) / (p.max_uses ?? 10)) * 100, 100)}%`, boxShadow: `0 0 6px ${C.accent}` }} />
               </div>
-              <span style={{ fontSize: 12, color: C.textDim }}>{p.uses ?? 0} / {p.max_uses ?? '∞'}</span>
+              <span style={{ fontSize: 11, color: C.textDim, fontFamily: 'monospace' }}>{p.uses ?? 0} / {p.max_uses ?? '∞'}</span>
             </div>
-            <span style={{ fontSize: 12, color: C.textDim }}>{fmtDate(p.created_at)}</span>
+            <span style={{ fontSize: 11, color: C.textDim, fontFamily: 'monospace' }}>{fmtDate(p.created_at)}</span>
             <button onClick={() => deletePromo(p.id)} style={deleteBtnSt}>✕</button>
           </div>
         ))}
@@ -451,13 +459,13 @@ function PromosTab({ promos, onRefresh }: { promos: PromoRow[]; onRefresh: () =>
 function PlaceholderTab({ label, bullets }: { label: string; bullets: string[] }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 24px', gap: 16 }}>
-      <div style={{ width: 48, height: 48, borderRadius: 12, background: C.accentDim, border: `1px solid ${C.accentBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: 48, height: 48, borderRadius: 12, background: C.accentDim, border: `1px solid ${C.accentBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 0 24px ${C.accent}20` }}>
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
       </div>
       <p style={{ fontWeight: 700, fontSize: 17, color: C.text }}>{label}</p>
-      <p style={{ fontSize: 13, color: C.textDim, textAlign: 'center', maxWidth: 300, lineHeight: 1.6 }}>This section is coming in the next build phase.</p>
+      <p style={{ fontSize: 12, color: C.textDim, textAlign: 'center', maxWidth: 300, lineHeight: 1.6, fontFamily: 'monospace' }}>This section is coming in the next build phase.</p>
       {bullets.length > 0 && (
-        <div style={{ marginTop: 8, padding: '16px 20px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, maxWidth: 360, width: '100%' }}>
+        <div style={{ marginTop: 8, padding: '16px 20px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, maxWidth: 360, width: '100%', backdropFilter: 'blur(8px)' }}>
           {bullets.map(b => (
             <div key={b} style={{ display: 'flex', gap: 10, marginBottom: 8, alignItems: 'flex-start' }}>
               <span style={{ color: C.accent, fontSize: 12, flexShrink: 0, marginTop: 1 }}>→</span>
@@ -649,7 +657,11 @@ export default function AdminPage() {
   }
 
   if (authLoading || (!isAdmin && !authLoading)) {
-    return <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.bg, color: C.textDim, fontSize: 14 }}>{authLoading ? 'Loading…' : 'Access denied'}</div>
+    return (
+      <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#020208', color: '#2e6880', fontSize: 13, fontFamily: 'monospace', letterSpacing: '0.06em' }}>
+        {authLoading ? '// AUTHENTICATING…' : '// ACCESS DENIED'}
+      </div>
+    )
   }
 
   const activeTodoCount = todos.filter(t => t.status === 'pending').length
@@ -660,39 +672,51 @@ export default function AdminPage() {
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, display: 'flex', overflow: 'hidden', background: C.bg, color: C.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', zIndex: 50 }}>
+    <div style={{
+      position: 'fixed', inset: 0, display: 'flex', overflow: 'hidden',
+      background: '#020208',
+      backgroundImage: 'linear-gradient(rgba(0,180,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(0,180,255,0.025) 1px, transparent 1px)',
+      backgroundSize: '48px 48px',
+      color: C.text,
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      zIndex: 50,
+    }}>
 
       {/* Mobile backdrop */}
       {isMobile && sidebarOpen && (
         <div
           onClick={() => setSidebarOpen(false)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 59 }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 59 }}
         />
       )}
 
       {/* ── Sidebar ── */}
       <aside style={{
-        width: 220, background: C.surface, borderRight: `1px solid ${C.border}`,
+        width: 220,
+        background: 'rgba(0,8,28,0.96)',
+        borderRight: `1px solid rgba(0,180,255,0.18)`,
         display: 'flex', flexDirection: 'column',
+        backdropFilter: 'blur(12px)',
+        boxShadow: 'inset -1px 0 0 rgba(0,180,255,0.06)',
         ...(isMobile ? {
           position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 60,
           transform: sidebarOpen ? 'translateX(0)' : 'translateX(-220px)',
           transition: 'transform 0.25s ease',
-          boxShadow: sidebarOpen ? '4px 0 32px rgba(0,0,0,0.7)' : 'none',
+          boxShadow: sidebarOpen ? '4px 0 48px rgba(0,0,0,0.9)' : 'none',
         } : {
           flexShrink: 0, height: '100%',
         }),
       }}>
 
         {/* Logo */}
-        <div style={{ padding: '22px 20px 18px', borderBottom: `1px solid ${C.border}` }}>
+        <div style={{ padding: '22px 20px 18px', borderBottom: `1px solid rgba(0,180,255,0.12)` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            <div style={{ width: 30, height: 30, borderRadius: 8, background: C.accentDim, border: `1px solid ${C.accentBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 0 16px ${C.accent}30` }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill={C.accent}><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
             </div>
             <div>
-              <p style={{ fontWeight: 800, fontSize: 14, color: C.text }}>Movement OS</p>
-              <p style={{ fontSize: 10, color: C.textDim, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Admin Portal</p>
+              <p style={{ fontWeight: 800, fontSize: 13, color: C.text, letterSpacing: '0.02em' }}>Movement OS</p>
+              <p style={{ fontSize: 9, color: C.textDim, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'monospace' }}>Admin Portal</p>
             </div>
           </div>
         </div>
@@ -701,16 +725,24 @@ export default function AdminPage() {
         <nav style={{ padding: '10px 10px', flex: 1, overflowY: 'auto' }}>
           {NAV_GROUPS.map(group => (
             <div key={group.label} style={{ marginBottom: 18 }}>
-              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.textDim, padding: '4px 10px 6px' }}>{group.label}</p>
+              <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: C.textDim, padding: '4px 10px 6px', fontFamily: 'monospace' }}>{group.label}</p>
               {group.items.map(item => {
                 const active = tab === item.id
                 const badge = item.id === 'todos' ? (activeTodoCount > 0 ? activeTodoCount : null)
                            : item.id === 'ideas' ? (ideas.length > 0 ? ideas.length : null)
                            : null
                 return (
-                  <button key={item.id} onClick={() => selectTab(item.id)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', borderRadius: 6, border: 'none', background: active ? C.accentDim : 'none', color: active ? C.accent : C.textMid, fontWeight: active ? 600 : 400, fontSize: 13, cursor: 'pointer', marginBottom: 2, textAlign: 'left', transition: 'all 0.1s', fontFamily: 'inherit' }}>
+                  <button key={item.id} onClick={() => selectTab(item.id)} style={{
+                    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '8px 10px', borderRadius: 6, border: 'none',
+                    background: active ? 'rgba(0,180,255,0.1)' : 'none',
+                    color: active ? C.accent : C.textMid,
+                    fontWeight: active ? 700 : 400, fontSize: 13, cursor: 'pointer', marginBottom: 2, textAlign: 'left',
+                    transition: 'all 0.15s', fontFamily: 'inherit',
+                    boxShadow: active ? `inset 0 0 0 1px rgba(0,180,255,0.2)` : 'none',
+                  }}>
                     <span>{item.label}</span>
-                    {badge && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: active ? C.accentBorder : C.surface2, color: active ? C.accent : C.textDim }}>{badge}</span>}
+                    {badge && <span style={{ fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 10, background: active ? 'rgba(0,180,255,0.2)' : 'rgba(0,180,255,0.07)', color: active ? C.accent : C.textDim, fontFamily: 'monospace' }}>{badge}</span>}
                   </button>
                 )
               })}
@@ -719,12 +751,12 @@ export default function AdminPage() {
         </nav>
 
         {/* Footer */}
-        <div style={{ padding: '14px 20px', borderTop: `1px solid ${C.border}` }}>
+        <div style={{ padding: '14px 20px', borderTop: `1px solid rgba(0,180,255,0.12)` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.green, boxShadow: `0 0 6px ${C.green}` }} />
-            <span style={{ fontSize: 11, color: C.textDim }}>All systems operational</span>
+            <div style={{ width: 7, height: 7, borderRadius: '50%', background: C.green, boxShadow: `0 0 8px ${C.green}` }} />
+            <span style={{ fontSize: 10, color: C.textDim, fontFamily: 'monospace', letterSpacing: '0.04em' }}>All systems operational</span>
           </div>
-          <button onClick={() => router.push('/today')} style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'none', color: C.textDim, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+          <button onClick={() => router.push('/today')} style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: `1px solid rgba(0,180,255,0.12)`, background: 'none', color: C.textMid, fontSize: 12, cursor: 'pointer', fontFamily: 'monospace', textAlign: 'left', letterSpacing: '0.04em' }}>
             ← Back to App
           </button>
         </div>
@@ -734,8 +766,15 @@ export default function AdminPage() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', minWidth: 0 }}>
 
         {/* Top bar */}
-        <header style={{ height: 56, borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '0 16px' : '0 28px', background: C.surface, flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <header style={{
+          height: 56, borderBottom: `1px solid rgba(0,180,255,0.12)`,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: isMobile ? '0 16px' : '0 28px',
+          background: 'rgba(0,5,20,0.9)',
+          backdropFilter: 'blur(12px)',
+          flexShrink: 0,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {isMobile && (
               <button
                 onClick={() => setSidebarOpen(o => !o)}
@@ -747,11 +786,16 @@ export default function AdminPage() {
               </button>
             )}
             <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{NAV_GROUPS.flatMap(g => g.items).find(i => i.id === tab)?.label}</span>
-            {dataLoading && <span style={{ fontSize: 11, color: C.textDim }}>· loading…</span>}
+            {dataLoading && <span style={{ fontSize: 10, color: C.textDim, fontFamily: 'monospace', letterSpacing: '0.06em' }}>· syncing…</span>}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {!isMobile && <span style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: C.accentDim, border: `1px solid ${C.accentBorder}`, color: C.accent, fontWeight: 700, letterSpacing: '0.06em' }}>ADMIN</span>}
-            <div style={{ width: 30, height: 30, borderRadius: '50%', background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, color: '#fff', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {!isMobile && (
+              <span style={{ fontSize: 9, fontFamily: 'monospace', fontWeight: 800, letterSpacing: '0.1em', color: C.textDim }}>
+                // SYSTEM ACTIVE
+              </span>
+            )}
+            {!isMobile && <span style={{ fontSize: 10, padding: '4px 10px', borderRadius: 6, background: C.accentDim, border: `1px solid ${C.accentBorder}`, color: C.accent, fontWeight: 800, letterSpacing: '0.08em', fontFamily: 'monospace' }}>ADMIN</span>}
+            <div style={{ width: 30, height: 30, borderRadius: '50%', background: C.accentDim, border: `1px solid ${C.accentBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, color: C.accent, flexShrink: 0, fontFamily: 'monospace', boxShadow: `0 0 12px ${C.accent}30` }}>
               {user?.email?.[0]?.toUpperCase() ?? 'A'}
             </div>
           </div>
