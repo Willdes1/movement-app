@@ -44,6 +44,37 @@ export default function RecoveryPage() {
           </Link>
         ))}
 
+        {/* Return to Sport */}
+        <Link
+          href="/recovery/return-to-sport"
+          style={{
+            display: 'block',
+            background: 'linear-gradient(135deg, rgba(0,80,30,0.45) 0%, rgba(0,40,15,0.6) 100%)',
+            border: '1px solid rgba(0,232,120,0.22)',
+            borderRadius: 14,
+            padding: '18px',
+            textDecoration: 'none',
+            color: 'var(--text)',
+            position: 'relative',
+            overflow: 'hidden',
+          }}
+        >
+          <div style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, background: 'radial-gradient(circle, rgba(0,232,120,0.08) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#00e878', boxShadow: '0 0 8px #00e878', flexShrink: 0 }} />
+            <h2 style={{ fontSize: 17, fontWeight: 700, color: '#00e878' }}>Return to Sport</h2>
+            <span style={{ marginLeft: 'auto', fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 4, background: 'rgba(0,232,120,0.12)', color: '#00e878', border: '1px solid rgba(0,232,120,0.2)' }}>AI</span>
+          </div>
+          <p style={{ fontSize: 13, color: 'var(--text-mid)', lineHeight: 1.5, marginBottom: 12 }}>
+            Sport-specific step-by-step comeback progression. AI builds your personalized protocol — daily check-in unlocks the next stage.
+          </p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'rgba(0,232,120,0.08)', border: '1px solid rgba(0,232,120,0.18)', color: '#00e878' }}>Personalized</span>
+            <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'rgba(0,232,120,0.08)', border: '1px solid rgba(0,232,120,0.18)', color: '#00e878' }}>Progressive</span>
+            <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'rgba(0,232,120,0.08)', border: '1px solid rgba(0,232,120,0.18)', color: '#00e878' }}>Daily check-in</span>
+          </div>
+        </Link>
+
         {/* Anatomy Explorer */}
         <Link
           href="/recovery/anatomy"
