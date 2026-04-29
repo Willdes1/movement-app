@@ -697,7 +697,6 @@ export default function AdminPage() {
         borderRight: `1px solid rgba(0,180,255,0.18)`,
         display: 'flex', flexDirection: 'column',
         backdropFilter: 'blur(12px)',
-        boxShadow: 'inset -1px 0 0 rgba(0,180,255,0.06)',
         ...(isMobile ? {
           position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 60,
           transform: sidebarOpen ? 'translateX(0)' : 'translateX(-220px)',
@@ -705,6 +704,7 @@ export default function AdminPage() {
           boxShadow: sidebarOpen ? '4px 0 48px rgba(0,0,0,0.9)' : 'none',
         } : {
           flexShrink: 0, height: '100%',
+          boxShadow: 'inset -1px 0 0 rgba(0,180,255,0.06)',
         }),
       }}>
 
