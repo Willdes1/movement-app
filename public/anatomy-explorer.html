@@ -143,6 +143,55 @@ footer{padding:9px 24px;border-top:1px solid rgba(0,180,255,.09);display:flex;al
 .hint{font-size:9px;color:var(--faint);letter-spacing:.06em;text-transform:uppercase}
 .hint b{color:var(--j1)}
 .awrap{cursor:grab}.awrap:active{cursor:grabbing}
+
+/* ── MOBILE ────────────────────────────────────────────────────── */
+@media(max-width:640px){
+  /* Header — collapse to essentials */
+  header{padding:9px 12px;gap:6px}
+  .brand{gap:7px;flex:1;min-width:0}
+  .dvd,.sys,.hstats{display:none}
+  .logo{font-size:16px}
+  .vsw{gap:2px;padding:2px}
+  .vb{padding:5px 9px;font-size:8px;letter-spacing:.06em}
+
+  /* Main — single column, skeleton fills space */
+  main{flex-direction:column;padding:0;gap:0;align-items:stretch;justify-content:flex-start;overflow:hidden}
+  .lrail{display:none}
+
+  /* Skeleton viewer — full width, stretches to fill */
+  .awrap{width:100%;flex:1;min-height:0;height:auto}
+  .hleft,.hright{display:none}
+  .oring.or1{width:220px;height:220px;margin:-110px 0 0 -110px}
+  .oring.or2{width:174px;height:174px;margin:-87px 0 0 -87px}
+  .oring.or3{width:270px;height:68px;margin:-34px 0 0 -135px}
+  .farea{width:200px;height:424px}
+  .sstatus{font-size:7px;letter-spacing:.1em;bottom:-18px}
+
+  /* Panel — slide-up bottom sheet */
+  #panel{
+    position:fixed!important;bottom:0;left:0;right:0;width:auto!important;
+    max-height:68vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    opacity:0;transform:translateY(30px);
+    transition:opacity .4s cubic-bezier(.16,1,.3,1),transform .4s cubic-bezier(.16,1,.3,1);
+    pointer-events:none;z-index:200
+  }
+  #panel.show{opacity:1;transform:translateY(0);pointer-events:all}
+  .pcard{border-radius:18px 18px 0 0!important}
+  .phead{padding:16px 18px 14px}
+  .pbody{padding:14px 18px 20px}
+
+  /* Footer — one line only */
+  footer{padding:6px 14px}
+  .hint:nth-child(2),.hint:last-child{display:none}
+  .hint{font-size:8px}
+
+  /* Back button — compact */
+  .back-btn{font-size:9px!important;padding:5px 10px!important;margin-right:6px!important;letter-spacing:.07em!important}
+}
+
+/* Mobile overlay behind bottom sheet */
+#mob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:190;backdrop-filter:blur(3px);cursor:pointer}
+#mob-overlay.on{display:block}
 </style>
 </head>
 <body class="vs">
@@ -152,7 +201,7 @@ footer{padding:9px 24px;border-top:1px solid rgba(0,180,255,.09);display:flex;al
 <div class="shell">
 <header>
   <div class="brand">
-    <a href="/recovery" target="_parent" style="display:flex;align-items:center;gap:6px;padding:6px 13px;border-radius:7px;border:1px solid rgba(0,180,255,0.45);background:rgba(0,40,120,0.55);color:#00d4ff;font-size:10px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;text-decoration:none;transition:all 0.2s;margin-right:10px;box-shadow:0 0 12px rgba(0,180,255,0.15)" onmouseover="this.style.background='rgba(0,60,160,0.7)';this.style.boxShadow='0 0 20px rgba(0,180,255,0.35)'" onmouseout="this.style.background='rgba(0,40,120,0.55)';this.style.boxShadow='0 0 12px rgba(0,180,255,0.15)'">← Recovery</a>
+    <a href="/recovery" target="_parent" class="back-btn" style="display:flex;align-items:center;gap:6px;padding:6px 13px;border-radius:7px;border:1px solid rgba(0,180,255,0.45);background:rgba(0,40,120,0.55);color:#00d4ff;font-size:10px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;text-decoration:none;transition:all 0.2s;margin-right:10px;box-shadow:0 0 12px rgba(0,180,255,0.15)" onmouseover="this.style.background='rgba(0,60,160,0.7)';this.style.boxShadow='0 0 20px rgba(0,180,255,0.35)'" onmouseout="this.style.background='rgba(0,40,120,0.55)';this.style.boxShadow='0 0 12px rgba(0,180,255,0.15)'">← Recovery</a>
     <div class="logo">Move<em>.</em></div>
     <div class="dvd"></div>
     <div class="sys">Biomechanical Anatomy System v0.3</div>
@@ -623,6 +672,7 @@ footer{padding:9px 24px;border-top:1px solid rgba(0,180,255,.09);display:flex;al
 </footer>
 </div>
 
+<div id="mob-overlay"></div>
 <div id="tip"><div class="tname" id="tname"></div><div class="tdesc" id="tdesc"></div><div class="tcta" id="tcta"></div></div>
 
 <script>
@@ -672,7 +722,9 @@ let dragStartX=0,dragStartY=0,lastX=0,lastY=0
 
 const stage=document.getElementById('stage'),bsvg=document.getElementById('bsvg')
 const tip=document.getElementById('tip'),panel=document.getElementById('panel'),pcard=document.getElementById('pcard'),sstatus=document.getElementById('sstatus')
+const mobOverlay=document.getElementById('mob-overlay')
 const groups=[...bsvg.querySelectorAll('.bg')]
+mobOverlay.addEventListener('click',reset)
 
 // Render loop — stationary until dragged
 ;(function loop(){
@@ -762,12 +814,14 @@ function pick(region,gEl,evt){
   sstatus.textContent='// LOCK: '+gEl.dataset.l.toUpperCase()
   renderPanel(region,gEl)
   panel.classList.add('show')
+  if(innerWidth<=640)mobOverlay.classList.add('on')
 }
 
 function reset(){
   sel=null
   groups.forEach(g=>{g.classList.remove('sel','dim');g.style.transform=''})
   bsvg.style.transform='';panel.classList.remove('show')
+  mobOverlay.classList.remove('on')
   document.getElementById('lregion').style.display='none'
   sstatus.textContent='// SCANNING — drag to rotate · hover to identify · click to analyze'
 }
