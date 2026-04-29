@@ -175,7 +175,7 @@ function OverviewTab({ users, events, kpis, isMobile }: {
 }
 
 // ─── USERS TAB ────────────────────────────────────────────────────────────────
-function UsersTab({ users, onRoleChange }: { users: UserStat[]; onRoleChange: (id: string, role: string) => Promise<void> }) {
+function UsersTab({ users, onRoleChange, onZoomIn }: { users: UserStat[]; onRoleChange: (id: string, role: string) => Promise<void>; onZoomIn: (user: UserStat) => void }) {
   const betaCount = users.filter(u => u.role === 'beta').length
   const ffCount = users.filter(u => u.role === 'ff').length
   const freeCount = users.filter(u => u.role === 'free').length
@@ -194,10 +194,11 @@ function UsersTab({ users, onRoleChange }: { users: UserStat[]; onRoleChange: (i
           { label: 'Last Active', width: 100 },
           { label: 'Joined', width: 90 },
           { label: 'Promote', width: 110 },
+          { label: '', width: 44 },
         ]} />
         {users.length === 0 && <EmptyState msg="No users yet" />}
         {users.map((u, i) => (
-          <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '2fr 90px 70px 70px 60px 60px 100px 90px 110px', padding: '13px 20px', borderBottom: i < users.length - 1 ? `1px solid ${C.border}` : 'none', alignItems: 'center', gap: 0 }}>
+          <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '2fr 90px 70px 70px 60px 60px 100px 90px 110px 44px', padding: '13px 20px', borderBottom: i < users.length - 1 ? `1px solid ${C.border}` : 'none', alignItems: 'center', gap: 0 }}>
             <div>
               <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 2, color: C.text }}>{displayName(u)}</p>
               <p style={{ fontSize: 10, color: C.textDim, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220, fontFamily: 'monospace' }}>{u.email}</p>
@@ -212,16 +213,13 @@ function UsersTab({ users, onRoleChange }: { users: UserStat[]; onRoleChange: (i
             {u.is_admin ? (
               <span style={{ fontSize: 10, color: C.amber, fontFamily: 'monospace' }}>Admin</span>
             ) : (
-              <select
-                value={u.role}
-                onChange={e => onRoleChange(u.id, e.target.value)}
-                style={{ padding: '4px 6px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'rgba(0,15,50,0.9)', color: C.text, fontSize: 11, cursor: 'pointer', fontFamily: 'monospace', outline: 'none' }}
-              >
+              <select value={u.role} onChange={e => onRoleChange(u.id, e.target.value)} style={{ padding: '4px 6px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'rgba(0,15,50,0.9)', color: C.text, fontSize: 11, cursor: 'pointer', fontFamily: 'monospace', outline: 'none' }}>
                 <option value="free">free</option>
                 <option value="ff">f&f</option>
                 <option value="beta">beta</option>
               </select>
             )}
+            <button onClick={() => onZoomIn(u)} title="View user details" style={{ padding: '4px 8px', borderRadius: 5, border: `1px solid ${C.accentBorder}`, background: C.accentDim, color: C.accent, fontSize: 12, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 700 }}>→</button>
           </div>
         ))}
       </Panel>
@@ -265,17 +263,17 @@ function TodosTab({ todos, onRefresh }: { todos: TodoRow[]; onRefresh: () => voi
   const [priority, setPriority] = useState('medium')
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
+  const [doneOpen, setDoneOpen] = useState(false)
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
   function flash(m: string) { setMsg(m); setTimeout(() => setMsg(''), 3000) }
+  function toggleExpand(id: string) { setExpandedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n }) }
 
   async function addTodo() {
     if (!newTodo.trim()) return
     setSaving(true)
     await supabase.from('todos').insert({ content: newTodo.trim(), status: 'pending', priority, category: 'general' })
-    setNewTodo('')
-    await onRefresh()
-    flash('Todo added')
-    setSaving(false)
+    setNewTodo(''); await onRefresh(); flash('Todo added'); setSaving(false)
   }
 
   async function toggleTodo(todo: TodoRow) {
@@ -284,8 +282,7 @@ function TodosTab({ todos, onRefresh }: { todos: TodoRow[]; onRefresh: () => voi
   }
 
   async function deleteTodo(id: string) {
-    await supabase.from('todos').delete().eq('id', id)
-    await onRefresh()
+    await supabase.from('todos').delete().eq('id', id); await onRefresh()
   }
 
   const active = todos.filter(t => t.status === 'pending')
@@ -298,40 +295,62 @@ function TodosTab({ todos, onRefresh }: { todos: TodoRow[]; onRefresh: () => voi
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         <input value={newTodo} onChange={e => setNewTodo(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTodo()} placeholder="Add a new todo…" style={{ ...inputSt, flex: 1, minWidth: 200 }} />
         <select value={priority} onChange={e => setPriority(e.target.value)} style={{ ...inputSt, width: 110 }}>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
+          <option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option>
         </select>
         <button onClick={addTodo} disabled={saving} style={addBtnSt}>Add</button>
       </div>
 
+      {active.length === 0 && <EmptyState msg="No active todos — you're clear." />}
       {active.length > 0 && (
         <Panel style={{ marginBottom: 16 }}>
-          {active.map((t, i) => (
-            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: i < active.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-              <button onClick={() => toggleTodo(t)} style={{ width: 22, height: 22, borderRadius: 5, border: `2px solid ${C.border}`, background: 'none', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.textDim, fontFamily: 'inherit' }}>○</button>
-              <span style={{ flex: 1, fontSize: 13, color: C.text }}>{t.content}</span>
-              {t.priority === 'high' && <span style={{ fontSize: 9, fontWeight: 800, color: C.red, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: 'monospace' }}>High</span>}
-              <span style={{ fontSize: 10, color: C.textDim, fontFamily: 'monospace' }}>{fmtDate(t.created_at)}</span>
-              <button onClick={() => deleteTodo(t.id)} style={deleteBtnSt}>✕</button>
-            </div>
-          ))}
+          {active.map((t, i) => {
+            const long = t.content.length > 80
+            const expanded = expandedIds.has(t.id)
+            return (
+              <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 16px', borderBottom: i < active.length - 1 ? `1px solid ${C.border}` : 'none' }}>
+                <button onClick={() => toggleTodo(t)} style={{ width: 22, height: 22, borderRadius: 5, border: `2px solid ${C.border}`, background: 'none', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.textDim, fontFamily: 'inherit', marginTop: 1 }}>○</button>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span
+                    onClick={() => long && toggleExpand(t.id)}
+                    style={{ fontSize: 13, color: C.text, cursor: long ? 'pointer' : 'default', display: 'block', whiteSpace: expanded ? 'pre-wrap' : 'nowrap', overflow: 'hidden', textOverflow: expanded ? 'clip' : 'ellipsis', lineHeight: 1.55 }}
+                    title={long && !expanded ? t.content : undefined}
+                  >{t.content}</span>
+                  {long && <span onClick={() => toggleExpand(t.id)} style={{ fontSize: 10, color: C.accent, cursor: 'pointer', fontFamily: 'monospace' }}>{expanded ? '▲ collapse' : '▼ expand'}</span>}
+                </div>
+                {t.priority === 'high' && <span style={{ fontSize: 9, fontWeight: 800, color: C.red, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: 'monospace', flexShrink: 0, marginTop: 3 }}>High</span>}
+                <span style={{ fontSize: 10, color: C.textDim, fontFamily: 'monospace', flexShrink: 0, marginTop: 3 }}>{fmtDate(t.created_at)}</span>
+                <button onClick={() => deleteTodo(t.id)} style={deleteBtnSt}>✕</button>
+              </div>
+            )
+          })}
         </Panel>
       )}
-      {active.length === 0 && <EmptyState msg="No active todos — you're clear." />}
 
       {done.length > 0 && (
         <>
-          <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: C.textDim, marginBottom: 10, marginTop: 8, fontFamily: 'monospace' }}>Done ({done.length})</p>
-          <Panel>
-            {done.map((t, i) => (
-              <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: i < done.length - 1 ? `1px solid ${C.border}` : 'none', opacity: 0.45 }}>
-                <button onClick={() => toggleTodo(t)} style={{ width: 22, height: 22, borderRadius: 5, border: `2px solid ${C.accent}`, background: C.accentDim, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.accent, fontSize: 11, fontFamily: 'inherit' }}>✓</button>
-                <span style={{ flex: 1, fontSize: 13, textDecoration: 'line-through', color: C.textMid }}>{t.content}</span>
-                <button onClick={() => deleteTodo(t.id)} style={deleteBtnSt}>✕</button>
-              </div>
-            ))}
-          </Panel>
+          <button onClick={() => setDoneOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: C.textDim, background: 'none', border: 'none', cursor: 'pointer', padding: '6px 0', marginTop: 8, fontFamily: 'monospace' }}>
+            <span style={{ fontSize: 10 }}>{doneOpen ? '▼' : '▶'}</span> Completed ({done.length})
+          </button>
+          {doneOpen && (
+            <Panel style={{ marginTop: 8 }}>
+              {done.map((t, i) => {
+                const long = t.content.length > 80
+                const expanded = expandedIds.has(t.id)
+                return (
+                  <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 16px', borderBottom: i < done.length - 1 ? `1px solid ${C.border}` : 'none', opacity: 0.5 }}>
+                    <button onClick={() => toggleTodo(t)} style={{ width: 22, height: 22, borderRadius: 5, border: `2px solid ${C.accent}`, background: C.accentDim, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.accent, fontSize: 11, fontFamily: 'inherit', marginTop: 1 }}>✓</button>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span
+                        onClick={() => long && toggleExpand(t.id)}
+                        style={{ fontSize: 13, textDecoration: 'line-through', color: C.textMid, cursor: long ? 'pointer' : 'default', display: 'block', whiteSpace: expanded ? 'pre-wrap' : 'nowrap', overflow: 'hidden', textOverflow: expanded ? 'clip' : 'ellipsis', lineHeight: 1.55 }}
+                      >{t.content}</span>
+                      {long && <span onClick={() => toggleExpand(t.id)} style={{ fontSize: 10, color: C.accent, cursor: 'pointer', fontFamily: 'monospace' }}>{expanded ? '▲ collapse' : '▼ expand'}</span>}
+                    </div>
+                  </div>
+                )
+              })}
+            </Panel>
+          )}
         </>
       )}
     </>
@@ -344,27 +363,21 @@ function IdeasTab({ ideas, onRefresh }: { ideas: IdeaRow[]; onRefresh: () => voi
   const [category, setCategory] = useState('General')
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
   function flash(m: string) { setMsg(m); setTimeout(() => setMsg(''), 3000) }
+  function toggleExpand(id: string) { setExpandedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n }) }
 
   async function addIdea() {
     if (!newIdea.trim()) return
     setSaving(true)
     await supabase.from('ideas').insert({ content: newIdea.trim(), category })
-    setNewIdea('')
-    await onRefresh()
-    flash('Idea saved')
-    setSaving(false)
-  }
-
-  async function deleteIdea(id: string) {
-    await supabase.from('ideas').delete().eq('id', id)
-    await onRefresh()
+    setNewIdea(''); await onRefresh(); flash('Idea saved'); setSaving(false)
   }
 
   return (
     <>
-      <SectionHead title="Ideas" sub={`${ideas.length} captured`} />
+      <SectionHead title="Ideas" sub={`${ideas.length} captured — ideas are permanent`} />
       <Flash msg={msg} />
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         <input value={newIdea} onChange={e => setNewIdea(e.target.value)} onKeyDown={e => e.key === 'Enter' && addIdea()} placeholder="Capture an idea…" style={{ ...inputSt, flex: 1, minWidth: 200 }} />
@@ -376,15 +389,186 @@ function IdeasTab({ ideas, onRefresh }: { ideas: IdeaRow[]; onRefresh: () => voi
 
       <Panel>
         {ideas.length === 0 && <EmptyState msg="No ideas yet" />}
-        {ideas.map((idea, i) => (
-          <div key={idea.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: i < ideas.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-            <span style={{ fontSize: 9, fontWeight: 800, color: C.accent, letterSpacing: '0.08em', textTransform: 'uppercase', minWidth: 76, fontFamily: 'monospace' }}>{idea.category}</span>
-            <span style={{ flex: 1, fontSize: 13, color: C.text }}>{idea.content}</span>
-            <span style={{ fontSize: 10, color: C.textDim, marginRight: 4, fontFamily: 'monospace' }}>{fmtDate(idea.created_at)}</span>
-            <button onClick={() => deleteIdea(idea.id)} style={deleteBtnSt}>✕</button>
-          </div>
-        ))}
+        {ideas.map((idea, i) => {
+          const long = idea.content.length > 90
+          const expanded = expandedIds.has(idea.id)
+          return (
+            <div key={idea.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 16px', borderBottom: i < ideas.length - 1 ? `1px solid ${C.border}` : 'none' }}>
+              <span style={{ fontSize: 9, fontWeight: 800, color: C.accent, letterSpacing: '0.08em', textTransform: 'uppercase', minWidth: 76, fontFamily: 'monospace', marginTop: 2, flexShrink: 0 }}>{idea.category}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span
+                  onClick={() => long && toggleExpand(idea.id)}
+                  style={{ fontSize: 13, color: C.text, cursor: long ? 'pointer' : 'default', display: 'block', whiteSpace: expanded ? 'pre-wrap' : 'nowrap', overflow: 'hidden', textOverflow: expanded ? 'clip' : 'ellipsis', lineHeight: 1.55 }}
+                >{idea.content}</span>
+                {long && <span onClick={() => toggleExpand(idea.id)} style={{ fontSize: 10, color: C.accent, cursor: 'pointer', fontFamily: 'monospace' }}>{expanded ? '▲ collapse' : '▼ read more'}</span>}
+              </div>
+              <span style={{ fontSize: 10, color: C.textDim, fontFamily: 'monospace', flexShrink: 0, marginTop: 2 }}>{fmtDate(idea.created_at)}</span>
+            </div>
+          )
+        })}
       </Panel>
+    </>
+  )
+}
+
+// ─── USER DETAIL PANEL ────────────────────────────────────────────────────────
+function UserDetailPanel({ user, onClose, onSaved }: { user: UserStat; onClose: () => void; onSaved: () => void }) {
+  const [profile, setProfile] = useState<Record<string, unknown> | null>(null)
+  const [edits, setEdits] = useState<Record<string, unknown>>({})
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [flashMsg, setFlashMsg] = useState('')
+  const [confirmAction, setConfirmAction] = useState<null | 'save' | 'delete_plan'>(null)
+  const [deletingPlan, setDeletingPlan] = useState(false)
+
+  const hasEdits = Object.keys(edits).length > 0
+
+  useEffect(() => {
+    supabase.from('profiles').select('*').eq('id', user.id).single()
+      .then(({ data }) => { if (data) setProfile(data as Record<string, unknown>); setLoading(false) })
+  }, [user.id])
+
+  function setField(key: string, value: unknown) { setEdits(prev => ({ ...prev, [key]: value })) }
+  function val(key: string) { return String((key in edits ? edits[key] : profile?.[key]) ?? '') }
+  function showFlash(m: string) { setFlashMsg(m); setTimeout(() => setFlashMsg(''), 3000) }
+
+  async function doSave() {
+    setSaving(true); setConfirmAction(null)
+    const { error } = await supabase.from('profiles').update(edits).eq('id', user.id)
+    if (!error) { setEdits({}); showFlash('Profile updated.'); onSaved() } else showFlash('Save failed.')
+    setSaving(false)
+  }
+
+  async function doDeletePlan() {
+    setDeletingPlan(true); setConfirmAction(null)
+    if (user.programId) {
+      await Promise.all([
+        supabase.from('weekly_plans').delete().eq('program_id', user.programId),
+        supabase.from('day_completions').delete().eq('program_id', user.programId),
+      ])
+      await supabase.from('training_programs').delete().eq('id', user.programId)
+    }
+    setDeletingPlan(false); showFlash('Plan deleted.'); onSaved()
+  }
+
+  const inp: React.CSSProperties = { width: '100%', padding: '8px 10px', borderRadius: 6, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 13, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }
+  const lbl: React.CSSProperties = { fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.textDim, marginBottom: 4, display: 'block' }
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 70 }} />
+      <div style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: 560, maxWidth: '100vw', background: C.surface, borderLeft: `1px solid ${C.border}`, zIndex: 71, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+        {/* Header */}
+        <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+          <div style={{ width: 38, height: 38, borderRadius: '50%', background: C.accentDim, border: `1px solid ${C.accentBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, color: C.accent, flexShrink: 0 }}>
+            {displayName(user)[0]?.toUpperCase() ?? '?'}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontWeight: 700, fontSize: 15, color: C.text }}>{displayName(user)}</p>
+            <p style={{ fontSize: 11, color: C.textDim, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</p>
+          </div>
+          <RoleBadge role={user.role} />
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.textDim, fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: '0 4px', marginLeft: 4 }}>×</button>
+        </div>
+
+        {/* Stats strip */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+          {[
+            { label: 'Weeks', value: user.weeksGenerated || '—', color: user.weeksGenerated > 0 ? C.accent : C.textDim },
+            { label: 'Days Done', value: user.daysCompleted || '—', color: user.daysCompleted > 0 ? C.green : C.textDim },
+            { label: 'Logs', value: user.exerciseLogs || '—', color: user.exerciseLogs > 0 ? C.purple : C.textDim },
+            { label: 'Joined', value: fmtDate(user.created_at), color: C.textDim },
+          ].map((s, i) => (
+            <div key={s.label} style={{ padding: '10px', textAlign: 'center', borderRight: i < 3 ? `1px solid ${C.border}` : 'none' }}>
+              <p style={{ fontSize: 15, fontWeight: 800, color: s.color }}>{s.value}</p>
+              <p style={{ fontSize: 9, color: C.textDim, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: 2 }}>{s.label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+          {flashMsg && <div style={{ padding: '9px 12px', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: 7, fontSize: 12, color: C.green, marginBottom: 16, fontFamily: 'monospace' }}>{flashMsg}</div>}
+          {loading ? <p style={{ fontSize: 13, color: C.textDim, textAlign: 'center', padding: '40px 0', fontFamily: 'monospace' }}>Loading profile…</p> : (
+            <>
+              {/* Plan */}
+              <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: C.textDim, marginBottom: 10, fontFamily: 'monospace' }}>Training Plan</p>
+              <div style={{ padding: '14px 16px', background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24 }}>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: user.hasProgram ? C.green : C.textDim }}>{user.hasProgram ? '● Active Program' : '○ No Program'}</p>
+                  {user.hasProgram && <p style={{ fontSize: 11, color: C.textDim, marginTop: 3, fontFamily: 'monospace' }}>{user.weeksGenerated} weeks · {user.daysCompleted} days completed</p>}
+                </div>
+                {user.hasProgram && (
+                  <button onClick={() => setConfirmAction('delete_plan')} disabled={deletingPlan} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.06)', color: C.red, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    {deletingPlan ? 'Deleting…' : '✕ Delete Plan'}
+                  </button>
+                )}
+              </div>
+
+              {/* Profile fields */}
+              <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: C.textDim, marginBottom: 12, fontFamily: 'monospace' }}>Profile Fields</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <div><label style={lbl}>Display Name</label><input value={val('name')} onChange={e => setField('name', e.target.value || null)} style={inp} placeholder="—" /></div>
+                <div><label style={lbl}>Gender</label>
+                  <select value={val('gender')} onChange={e => setField('gender', e.target.value || null)} style={inp}>
+                    <option value="">—</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
+                  </select>
+                </div>
+                <div><label style={lbl}>Age</label><input type="number" value={val('age')} onChange={e => setField('age', e.target.value ? parseInt(e.target.value) : null)} style={inp} placeholder="—" /></div>
+                <div><label style={lbl}>Days / Week</label><input type="number" min={1} max={7} value={val('days_per_week')} onChange={e => setField('days_per_week', e.target.value ? parseInt(e.target.value) : null)} style={inp} placeholder="—" /></div>
+              </div>
+              <div style={{ marginBottom: 12 }}><label style={lbl}>Sport(s)</label><input value={val('sport')} onChange={e => setField('sport', e.target.value || null)} style={inp} placeholder="e.g. Skateboarding" /></div>
+              <div style={{ marginBottom: 12 }}><label style={lbl}>Goal</label><input value={val('goal')} onChange={e => setField('goal', e.target.value || null)} style={inp} placeholder="e.g. Build strength" /></div>
+              <div style={{ marginBottom: 12 }}><label style={lbl}>Goal Notes</label><textarea value={val('goal_notes')} onChange={e => setField('goal_notes', e.target.value || null)} rows={3} style={{ ...inp, resize: 'none', lineHeight: 1.5 }} placeholder="Additional context…" /></div>
+              <div style={{ marginBottom: 12 }}><label style={lbl}>Prior Programs</label><textarea value={val('prior_programs')} onChange={e => setField('prior_programs', e.target.value || null)} rows={2} style={{ ...inp, resize: 'none', lineHeight: 1.5 }} placeholder="e.g. Enjoyed P90X, tried 5/3/1" /></div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div><label style={lbl}>Session Length</label><input value={val('session_length')} onChange={e => setField('session_length', e.target.value || null)} style={inp} placeholder="e.g. 60 min" /></div>
+                <div><label style={lbl}>Workout Location</label>
+                  <select value={val('workout_location')} onChange={e => setField('workout_location', e.target.value || null)} style={inp}>
+                    <option value="">—</option><option value="gym">Gym</option><option value="home">Home</option><option value="both">Both</option>
+                  </select>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Save footer */}
+        {hasEdits && (
+          <div style={{ padding: '14px 20px', borderTop: `1px solid ${C.border}`, background: C.surface2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+            <span style={{ fontSize: 11, color: C.amber, fontFamily: 'monospace' }}>⚠ Unsaved changes</span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setEdits({})} style={{ padding: '7px 12px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'none', color: C.textMid, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>Discard</button>
+              <button onClick={() => setConfirmAction('save')} disabled={saving} style={{ padding: '7px 14px', borderRadius: 6, border: 'none', background: C.accent, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                {saving ? 'Saving…' : 'Save Changes →'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Confirm modal */}
+      {confirmAction && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 80, padding: 24 }}>
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 24, maxWidth: 420, width: '100%' }}>
+            <p style={{ fontWeight: 800, fontSize: 17, color: C.text, marginBottom: 12 }}>{confirmAction === 'delete_plan' ? 'Delete Training Plan?' : 'Confirm Changes'}</p>
+            <div style={{ padding: '12px 14px', background: confirmAction === 'delete_plan' ? 'rgba(239,68,68,0.06)' : C.amberDim, border: `1px solid ${confirmAction === 'delete_plan' ? 'rgba(239,68,68,0.3)' : C.amber + '50'}`, borderRadius: 8, marginBottom: 20 }}>
+              <p style={{ fontSize: 13, color: C.textMid, lineHeight: 1.65 }}>
+                {confirmAction === 'delete_plan'
+                  ? `This will permanently delete all of ${displayName(user)}'s training data — program, all generated weeks, and completed days. Cannot be undone.`
+                  : `Are you sure you want to make changes? This will create a permanent change to ${displayName(user)}'s account.`}
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setConfirmAction(null)} style={{ flex: 1, padding: '11px', borderRadius: 8, border: `1px solid ${C.border}`, background: 'none', color: C.text, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+              <button onClick={confirmAction === 'delete_plan' ? doDeletePlan : doSave} disabled={saving || deletingPlan} style={{ flex: 1, padding: '11px', borderRadius: 8, border: 'none', background: confirmAction === 'delete_plan' ? C.red : C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                {confirmAction === 'delete_plan' ? 'Yes, Delete' : 'Yes, Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
@@ -531,6 +715,7 @@ export default function AdminPage() {
   const [promos, setPromos] = useState<PromoRow[]>([])
   const [kpis, setKpis] = useState<{ label: string; value: string | number; sub: string; accent: string }[]>([])
   const [dataLoading, setDataLoading] = useState(true)
+  const [selectedUser, setSelectedUser] = useState<UserStat | null>(null)
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768)
@@ -676,6 +861,7 @@ export default function AdminPage() {
   }
 
   return (
+    <>
     <div style={{ position: 'fixed', inset: 0, display: 'flex', overflow: 'hidden', background: C.bg, color: C.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', zIndex: 50 }}>
 
       {/* Mobile backdrop */}
@@ -770,7 +956,7 @@ export default function AdminPage() {
         {/* Scrollable content */}
         <main style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '20px 16px 40px' : '28px 28px 60px' }}>
           {tab === 'overview' && <OverviewTab users={users} events={events} kpis={kpis} isMobile={isMobile} />}
-          {tab === 'users' && <UsersTab users={users} onRoleChange={handleRoleChange} />}
+          {tab === 'users' && <UsersTab users={users} onRoleChange={handleRoleChange} onZoomIn={setSelectedUser} />}
           {tab === 'activity' && <ActivityTab events={events} />}
           {tab === 'todos' && <TodosTab todos={todos} onRefresh={loadAll} />}
           {tab === 'ideas' && <IdeasTab ideas={ideas} onRefresh={loadAll} />}
@@ -785,5 +971,14 @@ export default function AdminPage() {
         </main>
       </div>
     </div>
+
+    {selectedUser && (
+      <UserDetailPanel
+        user={selectedUser}
+        onClose={() => setSelectedUser(null)}
+        onSaved={() => { loadAll(); setSelectedUser(prev => prev ? { ...prev } : null) }}
+      />
+    )}
+    </>
   )
 }
