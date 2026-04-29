@@ -63,6 +63,7 @@ export default function PlanPage() {
   const [programComplete, setProgramComplete] = useState(false)
   const [showRegenModal, setShowRegenModal] = useState(false)
   const [regenInstructions, setRegenInstructions] = useState('')
+  const [profileReady, setProfileReady] = useState(false)
   const [showGenModal, setShowGenModal] = useState(false)
   const [pendingWeek, setPendingWeek] = useState<number | null>(null)
   const [dataLoading, setDataLoading] = useState(true)
@@ -139,10 +140,25 @@ export default function PlanPage() {
     }
   }, [fetchProfile, user, populateLibrary])
 
+  const startProgram = useCallback(async () => {
+    if (!user) return
+    setGenerating(true)
+    const today = new Date().toISOString().split('T')[0]
+    const { data: newProg } = await supabase.from('training_programs').insert({ user_id: user.id, start_date: today, total_weeks: 13, status: 'active' }).select('id, start_date, total_weeks, status').single()
+    if (!newProg) { setGenerating(false); return }
+    const prog: Program = { id: newProg.id, startDate: newProg.start_date, totalWeeks: newProg.total_weeks, status: newProg.status }
+    setProgram(prog); setCurrentWeek(1); setViewingWeek(1)
+    await generateWeek(prog, 1)
+  }, [user, generateWeek])
+
   const initProgram = useCallback(async () => {
     if (!user) return
     setDataLoading(true)
-    const { data: existing } = await supabase.from('training_programs').select('id, start_date, total_weeks, status').eq('user_id', user.id).single()
+    const [{ data: existing }, { data: prof }] = await Promise.all([
+      supabase.from('training_programs').select('id, start_date, total_weeks, status').eq('user_id', user.id).single(),
+      supabase.from('profiles').select('sport, goal').eq('id', user.id).single(),
+    ])
+    setProfileReady(!!(prof?.sport || prof?.goal))
     if (!existing) { setDataLoading(false); return }
     const prog: Program = { id: existing.id, startDate: existing.start_date, totalWeeks: existing.total_weeks, status: existing.status }
     setProgram(prog)
@@ -303,9 +319,29 @@ export default function PlanPage() {
   if (!program) {
     return (
       <div style={{ padding: '60px 24px', maxWidth: 600, margin: '0 auto', textAlign: 'center' }}>
-        <p style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>No Active Plan</p>
-        <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 24 }}>Set up your profile to generate your personalized 3-month program.</p>
-        <button onClick={() => router.push('/profile')} style={{ padding: '13px 28px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Set Up Profile →</button>
+        <div style={{ fontSize: 44, marginBottom: 16 }}>⚡</div>
+        <p style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>
+          {profileReady ? 'Ready to Build Your Plan' : 'Set Up Your Profile First'}
+        </p>
+        <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 28, lineHeight: 1.6 }}>
+          {profileReady
+            ? 'Your AI coach will build a personalized 13-week program based on your profile. It takes about 15 seconds.'
+            : 'Tell your AI coach about your sport, goals, and schedule so it can build the right program for you.'}
+        </p>
+        {profileReady ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 320, margin: '0 auto' }}>
+            <button onClick={startProgram} disabled={generating} style={{ padding: '15px 28px', borderRadius: 12, border: 'none', background: generating ? 'var(--surface2)' : 'var(--accent)', color: generating ? 'var(--text-dim)' : '#fff', fontWeight: 800, fontSize: 15, cursor: generating ? 'default' : 'pointer' }}>
+              {generating ? 'Building Week 1…' : 'Generate My 3-Month Plan →'}
+            </button>
+            <button onClick={() => router.push('/profile')} style={{ padding: '11px 28px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-mid)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+              Edit Profile First
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => router.push('/profile')} style={{ padding: '15px 28px', borderRadius: 12, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer' }}>
+            Set Up Profile →
+          </button>
+        )}
       </div>
     )
   }

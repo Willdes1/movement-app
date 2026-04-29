@@ -299,7 +299,12 @@ export default function ProfilePage() {
       })
     }
     setSaved(true)
-    setTimeout(() => { setSaved(false); setScreen('overview') }, 900)
+    // First-time users (no program yet) → redirect to plan page to generate their plan
+    const { data: prog } = user ? await supabase.from('training_programs').select('id').eq('user_id', user.id).single() : { data: null }
+    setTimeout(() => {
+      if (!prog) { router.push('/plan'); return }
+      setSaved(false); setScreen('overview')
+    }, 900)
   }
 
   // ── Overview ─────────────────────────────────────────────────────────────────

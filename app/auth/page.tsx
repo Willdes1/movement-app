@@ -30,6 +30,28 @@ export default function AuthPage() {
     setLoading(true)
 
     if (mode === 'signup') {
+      // Validate promo code before creating account
+      const code = promoCode.trim().toUpperCase()
+      let validatedPromo: { id: string; role: string; uses: number; max_uses: number } | null = null
+      if (code) {
+        const { data: promo } = await supabase
+          .from('promo_codes')
+          .select('id, role, uses, max_uses')
+          .eq('code', code)
+          .single()
+        if (!promo) {
+          setError('Invalid or expired promo code.')
+          setLoading(false)
+          return
+        }
+        if (promo.max_uses > 0 && promo.uses >= promo.max_uses) {
+          setError('That promo code has reached its usage limit.')
+          setLoading(false)
+          return
+        }
+        validatedPromo = promo
+      }
+
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password })
       if (signUpError) {
         setError(signUpError.message)
@@ -37,46 +59,35 @@ export default function AuthPage() {
         return
       }
 
-      // Validate and apply promo code if provided
-      if (promoCode.trim() && signUpData.user) {
-        const code = promoCode.trim().toUpperCase()
-        const { data: promo } = await supabase
-          .from('promo_codes')
-          .select('*')
-          .eq('code', code)
-          .single()
+      // If email confirmation is required, stash the promo code so we can apply it after login
+      if (validatedPromo) {
+        sessionStorage.setItem('pendingPromo', JSON.stringify({ id: validatedPromo.id, role: validatedPromo.role }))
+      }
 
-        if (promo) {
-          // uses_remaining: -1 = unlimited, 0 = exhausted, >0 = remaining
-          if (promo.uses_remaining === 0) {
-            setError('That promo code has reached its usage limit.')
-            setLoading(false)
-            return
-          }
-
-          await supabase
-            .from('profiles')
-            .upsert({ id: signUpData.user.id, plan_tier: 'pro' })
-
-          if (promo.uses_remaining > 0) {
-            await supabase
-              .from('promo_codes')
-              .update({ uses_remaining: promo.uses_remaining - 1 })
-              .eq('id', promo.id)
-          }
-        } else {
-          setError('Invalid or expired promo code.')
-          setLoading(false)
-          return
-        }
+      // If signup returned a session (no email confirmation required), apply immediately
+      if (signUpData.session && validatedPromo && signUpData.user) {
+        await supabase.from('profiles').upsert({ id: signUpData.user.id, role: validatedPromo.role })
+        await supabase.from('promo_codes').update({ uses: validatedPromo.uses + 1 }).eq('id', validatedPromo.id)
+        sessionStorage.removeItem('pendingPromo')
       }
 
       setConfirmSent(true)
     } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) {
         setError(error.message)
       } else {
+        // Apply any pending promo code from signup
+        const pending = sessionStorage.getItem('pendingPromo')
+        if (pending && data.user) {
+          try {
+            const promo = JSON.parse(pending) as { id: string; role: string }
+            const { data: current } = await supabase.from('promo_codes').select('uses').eq('id', promo.id).single()
+            await supabase.from('profiles').update({ role: promo.role }).eq('id', data.user.id)
+            await supabase.from('promo_codes').update({ uses: (current?.uses ?? 0) + 1 }).eq('id', promo.id)
+            sessionStorage.removeItem('pendingPromo')
+          } catch { /* silent — promo already applied or malformed */ }
+        }
         router.push('/today')
       }
     }

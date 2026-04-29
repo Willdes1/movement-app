@@ -58,6 +58,7 @@ function RoleBadge({ role }: { role: string }) {
   const cfg: Record<string, { bg: string; color: string }> = {
     admin: { bg: C.amberDim, color: C.amber },
     beta: { bg: C.greenDim, color: C.green },
+    ff:   { bg: 'rgba(0,180,255,0.12)', color: '#00b4ff' },
     free: { bg: 'rgba(0,180,255,0.06)', color: C.textMid },
   }
   const s = cfg[role] ?? cfg.free
@@ -177,11 +178,12 @@ function OverviewTab({ users, events, kpis, isMobile }: {
 // ─── USERS TAB ────────────────────────────────────────────────────────────────
 function UsersTab({ users, onRoleChange }: { users: UserStat[]; onRoleChange: (id: string, role: string) => Promise<void> }) {
   const betaCount = users.filter(u => u.role === 'beta').length
+  const ffCount = users.filter(u => u.role === 'ff').length
   const freeCount = users.filter(u => u.role === 'free').length
 
   return (
     <>
-      <SectionHead title="Users" sub={`${users.length} total · ${betaCount} beta · ${freeCount} free`} />
+      <SectionHead title="Users" sub={`${users.length} total · ${ffCount} f&f · ${betaCount} beta · ${freeCount} free`} />
       <Panel>
         <TableHeader cols={[
           { label: 'User', width: '2fr' },
@@ -208,16 +210,18 @@ function UsersTab({ users, onRoleChange }: { users: UserStat[]; onRoleChange: (i
             <span style={{ fontSize: 13, fontWeight: 600, color: u.exerciseLogs > 0 ? C.text : C.textDim, fontFamily: 'monospace' }}>{u.exerciseLogs || '—'}</span>
             <span style={{ fontSize: 10, color: C.textDim, fontFamily: 'monospace' }}>{u.lastActive ? fmtRelative(u.lastActive) : fmtDate(u.created_at)}</span>
             <span style={{ fontSize: 11, color: C.textDim, fontFamily: 'monospace' }}>{fmtDate(u.created_at)}</span>
-            {u.role === 'free' ? (
-              <button onClick={() => onRoleChange(u.id, 'beta')} style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${C.accentBorder}`, background: C.accentDim, color: C.accent, fontWeight: 700, fontSize: 11, cursor: 'pointer', fontFamily: 'monospace', letterSpacing: '0.04em' }}>
-                → Beta
-              </button>
-            ) : u.role === 'beta' ? (
-              <button onClick={() => onRoleChange(u.id, 'free')} style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'none', color: C.textDim, fontWeight: 600, fontSize: 11, cursor: 'pointer', fontFamily: 'monospace' }}>
-                Revoke
-              </button>
-            ) : (
+            {u.is_admin ? (
               <span style={{ fontSize: 10, color: C.amber, fontFamily: 'monospace' }}>Admin</span>
+            ) : (
+              <select
+                value={u.role}
+                onChange={e => onRoleChange(u.id, e.target.value)}
+                style={{ padding: '4px 6px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'rgba(0,15,50,0.9)', color: C.text, fontSize: 11, cursor: 'pointer', fontFamily: 'monospace', outline: 'none' }}
+              >
+                <option value="free">free</option>
+                <option value="ff">f&f</option>
+                <option value="beta">beta</option>
+              </select>
             )}
           </div>
         ))}
@@ -419,6 +423,7 @@ function PromosTab({ promos, onRefresh }: { promos: PromoRow[]; onRefresh: () =>
       <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
         <input value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="CODE (e.g. BETA2026)" style={{ ...inputSt, flex: 2, minWidth: 160, letterSpacing: '0.08em', fontFamily: 'monospace' }} />
         <select value={role} onChange={e => setRole(e.target.value)} style={{ ...inputSt, width: 120 }}>
+          <option value="ff">F&F Beta</option>
           <option value="beta">Beta Access</option>
           <option value="admin">Admin</option>
         </select>
