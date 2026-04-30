@@ -4,6 +4,7 @@
 ---
 
 ## 🔥 Active / Up Next
+- [ ] **Hyperextended elbow recovery plan** — RICE start (ice, rest, elevation), then 4-6 phase protocol that safely rebuilds elbow strength: passive ROM → active ROM → isometric loading → progressive resistance → sport-specific return. Add alongside SI Joint as a named playbook in the Recovery hub. Triggered by real injury 2026-04-29.
 - [ ] Add more recovery playbooks (Shoulder Impingement, Knee Rehab)
 - [ ] Build out Browse & Learn page (exercise library + articles)
 
@@ -25,6 +26,16 @@
 ## 🤖 AI Agent System — Core Vision (added 2026-04-21)
 > Full prompt saved for reference. Build in this order:
 
+### Multi-Agent Program Generator (added 2026-04-29)
+> Vision: Replace the single-model plan generator with a coordinated team of specialist agents — like a panel of doctors, therapists, and coaches working together. Each agent has a defined role and outputs feed into the next.
+
+- [ ] **Primary Brain Agent** — Central coordinator. Deep knowledge of kinesiology, physical therapy, ligament/tendon biomechanics, and human performance science. Responsible for the overall program architecture and integrating all other agent outputs into a coherent plan.
+- [ ] **Verification Agent** — Reviews the primary agent's output before it's returned to the user. Checks: exercise ordering logic, injury contraindication compliance, phase-appropriate intensity, rest time validity, and coaching cue accuracy. Rejects or corrects before delivery.
+- [ ] **Sports Expert Agent** — Specialist in movement patterns across every sport. Has deep knowledge of sport-specific demands, injury risk profiles, and return-to-play progressions for: skateboarding, snowboarding, volleyball, pickleball, basketball, tennis, soccer, track, cycling, and emerging sports worldwide. Informs warmup design, sport-specific conditioning, and return-to-sport protocols.
+- [ ] **Memory & Efficiency Agent** — Stores previously validated program outputs keyed by profile signature (sport + goal + week + phase). When a near-identical request comes in, reuses the stored program instead of re-generating from scratch. Tracks token savings. Also responsible for periodically refreshing stored programs when exercise science evolves or new cuing standards are adopted.
+- [ ] **Additional specialist agents as needed** — e.g., Nutrition Agent (synced to training phase), Recovery Agent (injury-specific protocols), Mindset Agent (warrior philosophy + session intent).
+
+### Existing Agent Items
 - [ ] **Injury → Recovery handoff** — When user starts a recovery playbook, AI modifies remaining training plan to keep them active with safe, injury-appropriate workouts. No full stop.
 - [ ] **Return-to-sport agent** (added 2026-04-27) — During active recovery, a second agent generates a full sport-specific return-to-sport plan. For skateboarding: Day 1 = riding around, pool riding, slappies → Day 2 = shiftys → Day 3 = 50-50s → 180s, etc. Progression is sport- and skill-level-specific. Each day after the recovery workout, a prompt asks how the sport session felt before unlocking the next step. Agent runs token-heavy generation once, saves the full plan (as a stored record), and only reads/updates it on daily check-ins — no re-generation per session. Activates automatically when user enters recovery mode.
 - [ ] **Post-recovery re-entry plan** — After completing recovery, AI does NOT revert to old plan. It rebuilds around the healed area: targeted protective exercises + gradual intensity ramp for that body part over a set period
@@ -82,6 +93,39 @@
 - [ ] **Bug monitoring agent** — Scans for bugs, estimates fix time, notifies affected users when issue is under investigation, updates them when resolved. Triggers app update or refresh prompts when needed.
 - [ ] **Replaced existing item**: Supersedes "Admin analytics dashboard (user activity, completion rates)" from Infrastructure.
 
+### Build Stats Tab (added 2026-04-29) — under Business Plan section in admin
+- [ ] New tab in the Business Plan / Launchpad section showing real-time build activity:
+  - Current builds in progress (open PRs or active sessions)
+  - Successfully completed builds and pushes (git commit history with timestamps)
+  - Total time and effort invested in the project (sum of dev session hours)
+  - Visual timeline of build milestones from day 0 to present
+
+### AI Competitor Scout Tab (added 2026-04-29) — dedicated admin tab
+- [ ] Auto-refreshing AI agent that scans on a configurable interval (default: every 3 days):
+  - Competitor feature updates across the fitness app industry (Nike TC, Whoop, Fitbod, Trainerize, etc.)
+  - Reddit discussions: r/fitness, r/personaltraining, r/physicaltherapy, r/skateboarding — what users wish existed
+  - Facebook groups for personal trainers and physical therapists — pain points and feature requests
+  - App Store reviews for competitor apps — common complaints and requests
+- [ ] Output: auto-populates a "AI Suggestions" folder in admin with entries showing: what was found, direct links to discussions, relevance to Move., and a proposed feature response
+- [ ] Configurable refresh interval: 3 days → 5 days → weekly → biweekly → monthly. Setting lives in the tab header. Reduce frequency if output becomes redundant.
+- [ ] Goal: stay ahead of competitors and build features the market is actively asking for but nobody has shipped
+
+### Development Time Tracker (added 2026-04-29) — likely under Workflow tab
+- [ ] Track total development time with a running clock: hours, weeks, months since first commit
+- [ ] Manual session logging: each dev session can be tagged with what was built, so the history is searchable
+- [ ] Milestones: auto-detected from git commits (e.g. "First commit", "First user signed up", "First plan generated", "First recovery plan")
+- [ ] Purpose: internal tracking + future storytelling ("built from 0 to X users in N months")
+
+### What's Built + AI Agents Roster (added 2026-04-29) — dedicated admin tab
+- [ ] Visual overview of every feature that is live in the app
+- [ ] AI Agents Roster section: list every agent powering the system, with:
+  - Agent name and role
+  - What it generates / what it reads
+  - When it fires (on demand vs. scheduled vs. triggered)
+  - Approximate token cost per run
+  - Model used (claude-sonnet-4-6 or other)
+- [ ] Update automatically as new agents are added
+
 ## 🏗️ Infrastructure
 - [ ] Stripe billing integration (freemium → paid tier)
 - [ ] Push notifications (streaks, reminders, milestones)
@@ -109,4 +153,4 @@
 - [x] Account tab with sign out, edit profile, admin link
 
 ---
-*Last updated: 2026-04-27*
+*Last updated: 2026-04-29*
