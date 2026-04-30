@@ -64,7 +64,8 @@ type Screen = 'overview' | 'edit'
 
 export default function ProfilePage() {
   const router = useRouter()
-  const { user, signOut, isAdmin } = useAuth()
+  const { user, signOut, isAdmin, effectiveUserId } = useAuth()
+  const userId = effectiveUserId ?? user?.id ?? ''
   const [screen, setScreen] = useState<Screen>('overview')
   const [profile, setProfile] = useState<UserProfile>({})
   const [saved, setSaved] = useState(false)
@@ -128,7 +129,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (user) {
-      supabase.from('profiles').select('*').eq('id', user.id).single().then(({ data }) => {
+      supabase.from('profiles').select('*').eq('id', userId).single().then(({ data }) => {
         if (data) {
           const p: UserProfile = {
             name: data.name ?? undefined,
@@ -279,7 +280,7 @@ export default function ProfilePage() {
     saveProfile(profileToSave)
     if (user) {
       await supabase.from('profiles').upsert({
-        id: user.id,
+        id: userId,
         name: profileToSave.name ?? null,
         gender: profileToSave.gender ?? null,
         sport: profileToSave.sport ?? null,
@@ -300,7 +301,7 @@ export default function ProfilePage() {
     }
     setSaved(true)
     // First-time users (no program yet) → redirect to plan page to generate their plan
-    const { data: prog } = user ? await supabase.from('training_programs').select('id').eq('user_id', user.id).single() : { data: null }
+    const { data: prog } = user ? await supabase.from('training_programs').select('id').eq('user_id', userId).single() : { data: null }
     setTimeout(() => {
       if (!prog) { router.push('/plan'); return }
       setSaved(false); setScreen('overview')

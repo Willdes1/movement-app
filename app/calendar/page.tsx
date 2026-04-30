@@ -128,7 +128,8 @@ function planDayToDate(startDate: string, weekNum: number, dayIndex: number): Da
 }
 
 function CalendarInner() {
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, effectiveUserId } = useAuth()
+  const userId = effectiveUserId ?? user?.id ?? ''
   const { activeRecovery } = useTheme()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -158,7 +159,7 @@ function CalendarInner() {
     const { data: prog } = await supabase
       .from('training_programs')
       .select('id, start_date')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single()
 
     if (!prog) { setLoading(false); return }
@@ -169,7 +170,7 @@ function CalendarInner() {
 
     const [{ data: plans }, { data: compData }] = await Promise.all([
       supabase.from('weekly_plans').select('week_number, plan').eq('program_id', prog.id),
-      supabase.from('day_completions').select('week_number, day_index').eq('program_id', prog.id).eq('user_id', user.id),
+      supabase.from('day_completions').select('week_number, day_index').eq('program_id', prog.id).eq('user_id', userId),
     ])
 
     if (compData) setCompletions(new Set(compData.map(r => `${r.week_number}-${r.day_index}`)))
@@ -226,7 +227,7 @@ function CalendarInner() {
     supabase
       .from('workout_logs')
       .select('id, exercise_normalized, logged_at, sets, reps, weight, weight_unit')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('exercise_normalized', selectedExercise.name_normalized)
       .order('logged_at', { ascending: false })
       .limit(1)
@@ -238,7 +239,7 @@ function CalendarInner() {
     if (!program || !user || completing) return
     setCompleting(true)
     await supabase.from('day_completions').upsert(
-      { user_id: user.id, program_id: program.id, week_number: weekNum, day_index: dayIdx, skipped: false },
+      { user_id: userId, program_id: program.id, week_number: weekNum, day_index: dayIdx, skipped: false },
       { onConflict: 'user_id,program_id,week_number,day_index' }
     )
     setCompletions(prev => new Set([...prev, `${weekNum}-${dayIdx}`]))
@@ -249,7 +250,7 @@ function CalendarInner() {
     if (!program || !user || completing) return
     setCompleting(true)
     await supabase.from('day_completions').delete()
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('program_id', program.id)
       .eq('week_number', weekNum)
       .eq('day_index', dayIdx)

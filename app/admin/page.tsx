@@ -175,7 +175,7 @@ function OverviewTab({ users, events, kpis, isMobile }: {
 }
 
 // ─── USERS TAB ────────────────────────────────────────────────────────────────
-function UsersTab({ users, onRoleChange, onZoomIn }: { users: UserStat[]; onRoleChange: (id: string, role: string) => Promise<void>; onZoomIn: (user: UserStat) => void }) {
+function UsersTab({ users, onRoleChange, onZoomIn, onImpersonate }: { users: UserStat[]; onRoleChange: (id: string, role: string) => Promise<void>; onZoomIn: (user: UserStat) => void; onImpersonate: (id: string, name: string) => void }) {
   const betaCount = users.filter(u => u.role === 'beta').length
   const ffCount = users.filter(u => u.role === 'ff').length
   const freeCount = users.filter(u => u.role === 'free').length
@@ -194,11 +194,11 @@ function UsersTab({ users, onRoleChange, onZoomIn }: { users: UserStat[]; onRole
           { label: 'Last Active', width: 100 },
           { label: 'Joined', width: 90 },
           { label: 'Promote', width: 110 },
-          { label: '', width: 44 },
+          { label: '', width: 110 },
         ]} />
         {users.length === 0 && <EmptyState msg="No users yet" />}
         {users.map((u, i) => (
-          <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '2fr 90px 70px 70px 60px 60px 100px 90px 110px 44px', padding: '13px 20px', borderBottom: i < users.length - 1 ? `1px solid ${C.border}` : 'none', alignItems: 'center', gap: 0 }}>
+          <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '2fr 90px 70px 70px 60px 60px 100px 90px 110px 110px', padding: '13px 20px', borderBottom: i < users.length - 1 ? `1px solid ${C.border}` : 'none', alignItems: 'center', gap: 0 }}>
             <div>
               <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 2, color: C.text }}>{displayName(u)}</p>
               <p style={{ fontSize: 10, color: C.textDim, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220, fontFamily: 'monospace' }}>{u.email}</p>
@@ -219,7 +219,18 @@ function UsersTab({ users, onRoleChange, onZoomIn }: { users: UserStat[]; onRole
                 <option value="beta">beta</option>
               </select>
             )}
-            <button onClick={() => onZoomIn(u)} title="View user details" style={{ padding: '4px 8px', borderRadius: 5, border: `1px solid ${C.accentBorder}`, background: C.accentDim, color: C.accent, fontSize: 12, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 700 }}>→</button>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {!u.is_admin && (
+                <button
+                  onClick={() => onImpersonate(u.id, displayName(u))}
+                  title="View app as this user"
+                  style={{ padding: '4px 8px', borderRadius: 5, border: '1px solid rgba(239,68,68,0.35)', background: 'rgba(239,68,68,0.1)', color: '#f87171', fontSize: 11, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 700 }}
+                >
+                  👁
+                </button>
+              )}
+              <button onClick={() => onZoomIn(u)} title="View user details" style={{ padding: '4px 8px', borderRadius: 5, border: `1px solid ${C.accentBorder}`, background: C.accentDim, color: C.accent, fontSize: 12, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 700 }}>→</button>
+            </div>
           </div>
         ))}
       </Panel>
@@ -701,8 +712,13 @@ const NAV_GROUPS = [
 
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 export default function AdminPage() {
-  const { user, isAdmin, loading: authLoading } = useAuth()
+  const { user, isAdmin, loading: authLoading, startImpersonation } = useAuth()
   const router = useRouter()
+
+  function handleImpersonate(userId: string, name: string) {
+    startImpersonation(userId, name)
+    router.push('/')
+  }
   const [tab, setTab] = useState<Tab>('overview')
   const [isMobile, setIsMobile] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -956,7 +972,7 @@ export default function AdminPage() {
         {/* Scrollable content */}
         <main style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '20px 16px 40px' : '28px 28px 60px' }}>
           {tab === 'overview' && <OverviewTab users={users} events={events} kpis={kpis} isMobile={isMobile} />}
-          {tab === 'users' && <UsersTab users={users} onRoleChange={handleRoleChange} onZoomIn={setSelectedUser} />}
+          {tab === 'users' && <UsersTab users={users} onRoleChange={handleRoleChange} onZoomIn={setSelectedUser} onImpersonate={handleImpersonate} />}
           {tab === 'activity' && <ActivityTab events={events} />}
           {tab === 'todos' && <TodosTab todos={todos} onRefresh={loadAll} />}
           {tab === 'ideas' && <IdeasTab ideas={ideas} onRefresh={loadAll} />}

@@ -48,7 +48,8 @@ function formatDate(iso: string) {
 }
 
 export default function ForYouPage() {
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, effectiveUserId } = useAuth()
+  const userId = effectiveUserId ?? user?.id ?? ''
   const router = useRouter()
 
   const [cards, setCards] = useState<FeedCard[] | null>(null)
@@ -67,8 +68,8 @@ export default function ForYouPage() {
     if (!user) return
     setLoading(true)
     const [{ data: profileData }, { data: feedData }] = await Promise.all([
-      supabase.from('profiles').select('*').eq('id', user.id).single(),
-      supabase.from('for_you_feed').select('cards, generated_at').eq('user_id', user.id).single(),
+      supabase.from('profiles').select('*').eq('id', userId).single(),
+      supabase.from('for_you_feed').select('cards, generated_at').eq('user_id', userId).single(),
     ])
     if (profileData) setProfile(profileData)
     if (feedData) {
@@ -97,7 +98,7 @@ export default function ForYouPage() {
       const { cards: newCards } = await res.json()
       const now = new Date().toISOString()
       await supabase.from('for_you_feed').upsert({
-        user_id: user!.id,
+        user_id: userId,
         cards: newCards,
         generated_at: now,
         updated_at: now,

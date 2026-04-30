@@ -133,7 +133,8 @@ function AIIcon({ size = 22 }: { size?: number }) {
 }
 
 export default function PlanPage() {
-  const { user, loading: authLoading, isAdmin, role } = useAuth()
+  const { user, loading: authLoading, isAdmin, role, effectiveUserId } = useAuth()
+  const userId = effectiveUserId ?? user?.id ?? ''
   const router = useRouter()
   const todayIdx = (new Date().getDay() + 6) % 7
 
@@ -174,7 +175,7 @@ export default function PlanPage() {
   }, [authLoading, user, router])
 
   const fetchProfile = useCallback(async () => {
-    const { data } = await supabase.from('profiles').select('*').eq('id', user!.id).single()
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
     return data
   }, [user])
 
@@ -216,7 +217,7 @@ export default function PlanPage() {
       const res = await fetch('/api/generate-plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profile, weekNumber: weekNum, phaseLabel: label, intensity, instructions }) })
       if (!res.ok) throw new Error('failed')
       const { plan } = await res.json()
-      await supabase.from('weekly_plans').upsert({ program_id: prog.id, user_id: user!.id, week_number: weekNum, phase, plan })
+      await supabase.from('weekly_plans').upsert({ program_id: prog.id, user_id: userId, week_number: weekNum, phase, plan })
       setWeekPlans(prev => ({ ...prev, [weekNum]: plan }))
       if (!silent) populateLibrary(plan)
     } catch {
@@ -232,7 +233,7 @@ export default function PlanPage() {
     if (!prog) {
       setGenerating(true)
       const today = new Date().toISOString().split('T')[0]
-      const { data: newProg } = await supabase.from('training_programs').insert({ user_id: user.id, start_date: today, total_weeks: 13, status: 'active' }).select('id, start_date, total_weeks, status').single()
+      const { data: newProg } = await supabase.from('training_programs').insert({ user_id: userId, start_date: today, total_weeks: 13, status: 'active' }).select('id, start_date, total_weeks, status').single()
       setGenerating(false)
       if (!newProg) return
       prog = { id: newProg.id, startDate: newProg.start_date, totalWeeks: newProg.total_weeks, status: newProg.status }
@@ -249,8 +250,8 @@ export default function PlanPage() {
     if (!user) return
     setDataLoading(true)
     const [{ data: existing }, { data: prof }] = await Promise.all([
-      supabase.from('training_programs').select('id, start_date, total_weeks, status').eq('user_id', user.id).single(),
-      supabase.from('profiles').select('sport, goal').eq('id', user.id).single(),
+      supabase.from('training_programs').select('id, start_date, total_weeks, status').eq('user_id', userId).single(),
+      supabase.from('profiles').select('sport, goal').eq('id', userId).single(),
     ])
     setProfileReady(!!(prof?.sport || prof?.goal))
     if (!existing) { setDataLoading(false); return }
@@ -262,7 +263,7 @@ export default function PlanPage() {
     if (week >= TOTAL_WEEKS) setProgramComplete(true)
     const [{ data: plans }, { data: compData }] = await Promise.all([
       supabase.from('weekly_plans').select('week_number, plan').eq('program_id', prog.id),
-      supabase.from('day_completions').select('week_number, day_index').eq('program_id', prog.id).eq('user_id', user.id),
+      supabase.from('day_completions').select('week_number, day_index').eq('program_id', prog.id).eq('user_id', userId),
     ])
     const planMap: Record<number, DayPlan[]> = {}
     plans?.forEach(p => { planMap[p.week_number] = p.plan as DayPlan[] })
@@ -279,7 +280,7 @@ export default function PlanPage() {
     if (!user || !program) return
     const refetch = () => {
       supabase.from('day_completions').select('week_number, day_index')
-        .eq('program_id', program.id).eq('user_id', user.id)
+        .eq('program_id', program.id).eq('user_id', userId)
         .then(({ data }) => { if (data) setCompletions(new Set(data.map(r => `${r.week_number}-${r.day_index}`))) })
     }
     window.addEventListener('focus', refetch)
@@ -289,14 +290,14 @@ export default function PlanPage() {
   useEffect(() => {
     setLastLog(null); setLogWeight(''); setLogSets(''); setLogReps(''); setLogSaved(false)
     if (!selectedExercise || !user) return
-    supabase.from('workout_logs').select('id, exercise_normalized, logged_at, sets, reps, weight, weight_unit').eq('user_id', user.id).eq('exercise_normalized', selectedExercise.name_normalized).order('logged_at', { ascending: false }).limit(1).single().then(({ data }) => { if (data) setLastLog(data as WorkoutLog) })
+    supabase.from('workout_logs').select('id, exercise_normalized, logged_at, sets, reps, weight, weight_unit').eq('user_id', userId).eq('exercise_normalized', selectedExercise.name_normalized).order('logged_at', { ascending: false }).limit(1).single().then(({ data }) => { if (data) setLastLog(data as WorkoutLog) })
   }, [selectedExercise, user])
 
   async function logSet() {
     if (!user || !selectedExercise || logSaving || logSaved) return
     setLogSaving(true)
-    await supabase.from('workout_logs').insert({ user_id: user.id, exercise_normalized: selectedExercise.name_normalized, sets: logSets ? parseInt(logSets) : null, reps: logReps ? parseInt(logReps) : null, weight: logWeight ? parseFloat(logWeight) : null, weight_unit: 'lbs' })
-    const { data } = await supabase.from('workout_logs').select('id, exercise_normalized, logged_at, sets, reps, weight, weight_unit').eq('user_id', user.id).eq('exercise_normalized', selectedExercise.name_normalized).order('logged_at', { ascending: false }).limit(1).single()
+    await supabase.from('workout_logs').insert({ user_id: userId, exercise_normalized: selectedExercise.name_normalized, sets: logSets ? parseInt(logSets) : null, reps: logReps ? parseInt(logReps) : null, weight: logWeight ? parseFloat(logWeight) : null, weight_unit: 'lbs' })
+    const { data } = await supabase.from('workout_logs').select('id, exercise_normalized, logged_at, sets, reps, weight, weight_unit').eq('user_id', userId).eq('exercise_normalized', selectedExercise.name_normalized).order('logged_at', { ascending: false }).limit(1).single()
     if (data) setLastLog(data as WorkoutLog)
     setLogSaved(true); setLogSaving(false)
   }
@@ -304,7 +305,7 @@ export default function PlanPage() {
   async function doMarkComplete(weekNum: number, dayIdx: number) {
     if (!program || !user) return
     setCompleting(true)
-    await supabase.from('day_completions').upsert({ user_id: user.id, program_id: program.id, week_number: weekNum, day_index: dayIdx, skipped: false }, { onConflict: 'user_id,program_id,week_number,day_index' })
+    await supabase.from('day_completions').upsert({ user_id: userId, program_id: program.id, week_number: weekNum, day_index: dayIdx, skipped: false }, { onConflict: 'user_id,program_id,week_number,day_index' })
     setCompletions(prev => new Set([...prev, `${weekNum}-${dayIdx}`]))
     setCompleting(false)
     const msg = COMPLETION_MESSAGES[Math.floor(Math.random() * COMPLETION_MESSAGES.length)]
@@ -333,7 +334,7 @@ export default function PlanPage() {
     const inserts: CompletionInsert[] = []
     for (let i = 0; i <= pendingComplete.dayIdx; i++) {
       const key = `${pendingComplete.weekNum}-${i}`
-      if (!completions.has(key) && plan[i].type !== 'rest') inserts.push({ user_id: user.id, program_id: program.id, week_number: pendingComplete.weekNum, day_index: i, skipped: false })
+      if (!completions.has(key) && plan[i].type !== 'rest') inserts.push({ user_id: userId, program_id: program.id, week_number: pendingComplete.weekNum, day_index: i, skipped: false })
     }
     if (inserts.length > 0) {
       await supabase.from('day_completions').upsert(inserts, { onConflict: 'user_id,program_id,week_number,day_index' })
@@ -375,7 +376,7 @@ export default function PlanPage() {
 
   async function restartProgram() {
     if (!user) return
-    await supabase.from('training_programs').delete().eq('user_id', user.id)
+    await supabase.from('training_programs').delete().eq('user_id', userId)
     setProgram(null); setWeekPlans({}); setCurrentWeek(1); setViewingWeek(1); setProgramComplete(false)
     initProgram()
   }

@@ -4,6 +4,7 @@ import './globals.css'
 import BottomNav from '@/components/ui/BottomNav'
 import Sidebar from '@/components/ui/Sidebar'
 import RecoveryBanner from '@/components/ui/RecoveryBanner'
+import ImpersonationBanner from '@/components/ui/ImpersonationBanner'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 
@@ -48,6 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div className="grain" />
             <Sidebar />
             <main className="app-main">
+              <ImpersonationBanner />
               <RecoveryBanner />
               {children}
             </main>

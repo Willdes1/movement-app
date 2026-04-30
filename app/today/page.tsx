@@ -45,7 +45,8 @@ function getGreeting() {
 }
 
 export default function TodayPage() {
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, effectiveUserId } = useAuth()
+  const userId = effectiveUserId ?? user?.id ?? ''
   const { activeRecovery } = useTheme()
   const router = useRouter()
 
@@ -65,8 +66,8 @@ export default function TodayPage() {
     setLoading(true)
 
     const [{ data: profile }, { data: prog }] = await Promise.all([
-      supabase.from('profiles').select('name').eq('id', user.id).single(),
-      supabase.from('training_programs').select('id, start_date').eq('user_id', user.id).single(),
+      supabase.from('profiles').select('name').eq('id', userId).single(),
+      supabase.from('training_programs').select('id, start_date').eq('user_id', userId).single(),
     ])
 
     if (profile?.name) setFirstName(profile.name.split(' ')[0])

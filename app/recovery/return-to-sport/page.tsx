@@ -141,7 +141,8 @@ function SessionBlock({ blockKey, block, expanded, onToggle }: {
 }
 
 export default function ReturnToSportPage() {
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, effectiveUserId } = useAuth()
+  const userId = effectiveUserId ?? user?.id ?? ''
   const { activeRecovery, setRecovery, clearRecovery } = useTheme()
   const router = useRouter()
 
@@ -176,8 +177,8 @@ export default function ReturnToSportPage() {
     if (!user) return
     setLoading(true)
     const [{ data: profile }, { data: plansData }] = await Promise.all([
-      supabase.from('profiles').select('sport, age, gender').eq('id', user.id).single(),
-      supabase.from('recovery_plans').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('profiles').select('sport, age, gender').eq('id', userId).single(),
+      supabase.from('recovery_plans').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
     ])
     if (profile?.sport) setSport(profile.sport)
     if (profile?.age) setAge(profile.age)
@@ -234,7 +235,7 @@ export default function ReturnToSportPage() {
       }
 
       const payload = {
-        user_id: user!.id, sport: sport || null,
+        user_id: userId, sport: sport || null,
         injury: intake.injury, doctor_visit: intake.doctorVisit,
         doctor_recommendations: intake.doctorRecs || null,
         phases, current_phase: 1, last_checkin_date: null, activated_at: null, completed_at: null,

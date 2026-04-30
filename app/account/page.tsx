@@ -7,7 +7,8 @@ import { loadProfile } from '@/lib/storage'
 import type { UserProfile } from '@/lib/types'
 
 export default function AccountPage() {
-  const { user, isAdmin, role, signOut, loading } = useAuth()
+  const { user, isAdmin, role, signOut, loading, effectiveUserId } = useAuth()
+  const userId = effectiveUserId ?? user?.id ?? ''
   const router = useRouter()
   const [profile, setProfile] = useState<UserProfile>({})
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
@@ -29,7 +30,7 @@ export default function AccountPage() {
 
   useEffect(() => {
     if (!user) return
-    supabase.from('profiles').select('avatar_url').eq('id', user.id).single()
+    supabase.from('profiles').select('avatar_url').eq('id', userId).single()
       .then(({ data }) => { if (data?.avatar_url) setAvatarUrl(data.avatar_url) })
   }, [user])
 
@@ -38,13 +39,13 @@ export default function AccountPage() {
     setAvatarLoading(true)
     try {
       const ext = file.name.split('.').pop() ?? 'jpg'
-      const path = `${user.id}/avatar.${ext}`
+      const path = `${userId}/avatar.${ext}`
       const { error } = await supabase.storage
         .from('avatars')
         .upload(path, file, { upsert: true, contentType: file.type })
       if (error) throw error
       const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
-      await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', user.id)
+      await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', userId)
       setAvatarUrl(publicUrl)
     } catch (err) {
       console.error('Avatar upload failed:', err)
@@ -67,7 +68,7 @@ export default function AccountPage() {
     try {
       // Check if user already redeemed any code
       const { data: existing } = await supabase
-        .from('promo_redemptions').select('id').eq('user_id', user.id).single()
+        .from('promo_redemptions').select('id').eq('user_id', userId).single()
       if (existing) { setPromoError('You have already redeemed a promo code.'); return }
 
       // Find the code
@@ -88,8 +89,8 @@ export default function AccountPage() {
       }
 
       // Grant access
-      await supabase.from('profiles').update({ role: promo.role }).eq('id', user.id)
-      await supabase.from('promo_redemptions').insert({ user_id: user.id, code_id: promo.id })
+      await supabase.from('profiles').update({ role: promo.role }).eq('id', userId)
+      await supabase.from('promo_redemptions').insert({ user_id: userId, code_id: promo.id })
 
       setPromoMsg('Code redeemed! Refreshing your account…')
       setTimeout(() => window.location.reload(), 1500)
