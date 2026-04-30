@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import LaunchpadTab from '@/components/admin/LaunchpadTab'
+import HealthTab from '@/components/admin/HealthTab'
 
 // ─── PALETTE ─────────────────────────────────────────────────────────────────
 const C = {
@@ -26,7 +27,7 @@ const C = {
 }
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
-type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad'
+type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad' | 'health'
 type TodoRow = { id: string; content: string; category: string; status: string; priority: string; created_at: string; updated_at: string }
 type IdeaRow = { id: string; content: string; category: string; created_at: string }
 type PromoRow = { id: string; code: string; role: string; max_uses: number; uses: number; created_at: string }
@@ -708,6 +709,12 @@ const NAV_GROUPS = [
       { id: 'launchpad' as Tab, label: 'Launchpad' },
     ],
   },
+  {
+    label: 'Dev Tools',
+    items: [
+      { id: 'health' as Tab, label: 'Health Monitor' },
+    ],
+  },
 ]
 
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
@@ -984,6 +991,7 @@ export default function AdminPage() {
             <PlaceholderTab label="Partner Management" bullets={['Physical therapists, nutritionists, trainers, influencers', 'Track audience size, performance, revenue contribution', 'Revenue-sharing model — partners earn on referrals', 'Partner portal: their own login, analytics, expected pay']} />
           )}
           {tab === 'launchpad' && <LaunchpadTab />}
+          {tab === 'health' && <HealthTab />}
         </main>
       </div>
     </div>
