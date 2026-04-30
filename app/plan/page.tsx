@@ -151,6 +151,7 @@ export default function PlanPage() {
   const [showGenModal, setShowGenModal] = useState(false)
   const [pendingWeek, setPendingWeek] = useState<number | null>(null)
   const [showAiModal, setShowAiModal] = useState(false)
+  const [pendingRebuild, setPendingRebuild] = useState<{ numWeeks: number; label: string } | null>(null)
   const [dataLoading, setDataLoading] = useState(true)
 
   const [exerciseLibrary, setExerciseLibrary] = useState<Record<string, ExerciseDetail>>({})
@@ -948,7 +949,7 @@ export default function PlanPage() {
                   <div style={{ fontSize: 11, fontWeight: 500, marginTop: 3 }}>F&F access · 1-month limit</div>
                 </div>
               ) : (
-                <button onClick={() => rebuildFullPlan(13)} style={{ padding: '14px 18px', borderRadius: 12, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>
+                <button onClick={() => setPendingRebuild({ numWeeks: 13, label: '3-Month Full Program (13 weeks)' })} style={{ padding: '14px 18px', borderRadius: 12, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>
                   <div>⭐ Rebuild Full Program — 3 Months</div>
                   <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.8, marginTop: 3 }}>Replaces all 13 weeks · Recommended</div>
                 </button>
@@ -959,12 +960,12 @@ export default function PlanPage() {
                   <div style={{ fontSize: 11, fontWeight: 500, marginTop: 2 }}>F&F access · 1-month limit</div>
                 </div>
               ) : (
-                <button onClick={() => rebuildFullPlan(8)} style={{ padding: '13px 18px', borderRadius: 12, border: '1px solid var(--accent-border)', background: 'var(--accent-bg)', color: 'var(--accent)', fontWeight: 700, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>
+                <button onClick={() => setPendingRebuild({ numWeeks: 8, label: '2-Month Program (8 weeks)' })} style={{ padding: '13px 18px', borderRadius: 12, border: '1px solid var(--accent-border)', background: 'var(--accent-bg)', color: 'var(--accent)', fontWeight: 700, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>
                   <div>2 Months (8 weeks)</div>
                   <div style={{ fontSize: 11, fontWeight: 500, opacity: 0.8, marginTop: 2 }}>Foundation + Build phases</div>
                 </button>
               )}
-              <button onClick={() => rebuildFullPlan(4)} style={{ padding: '13px 18px', borderRadius: 12, border: isFF ? 'none' : '1px solid var(--border)', background: isFF ? 'var(--accent)' : 'var(--surface2)', color: isFF ? '#fff' : 'var(--text)', fontWeight: 700, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>
+              <button onClick={() => setPendingRebuild({ numWeeks: 4, label: '1-Month Program (4 weeks)' })} style={{ padding: '13px 18px', borderRadius: 12, border: isFF ? 'none' : '1px solid var(--border)', background: isFF ? 'var(--accent)' : 'var(--surface2)', color: isFF ? '#fff' : 'var(--text)', fontWeight: 700, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>
                 <div>{isFF ? '⭐ ' : ''}1 Month (4 weeks)</div>
                 <div style={{ fontSize: 11, fontWeight: 500, color: isFF ? 'rgba(255,255,255,0.75)' : 'var(--text-dim)', marginTop: 2 }}>{isFF ? 'Your plan · Foundation phase' : 'Foundation phase only'}</div>
               </button>
@@ -972,6 +973,34 @@ export default function PlanPage() {
             <button onClick={() => { setShowAiModal(false); setShowRegenModal(true) }} style={{ width: '100%', padding: '13px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
               Regenerate This Week Only →
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Rebuild confirmation modal */}
+      {pendingRebuild && (
+        <div onClick={() => setPendingRebuild(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 24 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 18, padding: 24, width: '100%', maxWidth: 400, border: '1px solid rgba(239,68,68,0.3)' }}>
+            <p style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>Rebuild Program?</p>
+            <p style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 16, lineHeight: 1.6 }}>
+              You selected: <strong style={{ color: 'var(--text)' }}>{pendingRebuild.label}</strong>
+            </p>
+            <div style={{ padding: '12px 14px', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 10, marginBottom: 20 }}>
+              <p style={{ fontSize: 13, color: '#fca5a5', lineHeight: 1.65 }}>
+                ⚠ This will <strong>permanently delete all existing weeks</strong> and rebuild from scratch. This cannot be undone.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setPendingRebuild(null)} style={{ flex: 1, padding: '13px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button
+                onClick={() => { const n = pendingRebuild.numWeeks; setPendingRebuild(null); setShowAiModal(false); rebuildFullPlan(n) }}
+                style={{ flex: 1, padding: '13px', borderRadius: 10, border: 'none', background: '#dc2626', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
+              >
+                Yes, Rebuild →
+              </button>
+            </div>
           </div>
         </div>
       )}
