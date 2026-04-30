@@ -144,6 +144,7 @@ function CalendarInner() {
   const [selectedKey, setSelectedKey] = useState<string | null>(() => new Date().toISOString().split('T')[0])
   const [exerciseLibrary, setExerciseLibrary] = useState<Record<string, ExerciseDetail>>({})
   const [selectedExercise, setSelectedExercise] = useState<ExerciseDetail | null>(null)
+  const [exerciseFetching, setExerciseFetching] = useState(false)
   const [lastLog, setLastLog] = useState<WorkoutLog | null>(null)
   const [completions, setCompletions] = useState<Set<string>>(new Set())
   const [completing, setCompleting] = useState(false)
@@ -178,29 +179,84 @@ function CalendarInner() {
     plans?.forEach(p => { map[p.week_number] = p.plan as DayPlan[] })
     setWeekPlans(map)
 
-    // Load exercise library for all movements across all generated weeks
-    const allMovements = Object.values(map).flat()
-    const normalizedNames = [...new Set(
-      allMovements
+    // Load whatever is already in the library (fast path)
+    const allDays = Object.values(map).flat()
+    const displayNames = [...new Set(
+      allDays
         .filter(d => d.type !== 'rest')
         .flatMap(d => d.movements)
-        .map(m => normalizeExerciseName(parseExerciseName(m)))
+        .map(m => parseExerciseName(m))
         .filter(Boolean)
     )]
+    const normalizedNames = displayNames.map(normalizeExerciseName)
+
+    let libMap: Record<string, ExerciseDetail> = {}
     if (normalizedNames.length > 0) {
       const { data: libData } = await supabase
         .from('exercise_library')
         .select('name_normalized, name_display, how, breathing, core, tip')
         .in('name_normalized', normalizedNames)
       if (libData) {
-        const libMap: Record<string, ExerciseDetail> = {}
         libData.forEach(e => { libMap[e.name_normalized] = e as ExerciseDetail })
         setExerciseLibrary(libMap)
       }
     }
 
     setLoading(false)
+
+    // Background: generate details for any exercises not yet in the library
+    const existingKeys = new Set(Object.keys(libMap))
+    const missing = displayNames.filter(n => !existingKeys.has(normalizeExerciseName(n)))
+    if (missing.length > 0) {
+      try {
+        const res = await fetch('/api/generate-exercise-details', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ exercises: missing }),
+        })
+        if (res.ok) {
+          const { details } = await res.json()
+          if (Array.isArray(details) && details.length > 0) {
+            await supabase.from('exercise_library').upsert(details, { onConflict: 'name_normalized' })
+            setExerciseLibrary(prev => {
+              const next = { ...prev }
+              details.forEach((e: ExerciseDetail) => { next[e.name_normalized] = e })
+              return next
+            })
+          }
+        }
+      } catch { /* silent — library will populate on next load */ }
+    }
   }, [user])
+
+  // On-demand fetch for a single exercise if not yet in library
+  const openExercise = useCallback(async (rawName: string) => {
+    const name = parseExerciseName(rawName)
+    const key = normalizeExerciseName(name)
+    const cached = exerciseLibrary[key]
+    if (cached) { setSelectedExercise(cached); return }
+
+    // Show loading placeholder immediately
+    setSelectedExercise({ name_normalized: key, name_display: name, how: 'Loading coaching details…', breathing: null as unknown as string, core: null as unknown as string, tip: null as unknown as string })
+    setExerciseFetching(true)
+    try {
+      const res = await fetch('/api/generate-exercise-details', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ exercises: [name] }),
+      })
+      if (res.ok) {
+        const { details } = await res.json()
+        if (Array.isArray(details) && details[0]) {
+          const detail = details[0] as ExerciseDetail
+          await supabase.from('exercise_library').upsert([detail], { onConflict: 'name_normalized' })
+          setExerciseLibrary(prev => ({ ...prev, [detail.name_normalized]: detail }))
+          setSelectedExercise(detail)
+        }
+      }
+    } catch { /* keep loading placeholder visible */ }
+    finally { setExerciseFetching(false) }
+  }, [exerciseLibrary])
 
   useEffect(() => {
     if (user) loadData()
@@ -539,12 +595,9 @@ function CalendarInner() {
                           <p style={{ fontSize: 11, color: '#3b82f6', fontStyle: 'italic', marginBottom: 8, lineHeight: 1.5 }}>💡 {block.tip}</p>
                         )}
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                          {block.exercises.map((ex, ei) => {
-                            const detail = exerciseLibrary[normalizeExerciseName(parseExerciseName(ex))]
-                            return (
-                              <button key={ei} onClick={() => setSelectedExercise(detail ?? fallbackDetail(ex, selectedEntry.day))} style={{ fontSize: 10, padding: '3px 9px', borderRadius: 20, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-mid)', cursor: 'pointer', fontFamily: 'inherit' }}>{ex}</button>
-                            )
-                          })}
+                          {block.exercises.map((ex, ei) => (
+                            <button key={ei} onClick={() => openExercise(ex)} style={{ fontSize: 10, padding: '3px 9px', borderRadius: 20, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-mid)', cursor: 'pointer', fontFamily: 'inherit' }}>{ex}</button>
+                          ))}
                         </div>
                       </div>
                     )}
@@ -554,18 +607,15 @@ function CalendarInner() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: selectedEntry.day.type !== 'rest' ? 12 : 0 }}>
-              {selectedEntry.day.movements.map((m, i) => {
-                const detail = exerciseLibrary[normalizeExerciseName(parseExerciseName(m))]
-                return (
-                  <button
-                    key={i}
-                    onClick={() => setSelectedExercise(detail ?? fallbackDetail(m, selectedEntry.day))}
-                    style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-mid)', cursor: 'pointer', fontFamily: 'inherit' }}
-                  >
-                    {m}
-                  </button>
-                )
-              })}
+              {selectedEntry.day.movements.map((m, i) => (
+                <button
+                  key={i}
+                  onClick={() => openExercise(m)}
+                  style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-mid)', cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  {m}
+                </button>
+              ))}
             </div>
           )}
           {(() => {
@@ -618,11 +668,14 @@ function CalendarInner() {
           >
             <div style={{ padding: '20px 24px 0', flexShrink: 0 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-                <p style={{ fontWeight: 800, fontSize: 17, lineHeight: 1.3, paddingRight: 12 }}>{selectedExercise.name_display}</p>
+                <div style={{ flex: 1, paddingRight: 12 }}>
+                  <p style={{ fontWeight: 800, fontSize: 17, lineHeight: 1.3 }}>{selectedExercise.name_display}</p>
+                  {exerciseFetching && <p style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4, fontWeight: 600 }}>Generating coaching details…</p>}
+                </div>
                 <button onClick={() => setSelectedExercise(null)} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--text-dim)', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}>×</button>
               </div>
             </div>
-            <div style={{ overflowY: 'auto', padding: '0 24px 40px', flexGrow: 1 }}>
+            <div style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch' as never, padding: '0 24px 40px', flexGrow: 1 }}>
               {/* Last session (read-only) */}
               <div style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)', marginBottom: 14 }}>
                 <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--text-dim)', marginBottom: 6, textTransform: 'uppercase' }}>Last Session</p>
