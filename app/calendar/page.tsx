@@ -652,7 +652,7 @@ function CalendarInner() {
       {/* Weeks not yet generated notice */}
       {Object.keys(weekPlans).length < TOTAL_WEEKS && (
         <div style={{ marginTop: 20, padding: '12px 16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12, color: 'var(--text-dim)', textAlign: 'center' }}>
-          Weeks generate automatically as you progress. Navigate to <span style={{ color: 'var(--accent)', fontWeight: 700, cursor: 'pointer' }} onClick={() => router.push('/today')}>Home</span> to view or generate any week.
+          Some weeks are missing from this calendar. Go to <span style={{ color: 'var(--accent)', fontWeight: 700, cursor: 'pointer' }} onClick={() => router.push('/plan')}>Your Plan</span> and tap AI Generate to build your full program.
         </div>
       )}
 

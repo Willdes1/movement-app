@@ -149,6 +149,7 @@ export default function PlanPage() {
   const [profileReady, setProfileReady] = useState(false)
   const [showGenModal, setShowGenModal] = useState(false)
   const [pendingWeek, setPendingWeek] = useState<number | null>(null)
+  const [showAiModal, setShowAiModal] = useState(false)
   const [dataLoading, setDataLoading] = useState(true)
 
   const [exerciseLibrary, setExerciseLibrary] = useState<Record<string, ExerciseDetail>>({})
@@ -373,6 +374,14 @@ export default function PlanPage() {
     setRegenInstructions('')
   }
 
+  async function rebuildFullPlan(numWeeks: number) {
+    if (!program) return
+    setShowAiModal(false)
+    await supabase.from('weekly_plans').delete().eq('program_id', program.id)
+    setWeekPlans({})
+    startProgram(numWeeks)
+  }
+
   async function restartProgram() {
     if (!user) return
     await supabase.from('training_programs').delete().eq('user_id', userId)
@@ -387,7 +396,7 @@ export default function PlanPage() {
     await supabase.from('weekly_plans').delete().eq('program_id', program.id)
     const updated = { ...program, startDate: today, status: 'active' }
     setProgram(updated); setWeekPlans({}); setCurrentWeek(1); setViewingWeek(1); setProgramComplete(false)
-    generateWeek(updated, 1)
+    startProgram(13)
   }
 
   function isDayActionable(weekNum: number, dayIdx: number) {
@@ -601,11 +610,11 @@ export default function PlanPage() {
             <p style={{ fontSize: 12, color: phaseColor, fontWeight: 700, letterSpacing: '0.04em' }}>{phaseLabel}</p>
           </div>
           <div className="ai-gen-wrap" style={{ marginTop: 4 }}>
-            <button className="ai-gen-btn" onClick={() => setShowRegenModal(true)}>
+            <button className="ai-gen-btn" onClick={() => setShowAiModal(true)}>
               <AIIcon size={22}/>
               AI Generate
             </button>
-            <div className="ai-gen-tip">Rebuild this week&apos;s plan with AI</div>
+            <div className="ai-gen-tip">Generate or rebuild your plan with AI</div>
           </div>
         </div>
 
@@ -861,6 +870,35 @@ export default function PlanPage() {
       )}
 
       {/* Regenerate modal */}
+      {showAiModal && (
+        <div onClick={() => setShowAiModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 18, padding: 24, width: '100%', maxWidth: 420, border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+              <span style={{ color: 'var(--accent)' }}><AIIcon size={26}/></span>
+              <p style={{ fontSize: 18, fontWeight: 700 }}>AI Generate</p>
+            </div>
+            <p style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 20, lineHeight: 1.6 }}>Rebuild your full program or regenerate just this week.</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+              <button onClick={() => rebuildFullPlan(13)} style={{ padding: '14px 18px', borderRadius: 12, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>
+                <div>⭐ Rebuild Full Program — 3 Months</div>
+                <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.8, marginTop: 3 }}>Replaces all 13 weeks · Recommended</div>
+              </button>
+              <button onClick={() => rebuildFullPlan(8)} style={{ padding: '13px 18px', borderRadius: 12, border: '1px solid var(--accent-border)', background: 'var(--accent-bg)', color: 'var(--accent)', fontWeight: 700, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>
+                <div>2 Months (8 weeks)</div>
+                <div style={{ fontSize: 11, fontWeight: 500, opacity: 0.8, marginTop: 2 }}>Foundation + Build phases</div>
+              </button>
+              <button onClick={() => rebuildFullPlan(4)} style={{ padding: '13px 18px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontWeight: 700, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>
+                <div>1 Month (4 weeks)</div>
+                <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-dim)', marginTop: 2 }}>Foundation phase only</div>
+              </button>
+            </div>
+            <button onClick={() => { setShowAiModal(false); setShowRegenModal(true) }} style={{ width: '100%', padding: '13px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
+              Regenerate This Week Only →
+            </button>
+          </div>
+        </div>
+      )}
+
       {showRegenModal && (
         <div onClick={() => { setShowRegenModal(false); setRegenInstructions('') }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24 }}>
           <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 18, padding: 24, width: '100%', maxWidth: 420, border: '1px solid var(--border)' }}>
