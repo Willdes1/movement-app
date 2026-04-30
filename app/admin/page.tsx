@@ -704,6 +704,16 @@ function LibraryBackfillCard() {
   const addLog = (msg: string) => setLog(prev => [...prev, msg])
 
   useEffect(() => {
+    if (status !== 'running') return
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = 'Backfill is still running — leaving now will cut it off and waste tokens. Stay on this page.'
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [status])
+
+  useEffect(() => {
     async function loadStats() {
       const [{ count: libCount }, { data: plans }] = await Promise.all([
         supabase.from('exercise_library').select('*', { count: 'exact', head: true }),
@@ -777,9 +787,15 @@ function LibraryBackfillCard() {
           {status === 'running' ? 'Running…' : status === 'done' ? '✓ Done' : 'Backfill Now'}
         </button>
       </div>
+      {status === 'running' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 8, marginBottom: 10, fontSize: 12, color: C.amber }}>
+          <span>⚠</span>
+          <span><strong>Do not navigate away.</strong> Leaving this page will cut off the process mid-batch and waste tokens. Keep this tab open until you see "✓ Done".</span>
+        </div>
+      )}
       {log.length > 0 && (
         <div style={{ background: C.bg, borderRadius: 8, padding: '12px 14px', fontFamily: 'monospace', fontSize: 11, color: C.textMid, lineHeight: 1.8, maxHeight: 200, overflowY: 'auto' }}>
-          {log.map((l, i) => <div key={i}>{l}</div>)}
+          {log.map((l, i) => <div key={i} style={{ color: l.startsWith('Done') ? C.green : l.startsWith('⚠') ? C.amber : C.textMid }}>{l}</div>)}
         </div>
       )}
     </div>
