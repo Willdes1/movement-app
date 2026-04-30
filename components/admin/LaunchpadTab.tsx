@@ -1,6 +1,7 @@
 'use client'
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import GIT_STATS from '@/lib/git-stats.json'
 
 // ─── PALETTE (matches admin portal) ──────────────────────────────────────────
 const C = {
@@ -194,6 +195,8 @@ function OverviewSection() {
     'Responsive desktop sidebar + mobile bottom nav with active state routing',
     'Admin Mission Control portal (analytics, users, todos, ideas, promos, launchpad)',
     'Auth gates, promo code system, F&F beta role, Vercel + Supabase + GitHub CI/CD',
+    'Admin user impersonation — view the full app as any user via sessionStorage, red sticky banner, exit button',
+    'Health Monitor — one-click scan of all pages, API routes, and DB tables with copy-paste Claude Code fix prompts',
   ]
   const COMING = [
     'Injury → training handoff: AI-modified safe training plan that runs alongside recovery',
@@ -201,7 +204,7 @@ function OverviewSection() {
     'Stripe billing: Free → Pro → Plus → Supreme consumer tiers',
     'Professional B2B portal (trainers, PTs, coaches manage client profiles)',
     'Client portal: AI-assigned exercises, mobility, nutrition, accountability',
-    'Admin user impersonation — support beta users without their device',
+    'Health Monitor — auto-scans all routes, APIs, and DB tables with copy-paste fix prompts',
     'Wearable integration: Oura Ring, Apple Watch, Samsung Health',
     'Native iOS + Android via Capacitor wrapper',
     'Push notifications, streak system, accountability nudges',
@@ -231,6 +234,30 @@ function OverviewSection() {
 
   return (
     <div>
+      {/* Dev Build Stats */}
+      <div style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.07) 0%, rgba(167,139,250,0.07) 100%)', border: `1px solid ${C.accentBorder}`, borderRadius: 12, padding: '20px 24px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+        <div>
+          <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: C.textDim, marginBottom: 4 }}>Built Solo · 1 Dev · 1 AI</p>
+          <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.03em', color: C.text }}>{GIT_STATS.totalHours}<span style={{ fontSize: 16, fontWeight: 600, color: C.textMid, marginLeft: 4 }}>hrs logged</span></div>
+        </div>
+        <div style={{ width: 1, height: 44, background: C.border, flexShrink: 0 }} />
+        {[
+          { label: 'Coding Sessions', val: String(GIT_STATS.sessions), color: C.accent },
+          { label: 'Active Days', val: String(GIT_STATS.activeDays), color: C.purple },
+          { label: 'Total Commits', val: String(GIT_STATS.totalCommits), color: C.green },
+          { label: 'Started', val: new Date(GIT_STATS.firstCommit + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), color: C.amber },
+        ].map(s => (
+          <div key={s.label} style={{ textAlign: 'center', minWidth: 60 }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: s.color, letterSpacing: '-0.02em' }}>{s.val}</div>
+            <div style={{ fontSize: 10, color: C.textDim, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', marginTop: 2 }}>{s.label}</div>
+          </div>
+        ))}
+        <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+          <div style={{ fontSize: 10, color: C.textDim, fontFamily: 'monospace' }}>Auto-updated on every build</div>
+          <div style={{ fontSize: 10, color: C.textDim, fontFamily: 'monospace', marginTop: 2 }}>Last: {GIT_STATS.lastUpdated}</div>
+        </div>
+      </div>
+
       {/* KPI Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
         {[
