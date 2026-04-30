@@ -655,6 +655,137 @@ function PromosTab({ promos, onRefresh }: { promos: PromoRow[]; onRefresh: () =>
   )
 }
 
+// ─── LIBRARY BACKFILL ─────────────────────────────────────────────────────────
+function parseEx(s: string): string {
+  return s.replace(/\s+\d+[×x]\d+.*$/i, '').replace(/\s+\d+\s*(sets?|reps?|each|min|sec).*$/i, '').trim()
+}
+function normalizeEx(n: string): string {
+  return n.toLowerCase().replace(/[-–—]/g, ' ').replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '_')
+}
+const REST_EX = new Set(['Full rest', 'Light walk optional', 'Sleep 8+ hours'])
+
+function extractAllExerciseNames(plans: unknown[][]): string[] {
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const week of plans) {
+    for (const day of (week as Record<string, unknown>[]) ) {
+      const type = day.type as string
+      if (type === 'rest') continue
+      // from movements array
+      const movements = (day.movements as string[] | undefined) ?? []
+      for (const m of movements) {
+        const name = parseEx(m)
+        if (name && !REST_EX.has(name) && !seen.has(normalizeEx(name))) {
+          seen.add(normalizeEx(name)); result.push(name)
+        }
+      }
+      // from daily_session blocks
+      const ds = day.daily_session as Record<string, { exercises?: string[] }> | undefined
+      if (ds) {
+        for (const block of Object.values(ds)) {
+          for (const ex of block.exercises ?? []) {
+            const name = parseEx(ex)
+            if (name && !REST_EX.has(name) && !seen.has(normalizeEx(name))) {
+              seen.add(normalizeEx(name)); result.push(name)
+            }
+          }
+        }
+      }
+    }
+  }
+  return result
+}
+
+function LibraryBackfillCard() {
+  const [status, setStatus] = useState<'idle' | 'running' | 'done' | 'error'>('idle')
+  const [log, setLog] = useState<string[]>([])
+  const [stats, setStats] = useState<{ library: number; plan: number } | null>(null)
+
+  const addLog = (msg: string) => setLog(prev => [...prev, msg])
+
+  useEffect(() => {
+    async function loadStats() {
+      const [{ count: libCount }, { data: plans }] = await Promise.all([
+        supabase.from('exercise_library').select('*', { count: 'exact', head: true }),
+        supabase.from('weekly_plans').select('plan'),
+      ])
+      const allNames = extractAllExerciseNames((plans ?? []).map(p => p.plan as unknown[]))
+      setStats({ library: libCount ?? 0, plan: allNames.length })
+    }
+    loadStats()
+  }, [status])
+
+  async function run() {
+    setStatus('running'); setLog([])
+    try {
+      const { data: plans } = await supabase.from('weekly_plans').select('plan')
+      if (!plans?.length) { addLog('No weekly plans found in database.'); setStatus('error'); return }
+      addLog(`Found ${plans.length} weeks in database.`)
+
+      const allNames = extractAllExerciseNames(plans.map(p => p.plan as unknown[]))
+      addLog(`Extracted ${allNames.length} unique exercises across all weeks.`)
+
+      const normalizedNames = allNames.map(normalizeEx)
+      const { data: existing } = await supabase.from('exercise_library').select('name_normalized').in('name_normalized', normalizedNames)
+      const existingSet = new Set(existing?.map(e => e.name_normalized) ?? [])
+      const missing = allNames.filter(n => !existingSet.has(normalizeEx(n)))
+
+      if (missing.length === 0) { addLog('All exercises already have coaching details. Nothing to do.'); setStatus('done'); return }
+      addLog(`${missing.length} exercises need coaching details. Generating in batches…`)
+
+      const BATCH = 15
+      let saved = 0
+      for (let i = 0; i < missing.length; i += BATCH) {
+        const batch = missing.slice(i, i + BATCH)
+        addLog(`Batch ${Math.floor(i / BATCH) + 1}/${Math.ceil(missing.length / BATCH)}: ${batch.slice(0, 3).join(', ')}${batch.length > 3 ? '…' : ''}`)
+        try {
+          const res = await fetch('/api/generate-exercise-details', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ exercises: batch }) })
+          if (res.ok) {
+            const { details } = await res.json()
+            if (Array.isArray(details) && details.length > 0) {
+              await supabase.from('exercise_library').upsert(details, { onConflict: 'name_normalized' })
+              saved += details.length
+            }
+          }
+        } catch { addLog(`  ⚠ Batch ${Math.floor(i / BATCH) + 1} failed, continuing…`) }
+      }
+      addLog(`Done. ${saved} exercises saved to library. Zero AI charges on future views.`)
+      setStatus('done')
+    } catch (e) {
+      addLog(`Error: ${String(e)}`); setStatus('error')
+    }
+  }
+
+  return (
+    <div style={{ padding: '20px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, marginBottom: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+        <div>
+          <p style={{ fontWeight: 700, fontSize: 13, color: C.accent, fontFamily: 'monospace', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>Exercise Library Backfill</p>
+          <p style={{ fontSize: 12, color: C.textDim, lineHeight: 1.5 }}>Pre-generate coaching details for every exercise in your plan. Run once — free forever after.</p>
+          {stats && (
+            <p style={{ fontSize: 11, color: C.textMid, marginTop: 6, fontFamily: 'monospace' }}>
+              Library: <span style={{ color: C.green }}>{stats.library} saved</span> · Plan: <span style={{ color: C.amber }}>{stats.plan} unique exercises</span>
+              {stats.plan <= stats.library ? <span style={{ color: C.green }}> ✓ fully populated</span> : <span style={{ color: C.amber }}> · {stats.plan - stats.library} missing</span>}
+            </p>
+          )}
+        </div>
+        <button
+          onClick={run}
+          disabled={status === 'running'}
+          style={{ padding: '9px 18px', borderRadius: 8, border: `1px solid ${status === 'done' ? 'rgba(34,197,94,0.3)' : C.accentBorder}`, background: status === 'running' ? C.surface2 : status === 'done' ? C.greenDim : C.accentDim, color: status === 'running' ? C.textDim : status === 'done' ? C.green : C.accent, fontWeight: 700, fontSize: 13, cursor: status === 'running' ? 'not-allowed' : 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}
+        >
+          {status === 'running' ? 'Running…' : status === 'done' ? '✓ Done' : 'Backfill Now'}
+        </button>
+      </div>
+      {log.length > 0 && (
+        <div style={{ background: C.bg, borderRadius: 8, padding: '12px 14px', fontFamily: 'monospace', fontSize: 11, color: C.textMid, lineHeight: 1.8, maxHeight: 200, overflowY: 'auto' }}>
+          {log.map((l, i) => <div key={i}>{l}</div>)}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── PLACEHOLDER TAB ──────────────────────────────────────────────────────────
 function PlaceholderTab({ label, bullets }: { label: string; bullets: string[] }) {
   return (
@@ -991,7 +1122,7 @@ export default function AdminPage() {
             <PlaceholderTab label="Partner Management" bullets={['Physical therapists, nutritionists, trainers, influencers', 'Track audience size, performance, revenue contribution', 'Revenue-sharing model — partners earn on referrals', 'Partner portal: their own login, analytics, expected pay']} />
           )}
           {tab === 'launchpad' && <LaunchpadTab />}
-          {tab === 'health' && <HealthTab />}
+          {tab === 'health' && <><LibraryBackfillCard /><HealthTab /></>}
         </main>
       </div>
     </div>
