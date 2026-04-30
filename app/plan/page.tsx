@@ -93,27 +93,41 @@ function DumbbellSparkleIcon({ size = 20 }: { size?: number }) {
 
 function AIIcon({ size = 22 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24">
-      {/* Flexed bicep arm — stroke line-art, arm occupies left 55% of canvas */}
+    // viewBox 26×22: arm occupies x=1–13 (left lane), stars x=16–26 (right lane)
+    <svg width={size} height={size} viewBox="0 0 26 22" fill="currentColor">
+      {/* ── Arm outline — stroke only (hollow), no fill ─────────────────────
+          Path traces the arm clockwise:
+          fist top → thumb side → inner forearm → elbow → forearm bottom →
+          outer elbow → outer bicep (peak left) → shoulder → back to fist  */}
       <path
         fill="none"
         stroke="currentColor"
-        strokeWidth="1.65"
+        strokeWidth="1.6"
         strokeLinecap="round"
         strokeLinejoin="round"
-        d="M5,2 C6.5,1.2 10,1.4 11,2.8 C11.7,3.6 11.3,4.9 10,5.6
-           C11.5,6.1 13,8.2 13,11.2 C13,15.2 10.8,17.8 8.5,18.2
-           L3.8,18.2 C2.3,18.2 1.3,16.7 1.8,14.7 C2.3,13.1 1.9,11.2 1.4,9.7
-           C0.9,7.5 1.5,5 3.5,3.5 Z"
+        d="M5,2 C6.5,1 9.5,1 10.5,2.5
+           C11.2,3.5 10.8,5 9.8,5.6
+           C11.2,6.4 12.8,9 12.5,12
+           C12.2,15 10.5,17 8.5,17.5
+           L4.5,17.5
+           C2.5,17.5 2,16 2.5,14
+           C3,12.5 2.2,10.8 1.6,9.5
+           C1,7.5 1.5,5 3.5,3.5
+           C4.2,2.9 4.7,2.3 5,2 Z"
       />
-      {/* Gear overlaid on bicep — centered in muscle body */}
-      <g transform="translate(1.15, 5.7) scale(0.455)" fill="currentColor">
+      {/* ── Gear — filled solid, drawn on top of arm stroke ─────────────────
+          MD settings gear scaled to 38% and centered at (7, 11) in viewBox.
+          translate = (7 − 12×0.38, 11 − 12×0.38) = (2.44, 6.44)           */}
+      <g transform="translate(2.44,6.44) scale(0.38)">
         <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
       </g>
-      {/* Sparkle stars — top right, clear of arm */}
-      <path fill="currentColor" d="M20,1 L20.7,2.9 L22.6,3.6 L20.7,4.3 L20,6.2 L19.3,4.3 L17.4,3.6 L19.3,2.9 Z"/>
-      <circle fill="currentColor" cx="23" cy="1" r="0.7"/>
-      <circle fill="currentColor" cx="17.2" cy="0.8" r="0.5"/>
+      {/* ── Three AI sparkle stars — right lane, well clear of arm ──────── */}
+      {/* Large 4-pointed sparkle */}
+      <path d="M21,1.5 L21.65,3.1 L23.2,3.75 L21.65,4.4 L21,6 L20.35,4.4 L18.8,3.75 L20.35,3.1 Z"/>
+      {/* Medium 4-pointed sparkle */}
+      <path d="M23.5,9.2 L23.9,10.3 L25,10.7 L23.9,11.1 L23.5,12.2 L23.1,11.1 L22,10.7 L23.1,10.3 Z"/>
+      {/* Small dot accent */}
+      <circle cx="17.8" cy="1.2" r="0.75"/>
     </svg>
   )
 }
@@ -588,7 +602,7 @@ export default function PlanPage() {
           </div>
           <div className="ai-gen-wrap" style={{ marginTop: 4 }}>
             <button className="ai-gen-btn" onClick={() => setShowRegenModal(true)}>
-              <AIIcon size={20}/>
+              <AIIcon size={22}/>
               AI Generate
             </button>
             <div className="ai-gen-tip">Rebuild this week&apos;s plan with AI</div>
