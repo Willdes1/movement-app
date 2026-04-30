@@ -9,6 +9,30 @@ const playbooks = [
     exercises: '80+ exercises',
     color: 'var(--orange)',
   },
+  {
+    href: '/recovery/elbow',
+    title: 'Elbow Recovery',
+    desc: 'Hyperextended or sprained elbow — 6-phase RICE to full sport return',
+    phase: '6 Phases',
+    exercises: '40+ exercises',
+    color: 'var(--accent)',
+  },
+  {
+    href: '/recovery/shoulder',
+    title: 'Shoulder Impingement',
+    desc: 'Subacromial impingement — 4-phase rotator cuff & scapular protocol',
+    phase: '4 Phases',
+    exercises: '35+ exercises',
+    color: '#00d4aa',
+  },
+  {
+    href: '/recovery/knee',
+    title: 'Knee Rehab',
+    desc: 'General knee rehabilitation — 4-phase return-to-sport protocol',
+    phase: '4 Phases',
+    exercises: '40+ exercises',
+    color: '#a78bfa',
+  },
 ]
 
 export default function RecoveryPage() {
@@ -108,7 +132,7 @@ export default function RecoveryPage() {
       </div>
 
       <div style={{ marginTop: 24, padding: '20px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, textAlign: 'center' }}>
-        <p style={{ color: 'var(--text-dim)', fontSize: 13 }}>More playbooks coming soon.<br />Hip flexor, hamstring, knee, and shoulder protocols in development.</p>
+        <p style={{ color: 'var(--text-dim)', fontSize: 13 }}>More playbooks coming soon.<br />Hip flexor, hamstring, ankle, and wrist protocols in development.</p>
       </div>
     </div>
   )
