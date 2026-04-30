@@ -214,19 +214,22 @@ export default function PlanPage() {
 
   const startProgram = useCallback(async (numWeeks = 13) => {
     if (!user) return
-    setGenerating(true)
-    const today = new Date().toISOString().split('T')[0]
-    const { data: newProg } = await supabase.from('training_programs').insert({ user_id: user.id, start_date: today, total_weeks: 13, status: 'active' }).select('id, start_date, total_weeks, status').single()
-    if (!newProg) { setGenerating(false); return }
-    const prog: Program = { id: newProg.id, startDate: newProg.start_date, totalWeeks: newProg.total_weeks, status: newProg.status }
-    setProgram(prog); setCurrentWeek(1); setViewingWeek(1)
-    setGenerating(false)
+    let prog = program
+    if (!prog) {
+      setGenerating(true)
+      const today = new Date().toISOString().split('T')[0]
+      const { data: newProg } = await supabase.from('training_programs').insert({ user_id: user.id, start_date: today, total_weeks: 13, status: 'active' }).select('id, start_date, total_weeks, status').single()
+      setGenerating(false)
+      if (!newProg) return
+      prog = { id: newProg.id, startDate: newProg.start_date, totalWeeks: newProg.total_weeks, status: newProg.status }
+      setProgram(prog); setCurrentWeek(1); setViewingWeek(1)
+    }
     for (let w = 1; w <= numWeeks; w++) {
       setGeneratingProgress({ current: w, total: numWeeks })
       await generateWeek(prog, w, true)
     }
     setGeneratingProgress(null)
-  }, [user, generateWeek])
+  }, [user, program, generateWeek])
 
   const initProgram = useCallback(async () => {
     if (!user) return
@@ -241,7 +244,7 @@ export default function PlanPage() {
     setProgram(prog)
     const week = getCurrentWeek(prog.startDate)
     setCurrentWeek(week)
-    setViewingWeek(week)
+    setViewingWeek(1)
     if (week >= TOTAL_WEEKS) setProgramComplete(true)
     const [{ data: plans }, { data: compData }] = await Promise.all([
       supabase.from('weekly_plans').select('week_number, plan').eq('program_id', prog.id),
@@ -251,7 +254,6 @@ export default function PlanPage() {
     plans?.forEach(p => { planMap[p.week_number] = p.plan as DayPlan[] })
     setWeekPlans(planMap)
     if (compData) setCompletions(new Set(compData.map(r => `${r.week_number}-${r.day_index}`)))
-    if (!planMap[week]) await generateWeek(prog, week)
     setDataLoading(false)
   }, [user, generateWeek])
 
@@ -473,7 +475,7 @@ export default function PlanPage() {
     )
   }
 
-  if (!program) {
+  if (!program || Object.keys(weekPlans).length === 0) {
     return (
       <div style={{ padding: '60px 24px', maxWidth: 600, margin: '0 auto', textAlign: 'center' }}>
         <div style={{ fontSize: 44, marginBottom: 16 }}>⚡</div>
@@ -482,7 +484,7 @@ export default function PlanPage() {
         </p>
         <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 28, lineHeight: 1.6 }}>
           {profileReady
-            ? 'Your AI coach will build a personalized 13-week program based on your profile. It takes about 15 seconds.'
+            ? 'Your AI coach will build a personalized program based on your profile. Choose how many weeks to generate — takes about 2 min for a full program.'
             : 'Tell your AI coach about your sport, goals, and schedule so it can build the right program for you.'}
         </p>
         {profileReady ? (
