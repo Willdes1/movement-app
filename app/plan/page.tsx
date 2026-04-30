@@ -166,7 +166,7 @@ export default function PlanPage() {
   const [missedDays, setMissedDays] = useState<string[]>([])
   const [pendingComplete, setPendingComplete] = useState<{ weekNum: number; dayIdx: number } | null>(null)
   const [completing, setCompleting] = useState(false)
-  const [generatingProgress, setGeneratingProgress] = useState<{ current: number; total: number } | null>(null)
+  const [generatingProgress, setGeneratingProgress] = useState<{ current: number; total: number; details?: boolean } | null>(null)
   const [selectedDayIdx, setSelectedDayIdx] = useState(todayIdx)
   const [completionMsg, setCompletionMsg] = useState<string | null>(null)
 
@@ -193,9 +193,11 @@ export default function PlanPage() {
     const { data: existing } = await supabase.from('exercise_library').select('name_normalized').in('name_normalized', normalizedNames)
     const existingSet = new Set(existing?.map(e => e.name_normalized) ?? [])
     const missing = [...new Set(displayNames.filter(n => !existingSet.has(normalizeExerciseName(n))))]
-    if (missing.length > 0) {
+    const BATCH = 15
+    for (let i = 0; i < missing.length; i += BATCH) {
+      const batch = missing.slice(i, i + BATCH)
       try {
-        const res = await fetch('/api/generate-exercise-details', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ exercises: missing }) })
+        const res = await fetch('/api/generate-exercise-details', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ exercises: batch }) })
         if (res.ok) {
           const { details } = await res.json()
           if (Array.isArray(details) && details.length > 0) await supabase.from('exercise_library').upsert(details, { onConflict: 'name_normalized' })
@@ -205,12 +207,12 @@ export default function PlanPage() {
     await loadLibraryForWeek(plan)
   }, [loadLibraryForWeek])
 
-  const generateWeek = useCallback(async (prog: Program, weekNum: number, silent = false, instructions = '') => {
+  const generateWeek = useCallback(async (prog: Program, weekNum: number, silent = false, instructions = ''): Promise<DayPlan[] | null> => {
     if (!silent) { setGenerating(true); setError(null) }
     const profile = await fetchProfile()
     if (!profile?.sport && !profile?.goal) {
       if (!silent) { setError('Set up your profile first so your AI coach knows what to build.'); setGenerating(false) }
-      return
+      return null
     }
     const { phase, label, intensity } = getPhaseInfo(weekNum)
     try {
@@ -220,8 +222,10 @@ export default function PlanPage() {
       await supabase.from('weekly_plans').upsert({ program_id: prog.id, user_id: userId, week_number: weekNum, phase, plan })
       setWeekPlans(prev => ({ ...prev, [weekNum]: plan }))
       if (!silent) populateLibrary(plan)
+      return plan
     } catch {
       if (!silent) setError('Generation failed. Tap the regen button to try again.')
+      return null
     } finally {
       if (!silent) setGenerating(false)
     }
@@ -239,10 +243,14 @@ export default function PlanPage() {
       prog = { id: newProg.id, startDate: newProg.start_date, totalWeeks: newProg.total_weeks, status: newProg.status }
       setProgram(prog); setCurrentWeek(1); setViewingWeek(1)
     }
+    const allPlans: DayPlan[] = []
     for (let w = 1; w <= numWeeks; w++) {
       setGeneratingProgress({ current: w, total: numWeeks })
-      await generateWeek(prog, w, true)
+      const plan = await generateWeek(prog, w, true)
+      if (plan) allPlans.push(...plan)
     }
+    setGeneratingProgress({ current: numWeeks, total: numWeeks, details: true })
+    await populateLibrary(allPlans)
     setGeneratingProgress(null)
   }, [user, program, generateWeek])
 
@@ -443,14 +451,16 @@ export default function PlanPage() {
             <div key={i} style={{ position: 'absolute', bottom: 0, left: s.left, animation: `floatUp ${s.dur} ${s.delay} ease-in-out infinite`, fontSize: 13, color, opacity: 0 }}>✦</div>
           ))}
         </div>
-        <p style={{ fontWeight: 900, fontSize: 22, marginBottom: 6, letterSpacing: '-0.02em' }}>Building Your Program</p>
+        <p style={{ fontWeight: 900, fontSize: 22, marginBottom: 6, letterSpacing: '-0.02em' }}>
+          {generatingProgress.details ? 'Preparing Coaching Details' : 'Building Your Program'}
+        </p>
         <p style={{ fontSize: 13, color, fontWeight: 700, marginBottom: 28, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-          Week {generatingProgress.current} of {generatingProgress.total} — {label}
+          {generatingProgress.details ? 'Pre-generating all exercise coaching' : `Week ${generatingProgress.current} of ${generatingProgress.total} — ${label}`}
         </p>
         <div style={{ height: 6, background: 'var(--border)', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
-          <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 4, transition: 'width 0.6s ease' }} />
+          <div style={{ height: '100%', width: `${generatingProgress.details ? 100 : pct}%`, background: color, borderRadius: 4, transition: 'width 0.6s ease' }} />
         </div>
-        <p style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 28 }}>{pct}% complete</p>
+        <p style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 28 }}>{generatingProgress.details ? 'Almost done…' : `${pct}% complete`}</p>
         <p style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.7, maxWidth: 300, margin: '0 auto' }}>
           Your AI coach is designing {generatingProgress.total} weeks of personalized training — exercises, rest times, coaching cues, and phase progression.
         </p>

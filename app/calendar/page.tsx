@@ -240,6 +240,14 @@ function CalendarInner() {
     setSelectedExercise({ name_normalized: key, name_display: name, how: 'Loading coaching details…', breathing: null as unknown as string, core: null as unknown as string, tip: null as unknown as string })
     setExerciseFetching(true)
     try {
+      // Check DB before calling AI — avoids charges on every tap
+      const { data: dbEntry } = await supabase.from('exercise_library').select('name_normalized, name_display, how, breathing, core, tip').eq('name_normalized', key).single()
+      if (dbEntry) {
+        setExerciseLibrary(prev => ({ ...prev, [key]: dbEntry as ExerciseDetail }))
+        setSelectedExercise(dbEntry as ExerciseDetail)
+        return
+      }
+      // Only generate if genuinely missing from DB
       const res = await fetch('/api/generate-exercise-details', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
