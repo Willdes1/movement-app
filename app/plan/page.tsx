@@ -192,7 +192,8 @@ export default function PlanPage() {
     const displayNames = extractDisplayNames(plan)
     const normalizedNames = displayNames.map(normalizeExerciseName)
     if (!normalizedNames.length) return
-    const { data: existing } = await supabase.from('exercise_library').select('name_normalized').in('name_normalized', normalizedNames)
+    // Fetch full library (no .in() filter) — avoids URL length limits silently truncating large arrays
+    const { data: existing } = await supabase.from('exercise_library').select('name_normalized')
     const existingSet = new Set(existing?.map(e => e.name_normalized) ?? [])
     const missing = [...new Set(displayNames.filter(n => !existingSet.has(normalizeExerciseName(n))))]
     const BATCH = 15
@@ -293,6 +294,13 @@ export default function PlanPage() {
   useEffect(() => { if (user) initProgram() }, [user, initProgram])
   useEffect(() => { const plan = weekPlans[viewingWeek]; if (plan) populateLibrary(plan) }, [viewingWeek, weekPlans, populateLibrary])
   useEffect(() => { setSelectedDayIdx(viewingWeek === currentWeek ? todayIdx : 0) }, [viewingWeek, currentWeek, todayIdx])
+
+  useEffect(() => {
+    if (!generatingProgress) return
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [generatingProgress])
 
   useEffect(() => {
     if (!user || !program) return
@@ -429,7 +437,7 @@ export default function PlanPage() {
     const pct = generatingProgress.total > 0 ? Math.round((generatingProgress.current / generatingProgress.total) * 100) : 0
     const { label, color } = getPhaseInfo(generatingProgress.current)
     return (
-      <div style={{ padding: '60px 32px 80px', textAlign: 'center', maxWidth: 480, margin: '0 auto' }}>
+      <div style={{ position: 'fixed', inset: 0, zIndex: 150, background: 'var(--bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '32px' }}>
         <style>{`
           @keyframes spinCW  { from { transform: rotate(0deg) }   to { transform: rotate(360deg) } }
           @keyframes spinCCW { from { transform: rotate(0deg) }   to { transform: rotate(-360deg) } }
@@ -471,9 +479,12 @@ export default function PlanPage() {
           <div style={{ height: '100%', width: `${generatingProgress.details ? 100 : pct}%`, background: color, borderRadius: 4, transition: 'width 0.6s ease' }} />
         </div>
         <p style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 28 }}>{generatingProgress.details ? 'Almost done…' : `${pct}% complete`}</p>
-        <p style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.7, maxWidth: 300, margin: '0 auto' }}>
+        <p style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.7, maxWidth: 300, margin: '0 auto 20px' }}>
           Your AI coach is designing {generatingProgress.total} weeks of personalized training — exercises, rest times, coaching cues, and phase progression.
         </p>
+        <div style={{ padding: '9px 18px', borderRadius: 20, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', fontSize: 12, color: '#fca5a5', fontWeight: 700, letterSpacing: '0.02em' }}>
+          ⚠ Do not navigate away — this will stop generation
+        </div>
       </div>
     )
   }
