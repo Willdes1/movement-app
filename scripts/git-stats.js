@@ -1,8 +1,14 @@
 // Runs before every build (npm run prebuild / Vercel prebuild).
 // Reads git log, calculates coding sessions, writes lib/git-stats.json.
+// Skips on Vercel — shallow clone produces wrong numbers; committed JSON is authoritative.
 const { execSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
+
+if (process.env.VERCEL) {
+  console.log('ℹ git-stats.js: Vercel environment — using committed git-stats.json (shallow clone skipped).')
+  process.exit(0)
+}
 
 const SESSION_GAP_MS = 2 * 60 * 60 * 1000   // 2h gap = new session
 const BUFFER_MS      = 30 * 60 * 1000        // add 30 min to each session (pre-code thinking time)
