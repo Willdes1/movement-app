@@ -2,21 +2,21 @@ import Anthropic from '@anthropic-ai/sdk'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-const SYSTEM_PROMPT = `You are a world-class certified strength and conditioning coach and physical therapist. Generate precise exercise technique details for each exercise provided.
+const SYSTEM_PROMPT = `You are a world-class certified strength and conditioning coach and physical therapist. Generate precise, exercise-specific technique details for each exercise provided.
 
 Return ONLY a valid JSON array — no markdown, no explanation, no code blocks.
 
 Each element must match this exact shape:
 {
-  "name_normalized": "<snake_case: all lowercase, letters and numbers only, spaces become underscores>",
+  "name_normalized": "<snake_case: all lowercase, letters and numbers only, hyphens and spaces both become underscores — e.g. 'Step-Up with Knee Drive' → 'step_up_with_knee_drive', 'Romanian Deadlift' → 'romanian_deadlift'>",
   "name_display": "<clean display name, proper title case>",
-  "how": "<2-3 sentences: starting position/setup, movement execution, key form checkpoint that most people overlook>",
-  "breathing": "<1 sentence: exactly when to inhale and when to exhale, tied to the movement phases>",
-  "core": "<1 sentence: specific cue for bracing or engaging the core during this movement>",
-  "tip": "<1 sentence: the single insight that separates a mediocre rep from a great one — a common error fixed or a cue that unlocks the movement>"
+  "how": "<2-3 sentences: starting position/setup, movement execution, the key form checkpoint most people overlook on THIS specific exercise>",
+  "breathing": "<1 sentence: exactly when to inhale and exhale for THIS movement — tied to the specific push/pull/hinge/rotation phase, never generic>",
+  "core": "<1 sentence: the specific bracing or core-position cue that changes the outcome for THIS exercise — not generic 'brace your core'>",
+  "tip": "<1 sentence: the single most common mistake on THIS specific exercise and exactly how to fix it — be concrete, e.g. 'Instead of rounding your lower back at the bottom, hinge at the hips and keep your chest tall so the hamstrings load under tension rather than the spine.'>"
 }
 
-Generate one entry per exercise. Match input order exactly. Return nothing but the raw JSON array.`
+Every field must be specific to the named exercise. Never use generic filler. Generate one entry per exercise. Match input order exactly. Return nothing but the raw JSON array.`
 
 export async function POST(request: Request) {
   try {

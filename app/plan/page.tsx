@@ -14,18 +14,17 @@ type WorkoutLog = { id: string; exercise_normalized: string; logged_at: string; 
 type CompletionInsert = { user_id: string; program_id: string; week_number: number; day_index: number; skipped: boolean }
 
 function parseExerciseName(m: string) { return m.replace(/\s+\d+[×x]\d+.*$/i, '').replace(/\s+\d+\s+sets?.*$/i, '').trim() }
-function normalizeExerciseName(n: string) { return n.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '_') }
+function normalizeExerciseName(n: string) { return n.toLowerCase().replace(/[-–—]/g, ' ').replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '_') }
 const REST_MOVEMENTS = new Set(['Full rest', 'Light walk optional', 'Sleep 8+ hours'])
-function fallbackDetail(m: string, day: DayPlan): ExerciseDetail {
+function fallbackDetail(m: string, _day: DayPlan): ExerciseDetail {
   const name = parseExerciseName(m)
-  const restNote = day.rest && day.rest.between_sets !== '—' ? ` Rest ${day.rest.between_sets} between sets.` : ''
   return {
     name_normalized: normalizeExerciseName(name),
     name_display: name,
-    how: 'Detailed coaching for this exercise is still loading. Tap again in a few seconds, or regenerate the week to refresh.',
-    breathing: 'Exhale on exertion — the push, pull, or drive phase. Inhale slowly and controlled on the return.',
-    core: 'Brace your core before every rep. Think of pulling your navel toward your spine throughout the set.',
-    tip: (day.coaching ?? 'Focus on controlled form over speed.') + restNote,
+    how: 'Coaching for this exercise is loading. Tap again in a moment, or regenerate the week to refresh all details.',
+    breathing: null as unknown as string,
+    core: null as unknown as string,
+    tip: null as unknown as string,
   }
 }
 function extractDisplayNames(plan: DayPlan[]) {
@@ -798,7 +797,7 @@ export default function PlanPage() {
                 ) : <p style={{ fontSize: 13, color: 'var(--text-dim)' }}>No sessions logged yet</p>}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
-                {[{ label: 'HOW TO DO IT', text: selectedExercise.how, color: 'var(--text)' }, { label: 'BREATHING', text: selectedExercise.breathing, color: 'var(--text-mid)' }, { label: 'CORE ENGAGEMENT', text: selectedExercise.core, color: 'var(--text-mid)' }, { label: 'COACHING TIP', text: selectedExercise.tip, color: 'var(--accent)' }].map(({ label, text, color }) => (
+                {[{ label: 'HOW TO DO IT', text: selectedExercise.how, color: 'var(--text)' }, { label: 'BREATHING', text: selectedExercise.breathing, color: 'var(--text-mid)' }, { label: 'CORE ENGAGEMENT', text: selectedExercise.core, color: 'var(--text-mid)' }, { label: 'COACHING TIP', text: selectedExercise.tip, color: 'var(--accent)' }].filter(({ text }) => !!text).map(({ label, text, color }) => (
                   <div key={label} style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)' }}>
                     <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--text-dim)', marginBottom: 5, textTransform: 'uppercase' }}>{label}</p>
                     <p style={{ fontSize: 13, color, lineHeight: 1.65 }}>{text}</p>

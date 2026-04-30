@@ -79,19 +79,18 @@ function parseExerciseName(movement: string): string {
 }
 
 function normalizeExerciseName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '_')
+  return name.toLowerCase().replace(/[-–—]/g, ' ').replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '_')
 }
 
-function fallbackDetail(m: string, day: DayPlan): ExerciseDetail {
+function fallbackDetail(m: string, _day: DayPlan): ExerciseDetail {
   const name = parseExerciseName(m)
-  const restNote = day.rest && day.rest.between_sets !== '—' ? ` Rest ${day.rest.between_sets} between sets.` : ''
   return {
     name_normalized: normalizeExerciseName(name),
     name_display: name,
-    how: 'Detailed coaching for this exercise is still loading. Check back in a few seconds, or navigate to Your Plan to see full instructions.',
-    breathing: 'Exhale on exertion — the push, pull, or drive phase. Inhale slowly and controlled on the return.',
-    core: 'Brace your core before every rep. Think of pulling your navel toward your spine throughout the set.',
-    tip: (day.coaching ?? 'Focus on controlled form over speed.') + restNote,
+    how: 'Coaching for this exercise is loading. Tap again in a moment.',
+    breathing: null as unknown as string,
+    core: null as unknown as string,
+    tip: null as unknown as string,
   }
 }
 
@@ -652,7 +651,7 @@ function CalendarInner() {
                   { label: 'BREATHING', text: selectedExercise.breathing, color: 'var(--text-mid)' },
                   { label: 'CORE ENGAGEMENT', text: selectedExercise.core, color: 'var(--text-mid)' },
                   { label: 'COACHING TIP', text: selectedExercise.tip, color: 'var(--accent)' },
-                ].map(({ label, text, color }) => (
+                ].filter(({ text }) => !!text).map(({ label, text, color }) => (
                   <div key={label} style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)' }}>
                     <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--text-dim)', marginBottom: 5, textTransform: 'uppercase' }}>{label}</p>
                     <p style={{ fontSize: 13, color, lineHeight: 1.65 }}>{text}</p>
