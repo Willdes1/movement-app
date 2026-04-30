@@ -175,24 +175,31 @@ const SUB_TABS: { id: SubTab; label: string }[] = [
 // ─── OVERVIEW SECTION ────────────────────────────────────────────────────────
 function OverviewSection() {
   const BUILT = [
-    'AI 13-week plan generator (Foundation → Build → Peak → Maintenance)',
+    'AI plan generator — 1/2/3-month bulk generation, all weeks built at once with live progress screen',
+    'Phase-based training: Foundation → Build → Peak → Maintenance with per-phase intensity + rest times',
+    'Rest times baked into every plan (between_sets + between_rounds, scaled by phase and load type)',
+    'Daily session blocks — 6-block training days (morning/warmup/workout/abs/cooldown/evening), 3-block rest days',
     'SI Joint 4-phase recovery playbook (82+ exercises, dynamic theming)',
-    'Global exercise library — AI cues generated once, reused platform-wide',
-    'Calendar, workout logging (sets/reps/weight), day completion tracking',
-    'For You feed — sport tips + Japanese warrior mindset AI agent',
-    'Multi-sport profile, equipment constraints, home/gym location awareness',
-    'Responsive desktop sidebar + mobile bottom nav',
-    'Admin Mission Control portal (analytics, todos, ideas, promos)',
-    'Auth gates, promo code system, Vercel + Supabase + GitHub CI/CD',
+    'Custom injury recovery AI — describe any injury, get a multi-phase rehab plan with 6-block daily sessions',
+    'Return-to-sport AI agent — sport-specific phase-by-phase return-to-play progression',
+    'Global exercise library — AI cues + breathing tips generated once, reused platform-wide',
+    'Calendar with 6-block expandable daily session view + day completion + Undo',
+    'Workout logging (sets / reps / weight per exercise with personal best tracking)',
+    'For You feed — sport tips + Japanese warrior mindset AI agent (Mushin, Kaizen, Zanshin)',
+    'Multi-sport profile, equipment constraints, injury restrictions, home/gym awareness',
+    'Anatomy Explorer — Jarvis HUD with clickable skeleton, joint matrix, recovery protocols',
+    'Responsive desktop sidebar + mobile bottom nav with active state routing',
+    'Admin Mission Control portal (analytics, users, todos, ideas, promos, launchpad)',
+    'Auth gates, promo code system, F&F beta role, Vercel + Supabase + GitHub CI/CD',
   ]
   const COMING = [
-    'Return-to-sport AI agent (sport-specific daily progression)',
-    'Injury → recovery handoff: safe modified training plan during rehab',
-    'Nutrition AI: 3-month meal plan synced to training phases',
+    'Injury → training handoff: AI-modified safe training plan that runs alongside recovery',
+    'Nutrition AI: 3-month meal plan synced to training phases + macro targets',
     'Stripe billing: Free → Pro → Plus → Supreme consumer tiers',
-    'Professional B2B portal (trainers, PTs, coaches)',
-    'Client portal: exercises, mobility, water, diet — assigned by pro',
-    'Wearable integration: Oura Ring, Apple Watch, Samsung',
+    'Professional B2B portal (trainers, PTs, coaches manage client profiles)',
+    'Client portal: AI-assigned exercises, mobility, nutrition, accountability',
+    'Admin user impersonation — support beta users without their device',
+    'Wearable integration: Oura Ring, Apple Watch, Samsung Health',
     'Native iOS + Android via Capacitor wrapper',
     'Push notifications, streak system, accountability nudges',
   ]
@@ -210,10 +217,10 @@ function OverviewSection() {
     { name: 'Athlean-X', aiPlan: '✗', recovery: '✗', b2b: '✗', mindset: '✗', nutrition: '~ basic', market: '✗' },
   ]
   const ROADMAP = [
-    { phase: 'Phase 1', label: 'Core Consumer App', status: 'done', items: 'AI plan generator · Exercise library · Recovery system · Calendar · Workout logging · For You feed · Auth · Admin portal · CI/CD' },
-    { phase: 'Phase 2', label: 'AI Agents + Monetization', status: 'active', items: 'Return-to-sport agent · Injury→recovery handoff · Nutrition AI · Stripe billing · Push notifications · Native iOS/Android · Wearable integration' },
-    { phase: 'Phase 3', label: 'Professional B2B Portal', status: 'upcoming', items: 'Trainer/PT/coach accounts · Client profile management · Client portal · Professional admin dashboard · Engagement tracking' },
-    { phase: 'Phase 4', label: 'Marketplace + Scale', status: 'upcoming', items: 'Hire local trainers in-app · Marketplace listings · Built-in marketing automation · Revenue-sharing · Platform analytics for professionals' },
+    { phase: 'Phase 1', label: 'Core Consumer App', status: 'done', items: 'AI plan generator (bulk 1/2/3-month) · Phase-based training with rest times · 6-block daily sessions · Exercise library · SI Joint + custom injury recovery · Return-to-sport agent · Calendar + undo completion · Workout logging · For You feed · Anatomy Explorer · Auth · Admin portal · CI/CD' },
+    { phase: 'Phase 2', label: 'AI Agents + Monetization', status: 'active', items: 'Injury→training handoff (AI-modified safe plan during rehab) · Nutrition AI (3-month meal plan) · Stripe billing · Push notifications · Native iOS/Android · Wearable integration (Oura, Apple Watch)' },
+    { phase: 'Phase 3', label: 'Professional B2B Portal', status: 'upcoming', items: 'Trainer/PT/coach accounts · Client profile management · Client portal · Admin impersonation (beta support) · Professional analytics dashboard · Engagement tracking' },
+    { phase: 'Phase 4', label: 'Marketplace + Scale', status: 'upcoming', items: 'Hire local trainers in-app · Marketplace listings · Built-in marketing automation · Revenue-sharing · Platform data as B2B sales intelligence' },
     { phase: 'Phase 5', label: 'Enterprise + Partnerships', status: 'upcoming', items: 'White-label options · Insurance partnerships · University athletics licensing · International expansion · Strategic acquisition potential' },
   ]
 
