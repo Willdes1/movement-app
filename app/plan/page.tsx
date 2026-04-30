@@ -134,6 +134,7 @@ function AIIcon({ size = 22 }: { size?: number }) {
 export default function PlanPage() {
   const { user, loading: authLoading, isAdmin, role, effectiveUserId } = useAuth()
   const userId = effectiveUserId ?? user?.id ?? ''
+  const isFF = !isAdmin && role === 'ff'
   const router = useRouter()
   const todayIdx = (new Date().getDay() + 6) % 7
 
@@ -395,7 +396,7 @@ export default function PlanPage() {
     setShowAiModal(false)
     await supabase.from('weekly_plans').delete().eq('program_id', program.id)
     setWeekPlans({})
-    startProgram(numWeeks)
+    startProgram(isFF ? Math.min(numWeeks, 4) : numWeeks)
   }
 
   async function restartProgram() {
@@ -412,7 +413,7 @@ export default function PlanPage() {
     await supabase.from('weekly_plans').delete().eq('program_id', program.id)
     const updated = { ...program, startDate: today, status: 'active' }
     setProgram(updated); setWeekPlans({}); setCurrentWeek(1); setViewingWeek(1); setProgramComplete(false)
-    startProgram(13)
+    startProgram(isFF ? 4 : 13)
   }
 
   function isDayActionable(weekNum: number, dayIdx: number) {
@@ -539,7 +540,7 @@ export default function PlanPage() {
         <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Program Complete!</h1>
         <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 32, lineHeight: 1.6 }}>You finished all 13 weeks. That&apos;s a serious achievement. What&apos;s next?</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <button onClick={continueProgram} style={{ padding: '14px', borderRadius: 12, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>Continue for Another 3 Months →</button>
+          <button onClick={continueProgram} style={{ padding: '14px', borderRadius: 12, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>{isFF ? 'Continue for Another Month →' : 'Continue for Another 3 Months →'}</button>
           <button onClick={restartProgram} style={{ padding: '14px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Start a Fresh Plan</button>
         </div>
       </div>
@@ -560,17 +561,31 @@ export default function PlanPage() {
         </p>
         {profileReady ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 340, margin: '0 auto' }}>
-            <button onClick={() => startProgram(13)} disabled={generating} style={{ padding: '15px 20px', borderRadius: 12, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer', textAlign: 'left' }}>
-              <div>⭐ 3 Months — Full Program</div>
-              <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.8, marginTop: 3 }}>Recommended · All 13 weeks generated now</div>
-            </button>
-            <button onClick={() => startProgram(8)} disabled={generating} style={{ padding: '13px 20px', borderRadius: 12, border: '1px solid var(--accent-border)', background: 'var(--accent-bg)', color: 'var(--accent)', fontWeight: 700, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>
-              <div>2 Months (8 weeks)</div>
-              <div style={{ fontSize: 11, fontWeight: 500, opacity: 0.8, marginTop: 2 }}>Foundation + Build phases</div>
-            </button>
-            <button onClick={() => startProgram(4)} disabled={generating} style={{ padding: '13px 20px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontWeight: 700, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>
-              <div>1 Month (4 weeks)</div>
-              <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-dim)', marginTop: 2 }}>Foundation phase only</div>
+            {isFF ? (
+              <div style={{ padding: '15px 20px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text-dim)', fontSize: 15, textAlign: 'left', cursor: 'not-allowed', userSelect: 'none' }}>
+                <div style={{ fontWeight: 800 }}>🔒 3 Months — Full Program</div>
+                <div style={{ fontSize: 11, fontWeight: 500, marginTop: 3 }}>F&F access · 1-month limit</div>
+              </div>
+            ) : (
+              <button onClick={() => startProgram(13)} disabled={generating} style={{ padding: '15px 20px', borderRadius: 12, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer', textAlign: 'left' }}>
+                <div>⭐ 3 Months — Full Program</div>
+                <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.8, marginTop: 3 }}>Recommended · All 13 weeks generated now</div>
+              </button>
+            )}
+            {isFF ? (
+              <div style={{ padding: '13px 20px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text-dim)', fontSize: 14, textAlign: 'left', cursor: 'not-allowed', userSelect: 'none' }}>
+                <div style={{ fontWeight: 700 }}>🔒 2 Months (8 weeks)</div>
+                <div style={{ fontSize: 11, fontWeight: 500, marginTop: 2 }}>F&F access · 1-month limit</div>
+              </div>
+            ) : (
+              <button onClick={() => startProgram(8)} disabled={generating} style={{ padding: '13px 20px', borderRadius: 12, border: '1px solid var(--accent-border)', background: 'var(--accent-bg)', color: 'var(--accent)', fontWeight: 700, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>
+                <div>2 Months (8 weeks)</div>
+                <div style={{ fontSize: 11, fontWeight: 500, opacity: 0.8, marginTop: 2 }}>Foundation + Build phases</div>
+              </button>
+            )}
+            <button onClick={() => startProgram(4)} disabled={generating} style={{ padding: '13px 20px', borderRadius: 12, border: isFF ? 'none' : '1px solid var(--border)', background: isFF ? 'var(--accent)' : 'var(--surface2)', color: isFF ? '#fff' : 'var(--text)', fontWeight: 700, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>
+              <div>{isFF ? '⭐ ' : ''}1 Month (4 weeks)</div>
+              <div style={{ fontSize: 11, fontWeight: 500, color: isFF ? 'rgba(255,255,255,0.75)' : 'var(--text-dim)', marginTop: 2 }}>{isFF ? 'Your plan · Foundation phase' : 'Foundation phase only'}</div>
             </button>
             <button onClick={() => router.push('/profile')} style={{ padding: '11px 20px', borderRadius: 12, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-dim)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
               Edit Profile First
@@ -790,7 +805,7 @@ export default function PlanPage() {
                 <p style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Final week incoming 🏁</p>
                 <p style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 16, lineHeight: 1.5 }}>You&apos;re almost there. After this week, choose your next move.</p>
                 <div style={{ display: 'flex', gap: 10 }}>
-                  <button onClick={continueProgram} style={{ flex: 1, padding: '12px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Continue 3 More Months</button>
+                  <button onClick={continueProgram} style={{ flex: 1, padding: '12px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>{isFF ? 'Continue 1 More Month' : 'Continue 3 More Months'}</button>
                   <button onClick={restartProgram} style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Fresh Start</button>
                 </div>
               </div>
@@ -927,17 +942,31 @@ export default function PlanPage() {
             </div>
             <p style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 20, lineHeight: 1.6 }}>Rebuild your full program or regenerate just this week.</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-              <button onClick={() => rebuildFullPlan(13)} style={{ padding: '14px 18px', borderRadius: 12, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>
-                <div>⭐ Rebuild Full Program — 3 Months</div>
-                <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.8, marginTop: 3 }}>Replaces all 13 weeks · Recommended</div>
-              </button>
-              <button onClick={() => rebuildFullPlan(8)} style={{ padding: '13px 18px', borderRadius: 12, border: '1px solid var(--accent-border)', background: 'var(--accent-bg)', color: 'var(--accent)', fontWeight: 700, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>
-                <div>2 Months (8 weeks)</div>
-                <div style={{ fontSize: 11, fontWeight: 500, opacity: 0.8, marginTop: 2 }}>Foundation + Build phases</div>
-              </button>
-              <button onClick={() => rebuildFullPlan(4)} style={{ padding: '13px 18px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontWeight: 700, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>
-                <div>1 Month (4 weeks)</div>
-                <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-dim)', marginTop: 2 }}>Foundation phase only</div>
+              {isFF ? (
+                <div style={{ padding: '14px 18px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text-dim)', fontSize: 14, textAlign: 'left', cursor: 'not-allowed', userSelect: 'none' }}>
+                  <div style={{ fontWeight: 800 }}>🔒 Rebuild Full Program — 3 Months</div>
+                  <div style={{ fontSize: 11, fontWeight: 500, marginTop: 3 }}>F&F access · 1-month limit</div>
+                </div>
+              ) : (
+                <button onClick={() => rebuildFullPlan(13)} style={{ padding: '14px 18px', borderRadius: 12, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>
+                  <div>⭐ Rebuild Full Program — 3 Months</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.8, marginTop: 3 }}>Replaces all 13 weeks · Recommended</div>
+                </button>
+              )}
+              {isFF ? (
+                <div style={{ padding: '13px 18px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text-dim)', fontSize: 14, textAlign: 'left', cursor: 'not-allowed', userSelect: 'none' }}>
+                  <div style={{ fontWeight: 700 }}>🔒 2 Months (8 weeks)</div>
+                  <div style={{ fontSize: 11, fontWeight: 500, marginTop: 2 }}>F&F access · 1-month limit</div>
+                </div>
+              ) : (
+                <button onClick={() => rebuildFullPlan(8)} style={{ padding: '13px 18px', borderRadius: 12, border: '1px solid var(--accent-border)', background: 'var(--accent-bg)', color: 'var(--accent)', fontWeight: 700, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>
+                  <div>2 Months (8 weeks)</div>
+                  <div style={{ fontSize: 11, fontWeight: 500, opacity: 0.8, marginTop: 2 }}>Foundation + Build phases</div>
+                </button>
+              )}
+              <button onClick={() => rebuildFullPlan(4)} style={{ padding: '13px 18px', borderRadius: 12, border: isFF ? 'none' : '1px solid var(--border)', background: isFF ? 'var(--accent)' : 'var(--surface2)', color: isFF ? '#fff' : 'var(--text)', fontWeight: 700, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>
+                <div>{isFF ? '⭐ ' : ''}1 Month (4 weeks)</div>
+                <div style={{ fontSize: 11, fontWeight: 500, color: isFF ? 'rgba(255,255,255,0.75)' : 'var(--text-dim)', marginTop: 2 }}>{isFF ? 'Your plan · Foundation phase' : 'Foundation phase only'}</div>
               </button>
             </div>
             <button onClick={() => { setShowAiModal(false); setShowRegenModal(true) }} style={{ width: '100%', padding: '13px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
