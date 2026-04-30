@@ -4,8 +4,9 @@
 ---
 
 ## 🔥 Active / Up Next
-- [ ] **Hyperextended elbow recovery plan** — RICE start (ice, rest, elevation), then 4-6 phase protocol that safely rebuilds elbow strength: passive ROM → active ROM → isometric loading → progressive resistance → sport-specific return. Add alongside SI Joint as a named playbook in the Recovery hub. Triggered by real injury 2026-04-29.
-- [ ] Add more recovery playbooks (Shoulder Impingement, Knee Rehab)
+- [x] **Hyperextended elbow recovery plan** — 6-phase: RICE → Passive ROM → Active ROM → Isometric Loading → Progressive Resistance → Sport-Specific Return. Live at /recovery/elbow.
+- [x] **Shoulder Impingement playbook** — 4-phase: Pain Relief & Posture → Mobility → Rotator Cuff Activation → Return to Function. Live at /recovery/shoulder.
+- [x] **Knee Rehab playbook** — 4-phase: Protect → Stability → Strength → Return to Sport (includes hop test clearance). Live at /recovery/knee.
 - [ ] Build out Browse & Learn page (exercise library + articles)
 
 ## 🏋️ Profile — Workout Environment
