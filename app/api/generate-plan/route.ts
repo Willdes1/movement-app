@@ -156,7 +156,7 @@ export async function POST(request: Request) {
       throw new Error(`Day at index ${missingDs} is missing daily_session`)
     }
 
-    return Response.json({ plan })
+    return Response.json({ plan, usage: { input_tokens: message.usage.input_tokens, output_tokens: message.usage.output_tokens } })
   } catch (err) {
     console.error('Plan generation error:', err)
     return Response.json({ error: 'Failed to generate plan' }, { status: 500 })

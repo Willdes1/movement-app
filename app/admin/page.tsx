@@ -655,6 +655,92 @@ function PromosTab({ promos, onRefresh }: { promos: PromoRow[]; onRefresh: () =>
   )
 }
 
+// ─── TOKEN USAGE CARD ─────────────────────────────────────────────────────────
+type TokenRow = { id: string; operation: string; api_route: string; model: string; input_tokens: number; output_tokens: number; estimated_cost_usd: string | number; metadata: Record<string, unknown> | null; created_at: string }
+
+const OP_LABEL: Record<string, string> = {
+  exercise_backfill: 'Backfill',
+  plan_generation: 'Plan Gen',
+  exercise_details: 'Ex Details',
+}
+
+function TokenUsageCard() {
+  const [rows, setRows] = useState<TokenRow[]>([])
+  const [loading, setLoading] = useState(true)
+
+  async function load() {
+    setLoading(true)
+    const { data } = await supabase.from('token_usage').select('*').order('created_at', { ascending: false }).limit(100)
+    setRows(data ?? [])
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [])
+
+  const totalIn = rows.reduce((s, r) => s + (r.input_tokens ?? 0), 0)
+  const totalOut = rows.reduce((s, r) => s + (r.output_tokens ?? 0), 0)
+  const totalCost = rows.reduce((s, r) => s + parseFloat(String(r.estimated_cost_usd ?? 0)), 0)
+
+  function downloadCsv() {
+    const header = 'Operation,Route,Input Tokens,Output Tokens,Est Cost USD,Date'
+    const lines = rows.map(r => `${r.operation},${r.api_route},${r.input_tokens},${r.output_tokens},${parseFloat(String(r.estimated_cost_usd ?? 0)).toFixed(6)},${r.created_at}`)
+    const blob = new Blob([header + '\n' + lines.join('\n')], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = 'token-usage.csv'; a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return (
+    <div style={{ padding: '20px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, marginBottom: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+        <div>
+          <p style={{ fontWeight: 700, fontSize: 13, color: C.purple, fontFamily: 'monospace', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>Claude Token Usage</p>
+          {!loading && rows.length > 0 && (
+            <p style={{ fontSize: 11, color: C.textMid, fontFamily: 'monospace' }}>
+              {rows.length} ops · <span style={{ color: C.accent }}>{(totalIn + totalOut).toLocaleString()} tokens</span> · <span style={{ color: C.amber }}>Est. ${totalCost.toFixed(4)} spent</span>
+            </p>
+          )}
+          {!loading && rows.length === 0 && <p style={{ fontSize: 11, color: C.textDim, fontFamily: 'monospace' }}>No usage logged yet</p>}
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={downloadCsv} disabled={rows.length === 0} style={{ padding: '7px 12px', borderRadius: 7, border: `1px solid ${C.border}`, background: 'none', color: C.textDim, fontSize: 11, cursor: rows.length === 0 ? 'default' : 'pointer', fontFamily: 'monospace' }}>CSV</button>
+          <button onClick={load} style={{ padding: '7px 12px', borderRadius: 7, border: `1px solid ${C.accentBorder}`, background: C.accentDim, color: C.accent, fontSize: 11, cursor: 'pointer', fontFamily: 'monospace' }}>↺ Refresh</button>
+        </div>
+      </div>
+      {loading && <p style={{ fontSize: 12, color: C.textDim, fontFamily: 'monospace', padding: '12px 0' }}>Loading…</p>}
+      {!loading && rows.length > 0 && (
+        <div style={{ background: C.bg, borderRadius: 8, overflow: 'hidden', border: `1px solid ${C.border}` }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr 80px 80px 80px 110px', padding: '7px 12px', borderBottom: `1px solid ${C.border}`, background: C.surface2 }}>
+            {['Operation', 'Route', 'In', 'Out', 'Cost', 'When'].map(h => (
+              <span key={h} style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: C.textDim }}>{h}</span>
+            ))}
+          </div>
+          <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+            {rows.map((r, i) => (
+              <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '100px 1fr 80px 80px 80px 110px', padding: '8px 12px', borderBottom: i < rows.length - 1 ? `1px solid ${C.border}` : 'none', alignItems: 'center' }}>
+                <span style={{ fontSize: 11, color: C.purple, fontFamily: 'monospace', fontWeight: 700 }}>{OP_LABEL[r.operation] ?? r.operation}</span>
+                <span style={{ fontSize: 10, color: C.textDim, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.api_route}</span>
+                <span style={{ fontSize: 11, color: C.textMid, fontFamily: 'monospace' }}>{(r.input_tokens ?? 0).toLocaleString()}</span>
+                <span style={{ fontSize: 11, color: C.textMid, fontFamily: 'monospace' }}>{(r.output_tokens ?? 0).toLocaleString()}</span>
+                <span style={{ fontSize: 11, color: C.amber, fontFamily: 'monospace' }}>${parseFloat(String(r.estimated_cost_usd ?? 0)).toFixed(4)}</span>
+                <span style={{ fontSize: 10, color: C.textDim, fontFamily: 'monospace' }}>{fmtRelative(r.created_at)}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr 80px 80px 80px 110px', padding: '8px 12px', background: C.surface2, borderTop: `1px solid ${C.border}` }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: C.textDim, fontFamily: 'monospace' }}>TOTAL</span>
+            <span />
+            <span style={{ fontSize: 11, fontWeight: 700, color: C.accent, fontFamily: 'monospace' }}>{totalIn.toLocaleString()}</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: C.accent, fontFamily: 'monospace' }}>{totalOut.toLocaleString()}</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: C.amber, fontFamily: 'monospace' }}>${totalCost.toFixed(4)}</span>
+            <span />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── LIBRARY BACKFILL ─────────────────────────────────────────────────────────
 function parseEx(s: string): string {
   return s.replace(/\s+\d+[×x]\d+.*$/i, '').replace(/\s+\d+\s*(sets?|reps?|each|min|sec).*$/i, '').trim()
@@ -727,6 +813,7 @@ function LibraryBackfillCard() {
 
   async function run() {
     setStatus('running'); setLog([])
+    let totalIn = 0, totalOut = 0
     try {
       const { data: plans } = await supabase.from('weekly_plans').select('plan')
       if (!plans?.length) { addLog('No weekly plans found in database.'); setStatus('error'); return }
@@ -744,22 +831,41 @@ function LibraryBackfillCard() {
       addLog(`${missing.length} exercises need coaching details. Generating in batches…`)
 
       const BATCH = 15
+      const totalBatches = Math.ceil(missing.length / BATCH)
       let saved = 0
       for (let i = 0; i < missing.length; i += BATCH) {
         const batch = missing.slice(i, i + BATCH)
-        addLog(`Batch ${Math.floor(i / BATCH) + 1}/${Math.ceil(missing.length / BATCH)}: ${batch.slice(0, 3).join(', ')}${batch.length > 3 ? '…' : ''}`)
+        const batchNum = Math.floor(i / BATCH) + 1
+        addLog(`Batch ${batchNum}/${totalBatches}: ${batch.slice(0, 3).join(', ')}${batch.length > 3 ? '…' : ''}`)
         try {
           const res = await fetch('/api/generate-exercise-details', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ exercises: batch }) })
           if (res.ok) {
-            const { details } = await res.json()
+            const { details, usage } = await res.json()
             if (Array.isArray(details) && details.length > 0) {
               await supabase.from('exercise_library').upsert(details, { onConflict: 'name_normalized' })
               saved += details.length
+              const { count } = await supabase.from('exercise_library').select('*', { count: 'exact', head: true })
+              setStats(prev => prev ? { ...prev, library: count ?? prev.library } : prev)
+            }
+            if (usage) {
+              totalIn += usage.input_tokens ?? 0
+              totalOut += usage.output_tokens ?? 0
+              const batchCost = ((usage.input_tokens ?? 0) * 3 + (usage.output_tokens ?? 0) * 15) / 1_000_000
+              addLog(`  ✓ ${details?.length ?? 0} saved · ${(usage.input_tokens ?? 0).toLocaleString()}in / ${(usage.output_tokens ?? 0).toLocaleString()}out · $${batchCost.toFixed(4)}`)
+              await supabase.from('token_usage').insert({
+                operation: 'exercise_backfill',
+                api_route: '/api/generate-exercise-details',
+                input_tokens: usage.input_tokens,
+                output_tokens: usage.output_tokens,
+                estimated_cost_usd: batchCost,
+                metadata: { batch: batchNum, total_batches: totalBatches, exercise_count: batch.length },
+              })
             }
           }
-        } catch { addLog(`  ⚠ Batch ${Math.floor(i / BATCH) + 1} failed, continuing…`) }
+        } catch { addLog(`  ⚠ Batch ${batchNum} failed, continuing…`) }
       }
-      addLog(`Done. ${saved} exercises saved to library. Zero AI charges on future views.`)
+      const totalCost = (totalIn * 3 + totalOut * 15) / 1_000_000
+      addLog(`Done. ${saved} exercises saved · ${totalIn.toLocaleString()} in / ${totalOut.toLocaleString()} out tokens · Est. $${totalCost.toFixed(4)}`)
       setStatus('done')
     } catch (e) {
       addLog(`Error: ${String(e)}`); setStatus('error')
@@ -1138,7 +1244,7 @@ export default function AdminPage() {
             <PlaceholderTab label="Partner Management" bullets={['Physical therapists, nutritionists, trainers, influencers', 'Track audience size, performance, revenue contribution', 'Revenue-sharing model — partners earn on referrals', 'Partner portal: their own login, analytics, expected pay']} />
           )}
           {tab === 'launchpad' && <LaunchpadTab />}
-          {tab === 'health' && <><LibraryBackfillCard /><HealthTab /></>}
+          {tab === 'health' && <><TokenUsageCard /><LibraryBackfillCard /><HealthTab /></>}
         </main>
       </div>
     </div>

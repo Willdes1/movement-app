@@ -199,8 +199,12 @@ export default function PlanPage() {
       try {
         const res = await fetch('/api/generate-exercise-details', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ exercises: batch }) })
         if (res.ok) {
-          const { details } = await res.json()
+          const { details, usage } = await res.json()
           if (Array.isArray(details) && details.length > 0) await supabase.from('exercise_library').upsert(details, { onConflict: 'name_normalized' })
+          if (usage) {
+            const cost = ((usage.input_tokens ?? 0) * 3 + (usage.output_tokens ?? 0) * 15) / 1_000_000
+            supabase.from('token_usage').insert({ operation: 'exercise_details', api_route: '/api/generate-exercise-details', input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, estimated_cost_usd: cost, metadata: { exercise_count: batch.length } })
+          }
         }
       } catch { /* silent */ }
     }
@@ -218,8 +222,12 @@ export default function PlanPage() {
     try {
       const res = await fetch('/api/generate-plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profile, weekNumber: weekNum, phaseLabel: label, intensity, instructions }) })
       if (!res.ok) throw new Error('failed')
-      const { plan } = await res.json()
+      const { plan, usage } = await res.json()
       await supabase.from('weekly_plans').upsert({ program_id: prog.id, user_id: userId, week_number: weekNum, phase, plan })
+      if (usage) {
+        const cost = ((usage.input_tokens ?? 0) * 3 + (usage.output_tokens ?? 0) * 15) / 1_000_000
+        supabase.from('token_usage').insert({ operation: 'plan_generation', api_route: '/api/generate-plan', input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, estimated_cost_usd: cost, metadata: { week_number: weekNum } })
+      }
       setWeekPlans(prev => ({ ...prev, [weekNum]: plan }))
       if (!silent) populateLibrary(plan)
       return plan
