@@ -49,7 +49,8 @@ export async function POST(request: Request) {
       usage: { input_tokens: message.usage.input_tokens, output_tokens: message.usage.output_tokens },
     })
   } catch (err) {
-    console.error('Exercise detail generation error:', err)
-    return Response.json({ error: 'Failed to generate details' }, { status: 500 })
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('Exercise detail generation error:', msg)
+    return Response.json({ error: msg }, { status: 500 })
   }
 }

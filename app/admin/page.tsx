@@ -986,6 +986,7 @@ function LibraryBackfillCard() {
             }
           }
         } catch { addLog(`  ⚠ Batch ${batchNum} failed, continuing…`) }
+        await new Promise(resolve => setTimeout(resolve, 1000))
       }
       const totalCost = (totalIn * 3 + totalOut * 15) / 1_000_000
       addLog(`Done. ${saved} exercises saved · ${totalIn.toLocaleString()} in / ${totalOut.toLocaleString()} out tokens · Est. $${totalCost.toFixed(4)}`)
