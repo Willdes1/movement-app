@@ -815,6 +815,18 @@ function LibraryBackfillCard() {
     setStatus('running'); setLog([])
     let totalIn = 0, totalOut = 0
     try {
+      // ── Pre-flight: verify DB write access before spending any tokens ──────
+      const testRow = { name_normalized: '__backfill_test__', name_display: 'Test', how: 'test', breathing: 'test', core: 'test', tip: 'test' }
+      const { error: writeTestErr } = await supabase.from('exercise_library').upsert(testRow, { onConflict: 'name_normalized' })
+      if (writeTestErr) {
+        addLog(`✗ DB write blocked: ${writeTestErr.message}`)
+        addLog(`Fix: run this SQL in Supabase SQL Editor, then retry:`)
+        addLog(`CREATE POLICY "admin_all" ON exercise_library FOR ALL TO authenticated USING ((SELECT is_admin FROM profiles WHERE id = auth.uid())) WITH CHECK ((SELECT is_admin FROM profiles WHERE id = auth.uid()));`)
+        setStatus('error'); return
+      }
+      await supabase.from('exercise_library').delete().eq('name_normalized', '__backfill_test__')
+      addLog('DB write access confirmed.')
+
       const { data: plans } = await supabase.from('weekly_plans').select('plan')
       if (!plans?.length) { addLog('No weekly plans found in database.'); setStatus('error'); return }
       addLog(`Found ${plans.length} weeks in database.`)
@@ -822,8 +834,8 @@ function LibraryBackfillCard() {
       const allNames = extractAllExerciseNames(plans.map(p => p.plan as unknown[]))
       addLog(`Extracted ${allNames.length} unique exercises across all weeks.`)
 
-      const normalizedNames = allNames.map(normalizeEx)
-      const { data: existing } = await supabase.from('exercise_library').select('name_normalized').in('name_normalized', normalizedNames)
+      // Fetch full library (no .in() filter) — avoids URL length limit truncation with 700+ names
+      const { data: existing } = await supabase.from('exercise_library').select('name_normalized')
       const existingSet = new Set(existing?.map(e => e.name_normalized) ?? [])
       const missing = allNames.filter(n => !existingSet.has(normalizeEx(n)))
 
@@ -841,17 +853,25 @@ function LibraryBackfillCard() {
           const res = await fetch('/api/generate-exercise-details', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ exercises: batch }) })
           if (res.ok) {
             const { details, usage } = await res.json()
+            let batchSaved = 0
+            let saveErr: string | null = null
             if (Array.isArray(details) && details.length > 0) {
-              await supabase.from('exercise_library').upsert(details, { onConflict: 'name_normalized' })
-              saved += details.length
-              const { count } = await supabase.from('exercise_library').select('*', { count: 'exact', head: true })
-              setStats(prev => prev ? { ...prev, library: count ?? prev.library } : prev)
+              const { error: upsertErr } = await supabase.from('exercise_library').upsert(details, { onConflict: 'name_normalized' })
+              if (upsertErr) {
+                saveErr = upsertErr.message
+              } else {
+                batchSaved = details.length
+                saved += batchSaved
+                const { count } = await supabase.from('exercise_library').select('*', { count: 'exact', head: true })
+                setStats(prev => prev ? { ...prev, library: count ?? prev.library } : prev)
+              }
             }
             if (usage) {
               totalIn += usage.input_tokens ?? 0
               totalOut += usage.output_tokens ?? 0
               const batchCost = ((usage.input_tokens ?? 0) * 3 + (usage.output_tokens ?? 0) * 15) / 1_000_000
-              addLog(`  ✓ ${details?.length ?? 0} saved · ${(usage.input_tokens ?? 0).toLocaleString()}in / ${(usage.output_tokens ?? 0).toLocaleString()}out · $${batchCost.toFixed(4)}`)
+              const saveLabel = saveErr ? `✗ save failed: ${saveErr}` : `✓ ${batchSaved} saved`
+              addLog(`  ${saveLabel} · ${(usage.input_tokens ?? 0).toLocaleString()}in / ${(usage.output_tokens ?? 0).toLocaleString()}out · $${batchCost.toFixed(4)}`)
               await supabase.from('token_usage').insert({
                 operation: 'exercise_backfill',
                 api_route: '/api/generate-exercise-details',
@@ -860,6 +880,8 @@ function LibraryBackfillCard() {
                 estimated_cost_usd: batchCost,
                 metadata: { batch: batchNum, total_batches: totalBatches, exercise_count: batch.length },
               })
+            } else if (saveErr) {
+              addLog(`  ✗ save failed: ${saveErr}`)
             }
           }
         } catch { addLog(`  ⚠ Batch ${batchNum} failed, continuing…`) }
@@ -901,7 +923,7 @@ function LibraryBackfillCard() {
       )}
       {log.length > 0 && (
         <div style={{ background: C.bg, borderRadius: 8, padding: '12px 14px', fontFamily: 'monospace', fontSize: 11, color: C.textMid, lineHeight: 1.8, maxHeight: 200, overflowY: 'auto' }}>
-          {log.map((l, i) => <div key={i} style={{ color: l.startsWith('Done') ? C.green : l.startsWith('⚠') ? C.amber : C.textMid }}>{l}</div>)}
+          {log.map((l, i) => <div key={i} style={{ color: l.startsWith('Done') ? C.green : l.includes('✗') ? C.red : l.startsWith('⚠') ? C.amber : C.textMid }}>{l}</div>)}
         </div>
       )}
     </div>
