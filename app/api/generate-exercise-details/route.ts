@@ -1,5 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 
+export const maxDuration = 60
+
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 const SYSTEM_PROMPT = `You are a world-class certified strength and conditioning coach and physical therapist. Generate precise, exercise-specific technique details for each exercise provided.
@@ -29,7 +31,7 @@ export async function POST(request: Request) {
 
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
+      max_tokens: 2048,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: prompt }],
     })

@@ -937,7 +937,7 @@ function LibraryBackfillCard() {
       if (missing.length === 0) { addLog('All exercises already have coaching details. Nothing to do.'); setStatus('done'); return }
       addLog(`${missing.length} exercises need coaching details. Generating in batches…`)
 
-      const BATCH = 15
+      const BATCH = 8
       const totalBatches = Math.ceil(missing.length / BATCH)
       let saved = 0
       for (let i = 0; i < missing.length; i += BATCH) {

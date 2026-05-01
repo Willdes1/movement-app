@@ -197,7 +197,7 @@ export default function PlanPage() {
     const { data: existing } = await supabase.from('exercise_library').select('name_normalized')
     const existingSet = new Set(existing?.map(e => e.name_normalized) ?? [])
     const missing = [...new Set(displayNames.filter(n => !existingSet.has(normalizeExerciseName(n))))]
-    const BATCH = 15
+    const BATCH = 8
     for (let i = 0; i < missing.length; i += BATCH) {
       const batch = missing.slice(i, i + BATCH)
       try {
