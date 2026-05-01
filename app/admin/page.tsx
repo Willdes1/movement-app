@@ -786,6 +786,7 @@ function LibraryBackfillCard() {
   const [status, setStatus] = useState<'idle' | 'running' | 'done' | 'error'>('idle')
   const [log, setLog] = useState<string[]>([])
   const [stats, setStats] = useState<{ library: number; plan: number } | null>(null)
+  const [batchProgress, setBatchProgress] = useState<{ done: number; total: number } | null>(null)
 
   const addLog = (msg: string) => setLog(prev => [...prev, msg])
 
@@ -864,6 +865,7 @@ function LibraryBackfillCard() {
                 saved += batchSaved
                 const { count } = await supabase.from('exercise_library').select('*', { count: 'exact', head: true })
                 setStats(prev => prev ? { ...prev, library: count ?? prev.library } : prev)
+                setBatchProgress({ done: batchNum, total: totalBatches })
               }
             }
             if (usage) {
@@ -894,8 +896,12 @@ function LibraryBackfillCard() {
     }
   }
 
+  const pct = batchProgress && status === 'running' ? Math.round((batchProgress.done / batchProgress.total) * 100) : 0
+  const missing = stats ? Math.max(stats.plan - stats.library, 0) : null
+
   return (
     <div style={{ padding: '20px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, marginBottom: 24 }}>
+      {status === 'running' && <style>{`@keyframes bfPulse{0%,100%{box-shadow:0 0 0 0 rgba(59,130,246,0.5)}50%{box-shadow:0 0 0 7px rgba(59,130,246,0)}} @keyframes bfDot{0%,100%{opacity:1}50%{opacity:0.3}}`}</style>}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
         <div>
           <p style={{ fontWeight: 700, fontSize: 13, color: C.accent, fontFamily: 'monospace', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>Exercise Library Backfill</p>
@@ -903,18 +909,33 @@ function LibraryBackfillCard() {
           {stats && (
             <p style={{ fontSize: 11, color: C.textMid, marginTop: 6, fontFamily: 'monospace' }}>
               Library: <span style={{ color: C.green }}>{stats.library} saved</span> · Plan: <span style={{ color: C.amber }}>{stats.plan} unique exercises</span>
-              {stats.plan <= stats.library ? <span style={{ color: C.green }}> ✓ fully populated</span> : <span style={{ color: C.amber }}> · {stats.plan - stats.library} missing</span>}
+              {missing === 0 ? <span style={{ color: C.green }}> ✓ fully populated</span> : <span style={{ color: status === 'running' ? C.accent : C.amber }}> · {missing} missing</span>}
             </p>
           )}
         </div>
         <button
           onClick={run}
           disabled={status === 'running'}
-          style={{ padding: '9px 18px', borderRadius: 8, border: `1px solid ${status === 'done' ? 'rgba(34,197,94,0.3)' : C.accentBorder}`, background: status === 'running' ? C.surface2 : status === 'done' ? C.greenDim : C.accentDim, color: status === 'running' ? C.textDim : status === 'done' ? C.green : C.accent, fontWeight: 700, fontSize: 13, cursor: status === 'running' ? 'not-allowed' : 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}
+          style={{ padding: '9px 18px', borderRadius: 8, border: `1px solid ${status === 'done' ? 'rgba(34,197,94,0.3)' : C.accentBorder}`, background: status === 'running' ? 'rgba(59,130,246,0.15)' : status === 'done' ? C.greenDim : C.accentDim, color: status === 'running' ? C.accent : status === 'done' ? C.green : C.accent, fontWeight: 700, fontSize: 13, cursor: status === 'running' ? 'not-allowed' : 'pointer', flexShrink: 0, whiteSpace: 'nowrap', animation: status === 'running' ? 'bfPulse 1.8s ease-in-out infinite' : 'none' }}
         >
-          {status === 'running' ? 'Running…' : status === 'done' ? '✓ Done' : 'Backfill Now'}
+          {status === 'running' ? <span>● Running…</span> : status === 'done' ? '✓ Done' : 'Backfill Now'}
         </button>
       </div>
+
+      {status === 'running' && batchProgress && (
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+            <span style={{ fontSize: 11, color: C.accent, fontFamily: 'monospace', fontWeight: 700 }}>
+              <span style={{ animation: 'bfDot 1s ease-in-out infinite', display: 'inline-block' }}>●</span> Batch {batchProgress.done}/{batchProgress.total} · {stats?.library ?? 0} saved · {missing} remaining
+            </span>
+            <span style={{ fontSize: 11, color: C.textDim, fontFamily: 'monospace' }}>{pct}%</span>
+          </div>
+          <div style={{ height: 5, background: C.surface2, borderRadius: 4, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${pct}%`, background: C.accent, borderRadius: 4, transition: 'width 0.6s ease', boxShadow: `0 0 8px ${C.accent}` }} />
+          </div>
+        </div>
+      )}
+
       {status === 'running' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 8, marginBottom: 10, fontSize: 12, color: C.amber }}>
           <span>⚠</span>
