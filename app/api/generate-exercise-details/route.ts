@@ -37,8 +37,10 @@ export async function POST(request: Request) {
     })
 
     const raw = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
-    const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()
-    const details = JSON.parse(cleaned)
+    // Extract JSON array from anywhere in the response — handles Claude adding preamble text
+    const match = raw.match(/\[[\s\S]*\]/)
+    if (!match) throw new Error(`No JSON array found in response. Raw: ${raw.slice(0, 200)}`)
+    const details = JSON.parse(match[0])
 
     if (!Array.isArray(details)) throw new Error('Expected array')
 

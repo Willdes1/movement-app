@@ -946,6 +946,11 @@ function LibraryBackfillCard() {
         addLog(`Batch ${batchNum}/${totalBatches}: ${batch.slice(0, 3).join(', ')}${batch.length > 3 ? '…' : ''}`)
         try {
           const res = await fetch('/api/generate-exercise-details', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ exercises: batch }) })
+          if (!res.ok) {
+            const errBody = await res.text().catch(() => '')
+            addLog(`  ✗ API error ${res.status}: ${errBody.slice(0, 120)}`)
+            continue
+          }
           if (res.ok) {
             const { details, usage } = await res.json()
             let batchSaved = 0
