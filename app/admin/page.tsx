@@ -664,6 +664,100 @@ const OP_LABEL: Record<string, string> = {
   exercise_details: 'Ex Details',
 }
 
+// ─── EXERCISE LIBRARY CARD ───────────────────────────────────────────────────
+type LibraryRow = { name_normalized: string; name_display: string; how: string | null; breathing: string | null; core: string | null; tip: string | null }
+
+function ExerciseLibraryCard() {
+  const [rows, setRows] = useState<LibraryRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [filterMissing, setFilterMissing] = useState(false)
+
+  async function load() {
+    setLoading(true)
+    const { data } = await supabase.from('exercise_library').select('name_normalized, name_display, how, breathing, core, tip').order('name_display')
+    setRows(data ?? [])
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [])
+
+  const filtered = rows.filter(r => {
+    const matchesSearch = !search || r.name_display.toLowerCase().includes(search.toLowerCase())
+    const hasGap = !r.how || !r.breathing || !r.core || !r.tip
+    return matchesSearch && (!filterMissing || hasGap)
+  })
+
+  function exportCSV() {
+    const header = 'name_display,name_normalized,has_how,has_breathing,has_core,has_tip\n'
+    const body = rows.map(r =>
+      [r.name_display, r.name_normalized, r.how ? 'yes' : 'no', r.breathing ? 'yes' : 'no', r.core ? 'yes' : 'no', r.tip ? 'yes' : 'no'].join(',')
+    ).join('\n')
+    const blob = new Blob([header + body], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = 'exercise_library.csv'; a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const missingCount = rows.filter(r => !r.how || !r.breathing || !r.core || !r.tip).length
+
+  return (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', marginBottom: 24 }}>
+      <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Exercise Library</div>
+          <div style={{ fontSize: 12, color: C.textDim, marginTop: 2 }}>
+            {loading ? 'Loading…' : `${rows.length} exercises · ${missingCount} missing coaching details`}
+          </div>
+        </div>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search exercises…"
+          style={{ padding: '6px 12px', borderRadius: 6, border: `1px solid ${C.border}`, background: C.surface2, color: C.text, fontSize: 12, width: 180 }}
+        />
+        <button
+          onClick={() => setFilterMissing(f => !f)}
+          style={{ padding: '6px 12px', borderRadius: 6, border: `1px solid ${filterMissing ? C.amber : C.border}`, background: filterMissing ? C.amberDim : 'transparent', color: filterMissing ? C.amber : C.textMid, fontSize: 12, cursor: 'pointer' }}
+        >
+          {filterMissing ? '● Missing only' : 'Show missing'}
+        </button>
+        <button onClick={exportCSV} style={{ padding: '6px 12px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'transparent', color: C.textMid, fontSize: 12, cursor: 'pointer' }}>
+          Export CSV
+        </button>
+        <button onClick={load} style={{ padding: '6px 12px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'transparent', color: C.textMid, fontSize: 12, cursor: 'pointer' }}>
+          ↻
+        </button>
+      </div>
+      {!loading && (
+        <div style={{ overflowX: 'auto', maxHeight: 400 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 80px 80px', padding: '8px 20px', borderBottom: `1px solid ${C.border}`, background: C.surface2, fontSize: 11, color: C.textDim, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', position: 'sticky', top: 0 }}>
+            <span>Exercise</span><span style={{ textAlign: 'center' }}>How</span><span style={{ textAlign: 'center' }}>Breath</span><span style={{ textAlign: 'center' }}>Core</span><span style={{ textAlign: 'center' }}>Tip</span>
+          </div>
+          {filtered.map(r => (
+            <div key={r.name_normalized} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 80px 80px', padding: '8px 20px', borderBottom: `1px solid ${C.border}`, fontSize: 12, alignItems: 'center' }}>
+              <div>
+                <div style={{ color: C.text, fontWeight: 500 }}>{r.name_display}</div>
+                <div style={{ color: C.textDim, fontSize: 10, fontFamily: 'monospace' }}>{r.name_normalized}</div>
+              </div>
+              {(['how', 'breathing', 'core', 'tip'] as const).map(field => (
+                <div key={field} style={{ textAlign: 'center', color: r[field] ? C.green : C.red, fontSize: 13 }}>
+                  {r[field] ? '✓' : '✗'}
+                </div>
+              ))}
+            </div>
+          ))}
+          {filtered.length === 0 && (
+            <div style={{ padding: 32, textAlign: 'center', color: C.textDim, fontSize: 13 }}>
+              {search || filterMissing ? 'No exercises match your filter.' : 'No exercises in library yet.'}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function TokenUsageCard() {
   const [rows, setRows] = useState<TokenRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -1287,7 +1381,7 @@ export default function AdminPage() {
             <PlaceholderTab label="Partner Management" bullets={['Physical therapists, nutritionists, trainers, influencers', 'Track audience size, performance, revenue contribution', 'Revenue-sharing model — partners earn on referrals', 'Partner portal: their own login, analytics, expected pay']} />
           )}
           {tab === 'launchpad' && <LaunchpadTab />}
-          {tab === 'health' && <><TokenUsageCard /><LibraryBackfillCard /><HealthTab /></>}
+          {tab === 'health' && <><TokenUsageCard /><LibraryBackfillCard /><ExerciseLibraryCard /><HealthTab /></>}
         </main>
       </div>
     </div>

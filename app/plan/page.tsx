@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
+import { usePlanGeneration } from '@/components/PlanGenerationContext'
 
 type DailyBlock = { label: string; duration: string; exercises: string[]; tip?: string }
 type DailySession = { morning?: DailyBlock; warmup?: DailyBlock; workout?: DailyBlock; abs?: DailyBlock; cooldown?: DailyBlock; evening?: DailyBlock }
@@ -137,6 +138,7 @@ export default function PlanPage() {
   const isFF = !isAdmin && role === 'ff'
   const router = useRouter()
   const todayIdx = (new Date().getDay() + 6) % 7
+  const { isGenerating: ctxGenerating, progress: ctxProgress, startGeneration } = usePlanGeneration()
 
   const [program, setProgram] = useState<Program | null>(null)
   const [currentWeek, setCurrentWeek] = useState(1)
@@ -168,7 +170,6 @@ export default function PlanPage() {
   const [missedDays, setMissedDays] = useState<string[]>([])
   const [pendingComplete, setPendingComplete] = useState<{ weekNum: number; dayIdx: number } | null>(null)
   const [completing, setCompleting] = useState(false)
-  const [generatingProgress, setGeneratingProgress] = useState<{ current: number; total: number; details?: boolean } | null>(null)
   const [selectedDayIdx, setSelectedDayIdx] = useState(todayIdx)
   const [completionMsg, setCompletionMsg] = useState<string | null>(null)
 
@@ -254,16 +255,21 @@ export default function PlanPage() {
       prog = { id: newProg.id, startDate: newProg.start_date, totalWeeks: newProg.total_weeks, status: newProg.status }
       setProgram(prog); setCurrentWeek(1); setViewingWeek(1)
     }
-    const allPlans: DayPlan[] = []
-    for (let w = 1; w <= numWeeks; w++) {
-      setGeneratingProgress({ current: w, total: numWeeks })
-      const plan = await generateWeek(prog, w, true)
-      if (plan) allPlans.push(...plan)
+    const profile = await fetchProfile()
+    if (!profile?.sport && !profile?.goal) {
+      setError('Set up your profile first so your AI coach knows what to build.')
+      return
     }
-    setGeneratingProgress({ current: numWeeks, total: numWeeks, details: true })
-    await populateLibrary(allPlans)
-    setGeneratingProgress(null)
-  }, [user, program, generateWeek])
+    startGeneration({
+      program: prog,
+      numWeeks,
+      userId,
+      profile,
+      onWeekComplete: (weekNum, plan) => {
+        setWeekPlans(prev => ({ ...prev, [weekNum]: plan }))
+      },
+    })
+  }, [user, program, fetchProfile, startGeneration, userId])
 
   const initProgram = useCallback(async () => {
     if (!user) return
@@ -292,15 +298,14 @@ export default function PlanPage() {
   }, [user, generateWeek])
 
   useEffect(() => { if (user) initProgram() }, [user, initProgram])
-  useEffect(() => { const plan = weekPlans[viewingWeek]; if (plan) populateLibrary(plan) }, [viewingWeek, weekPlans, populateLibrary])
   useEffect(() => { setSelectedDayIdx(viewingWeek === currentWeek ? todayIdx : 0) }, [viewingWeek, currentWeek, todayIdx])
 
   useEffect(() => {
-    if (!generatingProgress) return
+    if (!ctxGenerating) return
     const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
-  }, [generatingProgress])
+  }, [ctxGenerating])
 
   useEffect(() => {
     if (!user || !program) return
@@ -405,7 +410,16 @@ export default function PlanPage() {
     setShowAiModal(false)
     await supabase.from('weekly_plans').delete().eq('program_id', program.id)
     setWeekPlans({})
-    startProgram(isFF ? Math.min(numWeeks, 4) : numWeeks)
+    const profile = await fetchProfile()
+    startGeneration({
+      program,
+      numWeeks: isFF ? Math.min(numWeeks, 4) : numWeeks,
+      userId,
+      profile,
+      onWeekComplete: (weekNum, plan) => {
+        setWeekPlans(prev => ({ ...prev, [weekNum]: plan }))
+      },
+    })
   }
 
   async function restartProgram() {
@@ -422,7 +436,16 @@ export default function PlanPage() {
     await supabase.from('weekly_plans').delete().eq('program_id', program.id)
     const updated = { ...program, startDate: today, status: 'active' }
     setProgram(updated); setWeekPlans({}); setCurrentWeek(1); setViewingWeek(1); setProgramComplete(false)
-    startProgram(isFF ? 4 : 13)
+    const profile = await fetchProfile()
+    startGeneration({
+      program: updated,
+      numWeeks: isFF ? 4 : 13,
+      userId,
+      profile,
+      onWeekComplete: (weekNum, plan) => {
+        setWeekPlans(prev => ({ ...prev, [weekNum]: plan }))
+      },
+    })
   }
 
   function isDayActionable(weekNum: number, dayIdx: number) {
@@ -433,9 +456,9 @@ export default function PlanPage() {
 
   if (authLoading || dataLoading) return <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-dim)' }}>Loading...</div>
 
-  if (generatingProgress) {
-    const pct = generatingProgress.total > 0 ? Math.round((generatingProgress.current / generatingProgress.total) * 100) : 0
-    const { label, color } = getPhaseInfo(generatingProgress.current)
+  if (ctxProgress) {
+    const pct = ctxProgress.total > 0 ? Math.round((ctxProgress.current / ctxProgress.total) * 100) : 0
+    const { label, color } = getPhaseInfo(ctxProgress.current)
     return (
       <div style={{ position: 'fixed', inset: 0, zIndex: 150, background: 'var(--bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '32px' }}>
         <style>{`
@@ -470,17 +493,17 @@ export default function PlanPage() {
           ))}
         </div>
         <p style={{ fontWeight: 900, fontSize: 22, marginBottom: 6, letterSpacing: '-0.02em' }}>
-          {generatingProgress.details ? 'Preparing Coaching Details' : 'Building Your Program'}
+          {ctxProgress.details ? 'Preparing Coaching Details' : 'Building Your Program'}
         </p>
         <p style={{ fontSize: 13, color, fontWeight: 700, marginBottom: 28, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-          {generatingProgress.details ? 'Pre-generating all exercise coaching' : `Week ${generatingProgress.current} of ${generatingProgress.total} — ${label}`}
+          {ctxProgress.details ? 'Pre-generating all exercise coaching' : `Week ${ctxProgress.current} of ${ctxProgress.total} — ${label}`}
         </p>
         <div style={{ height: 6, background: 'var(--border)', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
-          <div style={{ height: '100%', width: `${generatingProgress.details ? 100 : pct}%`, background: color, borderRadius: 4, transition: 'width 0.6s ease' }} />
+          <div style={{ height: '100%', width: `${ctxProgress.details ? 100 : pct}%`, background: color, borderRadius: 4, transition: 'width 0.6s ease' }} />
         </div>
-        <p style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 28 }}>{generatingProgress.details ? 'Almost done…' : `${pct}% complete`}</p>
+        <p style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 28 }}>{ctxProgress.details ? 'Almost done…' : `${pct}% complete`}</p>
         <p style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.7, maxWidth: 300, margin: '0 auto 20px' }}>
-          Your AI coach is designing {generatingProgress.total} weeks of personalized training — exercises, rest times, coaching cues, and phase progression.
+          Your AI coach is designing {ctxProgress.total} weeks of personalized training — exercises, rest times, coaching cues, and phase progression.
         </p>
         <div style={{ padding: '9px 18px', borderRadius: 20, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', fontSize: 12, color: '#fca5a5', fontWeight: 700, letterSpacing: '0.02em' }}>
           ⚠ Do not navigate away — this will stop generation

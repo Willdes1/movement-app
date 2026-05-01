@@ -7,6 +7,8 @@ import RecoveryBanner from '@/components/ui/RecoveryBanner'
 import ImpersonationBanner from '@/components/ui/ImpersonationBanner'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
+import { PlanGenerationProvider } from '@/components/PlanGenerationContext'
+import GenerationBanner from '@/components/GenerationBanner'
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -46,16 +48,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body style={{ fontFamily: 'var(--font-dm-sans, DM Sans), sans-serif' }} suppressHydrationWarning>
         <AuthProvider>
           <ThemeProvider>
-            <div className="grain" />
-            <Sidebar />
-            <main className="app-main">
-              <ImpersonationBanner />
-              <RecoveryBanner />
-              {children}
-            </main>
-            <div className="mobile-nav-wrapper">
-              <BottomNav />
-            </div>
+            <PlanGenerationProvider>
+              <div className="grain" />
+              <Sidebar />
+              <main className="app-main">
+                <ImpersonationBanner />
+                <RecoveryBanner />
+                <GenerationBanner />
+                {children}
+              </main>
+              <div className="mobile-nav-wrapper">
+                <BottomNav />
+              </div>
+            </PlanGenerationProvider>
           </ThemeProvider>
         </AuthProvider>
       </body>

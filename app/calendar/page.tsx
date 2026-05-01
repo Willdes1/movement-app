@@ -203,30 +203,6 @@ function CalendarInner() {
     }
 
     setLoading(false)
-
-    // Background: generate details for any exercises not yet in the library
-    const existingKeys = new Set(Object.keys(libMap))
-    const missing = displayNames.filter(n => !existingKeys.has(normalizeExerciseName(n)))
-    if (missing.length > 0) {
-      try {
-        const res = await fetch('/api/generate-exercise-details', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ exercises: missing }),
-        })
-        if (res.ok) {
-          const { details } = await res.json()
-          if (Array.isArray(details) && details.length > 0) {
-            await supabase.from('exercise_library').upsert(details, { onConflict: 'name_normalized' })
-            setExerciseLibrary(prev => {
-              const next = { ...prev }
-              details.forEach((e: ExerciseDetail) => { next[e.name_normalized] = e })
-              return next
-            })
-          }
-        }
-      } catch { /* silent — library will populate on next load */ }
-    }
   }, [user])
 
   // On-demand fetch for a single exercise if not yet in library
@@ -247,22 +223,9 @@ function CalendarInner() {
         setSelectedExercise(dbEntry as ExerciseDetail)
         return
       }
-      // Only generate if genuinely missing from DB
-      const res = await fetch('/api/generate-exercise-details', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ exercises: [name] }),
-      })
-      if (res.ok) {
-        const { details } = await res.json()
-        if (Array.isArray(details) && details[0]) {
-          const detail = details[0] as ExerciseDetail
-          await supabase.from('exercise_library').upsert([detail], { onConflict: 'name_normalized' })
-          setExerciseLibrary(prev => ({ ...prev, [detail.name_normalized]: detail }))
-          setSelectedExercise(detail)
-        }
-      }
-    } catch { /* keep loading placeholder visible */ }
+      // Not in library — coaching tips are pre-generated at plan generation time
+      setSelectedExercise({ name_normalized: key, name_display: name, how: 'Coaching tips for this exercise are not yet available. Generate your plan to load all coaching details automatically.', breathing: null as unknown as string, core: null as unknown as string, tip: null as unknown as string })
+    } catch { /* keep placeholder visible */ }
     finally { setExerciseFetching(false) }
   }, [exerciseLibrary])
 
