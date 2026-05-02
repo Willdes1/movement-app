@@ -55,6 +55,49 @@ function extractDisplayNames(plans: DayPlan[]) {
   )]
 }
 
+const BATCH = 8
+
+async function saveExerciseDetails(
+  names: string[],
+  librarySet: Set<string>,
+  weekNumber: number,
+) {
+  const missing = names.filter(n => !librarySet.has(normalizeExerciseName(n)))
+  if (missing.length === 0) return
+
+  for (let i = 0; i < missing.length; i += BATCH) {
+    const batch = missing.slice(i, i + BATCH)
+    try {
+      const res = await fetch('/api/generate-exercise-details', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ exercises: batch }),
+      })
+      if (res.ok) {
+        const { details, usage } = await res.json()
+        if (Array.isArray(details) && details.length > 0) {
+          await supabase.from('exercise_library').upsert(details, { onConflict: 'name_normalized' })
+          // Update in-memory set so later weeks don't regenerate the same exercises
+          details.forEach((d: Record<string, unknown>) => {
+            if (typeof d.name_normalized === 'string') librarySet.add(d.name_normalized)
+          })
+        }
+        if (usage) {
+          const cost = ((usage.input_tokens ?? 0) * 3 + (usage.output_tokens ?? 0) * 15) / 1_000_000
+          supabase.from('token_usage').insert({
+            operation: 'exercise_details',
+            api_route: '/api/generate-exercise-details',
+            input_tokens: usage.input_tokens,
+            output_tokens: usage.output_tokens,
+            estimated_cost_usd: cost,
+            metadata: { exercise_count: batch.length, week_number: weekNumber },
+          })
+        }
+      }
+    } catch { /* continue to next batch */ }
+  }
+}
+
 export function PlanGenerationProvider({ children }: { children: React.ReactNode }) {
   const [isGenerating, setIsGenerating] = useState(false)
   const [progress, setProgress] = useState<GenerationProgress | null>(null)
@@ -67,7 +110,10 @@ export function PlanGenerationProvider({ children }: { children: React.ReactNode
     setIsGenerating(true)
     setShowDoneNotification(false)
 
-    const allPlans: DayPlan[] = []
+    // Load library once up front — maintained in memory throughout generation
+    // so each week only generates coaching details for exercises not yet saved.
+    const { data: libraryData } = await supabase.from('exercise_library').select('name_normalized')
+    const librarySet = new Set(libraryData?.map(e => e.name_normalized) ?? [])
 
     for (let w = 1; w <= config.numWeeks; w++) {
       setProgress({ current: w, total: config.numWeeks })
@@ -85,39 +131,16 @@ export function PlanGenerationProvider({ children }: { children: React.ReactNode
           const cost = ((usage.input_tokens ?? 0) * 3 + (usage.output_tokens ?? 0) * 15) / 1_000_000
           supabase.from('token_usage').insert({ operation: 'plan_generation', api_route: '/api/generate-plan', input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, estimated_cost_usd: cost, metadata: { week_number: w } })
         }
-        allPlans.push(...plan)
         config.onWeekComplete?.(w, plan)
-      } catch { /* continue to next week */ }
-    }
 
-    // Populate exercise library for all exercises in the generated plan
-    setProgress({ current: config.numWeeks, total: config.numWeeks, details: true })
-    const displayNames = extractDisplayNames(allPlans)
-    if (displayNames.length > 0) {
-      const { data: existing } = await supabase.from('exercise_library').select('name_normalized')
-      const existingSet = new Set(existing?.map(e => e.name_normalized) ?? [])
-      const missing = [...new Set(displayNames.filter(n => !existingSet.has(normalizeExerciseName(n))))]
-      const BATCH = 8
-      for (let i = 0; i < missing.length; i += BATCH) {
-        const batch = missing.slice(i, i + BATCH)
-        try {
-          const res = await fetch('/api/generate-exercise-details', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ exercises: batch }),
-          })
-          if (res.ok) {
-            const { details, usage } = await res.json()
-            if (Array.isArray(details) && details.length > 0) {
-              await supabase.from('exercise_library').upsert(details, { onConflict: 'name_normalized' })
-            }
-            if (usage) {
-              const cost = ((usage.input_tokens ?? 0) * 3 + (usage.output_tokens ?? 0) * 15) / 1_000_000
-              supabase.from('token_usage').insert({ operation: 'exercise_details', api_route: '/api/generate-exercise-details', input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, estimated_cost_usd: cost, metadata: { exercise_count: batch.length } })
-            }
-          }
-        } catch { /* continue */ }
-      }
+        // Save coaching details for this week's exercises before moving to the next week.
+        // If the browser closes here, weeks already processed are fully saved.
+        const weekNames = extractDisplayNames(plan)
+        if (weekNames.some(n => !librarySet.has(normalizeExerciseName(n)))) {
+          setProgress({ current: w, total: config.numWeeks, details: true })
+          await saveExerciseDetails(weekNames, librarySet, w)
+        }
+      } catch { /* continue to next week */ }
     }
 
     setProgress(null)

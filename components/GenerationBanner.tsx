@@ -30,7 +30,7 @@ export default function GenerationBanner() {
   // Generating state
   const label = progress
     ? progress.details
-      ? 'Saving exercise coaching details…'
+      ? `Week ${progress.current} of ${progress.total} · saving exercises…`
       : `Week ${progress.current} of ${progress.total}`
     : 'Starting…'
 
