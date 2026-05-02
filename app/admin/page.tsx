@@ -673,14 +673,18 @@ function ExerciseLibraryCard() {
   const [search, setSearch] = useState('')
   const [filterMissing, setFilterMissing] = useState(false)
 
-  async function load() {
-    setLoading(true)
+  async function load(silent = false) {
+    if (!silent) setLoading(true)
     const { data } = await supabase.from('exercise_library').select('name_normalized, name_display, how, breathing, core, tip').order('name_display')
     setRows(data ?? [])
-    setLoading(false)
+    if (!silent) setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    const interval = setInterval(() => load(true), 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   const filtered = rows.filter(r => {
     const matchesSearch = !search || r.name_display.toLowerCase().includes(search.toLowerCase())
@@ -725,7 +729,7 @@ function ExerciseLibraryCard() {
         <button onClick={exportCSV} style={{ padding: '6px 12px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'transparent', color: C.textMid, fontSize: 12, cursor: 'pointer' }}>
           Export CSV
         </button>
-        <button onClick={load} style={{ padding: '6px 12px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'transparent', color: C.textMid, fontSize: 12, cursor: 'pointer' }}>
+        <button onClick={() => load()} style={{ padding: '6px 12px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'transparent', color: C.textMid, fontSize: 12, cursor: 'pointer' }}>
           ↻
         </button>
       </div>
