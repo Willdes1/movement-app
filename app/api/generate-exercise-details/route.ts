@@ -44,8 +44,18 @@ export async function POST(request: Request) {
 
     if (!Array.isArray(details)) throw new Error('Expected array')
 
+    // Replace any null fields with empty strings so NOT NULL DB constraints never block a save
+    const sanitized = (details as Record<string, unknown>[]).map(d => ({
+      name_normalized: d.name_normalized ?? '',
+      name_display: d.name_display ?? '',
+      how: d.how ?? '',
+      breathing: d.breathing ?? '',
+      core: d.core ?? '',
+      tip: d.tip ?? '',
+    }))
+
     return Response.json({
-      details,
+      details: sanitized,
       usage: { input_tokens: message.usage.input_tokens, output_tokens: message.usage.output_tokens },
     })
   } catch (err) {
