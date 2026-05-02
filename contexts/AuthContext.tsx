@@ -64,10 +64,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch {}
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
-      if (session?.user) fetchUserStatus(session.user.id)
+      if (session?.user) await fetchUserStatus(session.user.id)
       setLoading(false)
     })
 
