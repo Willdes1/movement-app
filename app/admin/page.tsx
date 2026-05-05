@@ -693,11 +693,20 @@ function ExerciseLibraryCard() {
   })
 
   function exportCSV() {
-    const header = 'name_display,name_normalized,has_how,has_breathing,has_core,has_tip\n'
+    // Wrap any value containing commas, quotes, or newlines in double-quotes;
+    // escape internal double-quotes by doubling them (RFC 4180).
+    function esc(v: string | null) {
+      if (!v) return ''
+      const s = v.replace(/"/g, '""')
+      return /[,"\n\r]/.test(s) ? `"${s}"` : s
+    }
+    const header = 'name_display,name_normalized,how,breathing,core,tip\n'
+    // Export all rows regardless of current search/filter state
     const body = rows.map(r =>
-      [r.name_display, r.name_normalized, r.how ? 'yes' : 'no', r.breathing ? 'yes' : 'no', r.core ? 'yes' : 'no', r.tip ? 'yes' : 'no'].join(',')
+      [esc(r.name_display), esc(r.name_normalized), esc(r.how), esc(r.breathing), esc(r.core), esc(r.tip)].join(',')
     ).join('\n')
-    const blob = new Blob([header + body], { type: 'text/csv' })
+    // BOM ensures Excel opens the file with correct UTF-8 encoding
+    const blob = new Blob(['﻿' + header + body], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a'); a.href = url; a.download = 'exercise_library.csv'; a.click()
     URL.revokeObjectURL(url)
