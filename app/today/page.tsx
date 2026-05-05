@@ -6,7 +6,20 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { supabase } from '@/lib/supabase'
 
-type DayPlan = { day: string; label: string; type: string; movements: string[]; duration: string; focus?: string; rest?: { between_sets: string; between_rounds: string }; coaching?: string }
+type DailyBlock = { label: string; duration: string; exercises: string[]; tip?: string }
+type DailySession = { morning?: DailyBlock; warmup?: DailyBlock; workout?: DailyBlock; abs?: DailyBlock; cooldown?: DailyBlock; evening?: DailyBlock }
+type DayPlan = { day: string; label: string; type: string; movements: string[]; duration: string; focus?: string; rest?: { between_sets: string; between_rounds: string }; coaching?: string; daily_session?: DailySession }
+
+const BLOCK_ORDER = ['morning', 'warmup', 'workout', 'abs', 'cooldown', 'evening'] as const
+const REST_BLOCK_ORDER = ['morning', 'abs', 'evening'] as const
+const BLOCK_CONFIG: Record<string, { color: string; icon: string }> = {
+  morning:  { color: 'var(--green)',    icon: '🌅' },
+  warmup:   { color: 'var(--orange)',   icon: '🔥' },
+  workout:  { color: 'var(--accent)',   icon: '💪' },
+  abs:      { color: 'var(--accent)',   icon: '⚡' },
+  cooldown: { color: 'var(--yellow)',   icon: '🧘' },
+  evening:  { color: 'var(--orange)',   icon: '🌙' },
+}
 
 const TIPS = [
   'Consistency beats intensity. 10 minutes daily outperforms 1 hour occasionally.',
@@ -198,12 +211,42 @@ export default function TodayPage() {
         {!isRecovering && weekGenerated && isRestDay && (
           <>
             <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 4 }}>Rest Day</div>
-            <div style={{ fontSize: 12, color: 'var(--text-mid)', lineHeight: 1.5, marginBottom: 12 }}>Recovery is part of training. Let your body absorb the work.</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
-              {todayPlan?.movements.map((m, i) => (
-                <span key={i} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>{m}</span>
-              ))}
-            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-mid)', lineHeight: 1.5, marginBottom: 14 }}>Recovery is part of training. Let your body absorb the work.</div>
+            {todayPlan?.daily_session ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                {REST_BLOCK_ORDER
+                  .filter(key => todayPlan.daily_session![key])
+                  .map(key => {
+                    const block = todayPlan.daily_session![key]!
+                    const cfg = BLOCK_CONFIG[key]
+                    return (
+                      <div key={key} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                          <span style={{ fontSize: 15 }}>{cfg.icon}</span>
+                          <span style={{ fontSize: 12, fontWeight: 800, color: cfg.color, flex: 1 }}>{block.label}</span>
+                          {block.duration && <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 600 }}>{block.duration}</span>}
+                        </div>
+                        <div style={{ padding: '8px 12px' }}>
+                          {block.exercises.map((ex, ei) => (
+                            <div key={ei} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', borderBottom: ei < block.exercises.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                              <div style={{ width: 4, height: 4, borderRadius: '50%', background: cfg.color, flexShrink: 0 }} />
+                              <span style={{ fontSize: 12, color: 'var(--text-dim)', textTransform: 'capitalize' }}>{ex}</span>
+                            </div>
+                          ))}
+                          {block.tip && <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6, fontStyle: 'italic', paddingTop: 6, borderTop: '1px solid var(--border)' }}>💡 {block.tip}</p>}
+                        </div>
+                      </div>
+                    )
+                  })
+                }
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+                {todayPlan?.movements.map((m, i) => (
+                  <span key={i} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>{m}</span>
+                ))}
+              </div>
+            )}
             <Link href={`/calendar?date=${new Date().toISOString().split('T')[0]}`} style={{ display: 'block', padding: '14px', borderRadius: 12, background: 'var(--surface2)', color: 'var(--text)', fontWeight: 700, fontSize: 14, textAlign: 'center', textDecoration: 'none', border: '1px solid var(--border)' }}>
               View Today in Calendar →
             </Link>
@@ -218,14 +261,44 @@ export default function TodayPage() {
                 <span style={{ fontSize: 12, color: 'var(--text-dim)', fontWeight: 600 }}>{todayPlan.duration}</span>
               )}
             </div>
-            <div style={{ fontSize: 11, color: typeColor, fontWeight: 700, marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: typeColor, fontWeight: 700, marginBottom: 14 }}>
               Week {currentWeek} · {phase?.label} Phase
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
-              {todayPlan.movements.map((m, i) => (
-                <span key={i} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-mid)' }}>{m}</span>
-              ))}
-            </div>
+            {todayPlan.daily_session ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                {BLOCK_ORDER
+                  .filter(key => todayPlan.daily_session![key])
+                  .map(key => {
+                    const block = todayPlan.daily_session![key]!
+                    const cfg = BLOCK_CONFIG[key]
+                    return (
+                      <div key={key} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                          <span style={{ fontSize: 15 }}>{cfg.icon}</span>
+                          <span style={{ fontSize: 12, fontWeight: 800, color: cfg.color, flex: 1 }}>{block.label}</span>
+                          {block.duration && <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 600 }}>{block.duration}</span>}
+                        </div>
+                        <div style={{ padding: '8px 12px' }}>
+                          {block.exercises.map((ex, ei) => (
+                            <div key={ei} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', borderBottom: ei < block.exercises.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                              <div style={{ width: 4, height: 4, borderRadius: '50%', background: cfg.color, flexShrink: 0 }} />
+                              <span style={{ fontSize: 12, color: 'var(--text-mid)', textTransform: 'capitalize' }}>{ex}</span>
+                            </div>
+                          ))}
+                          {block.tip && <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6, fontStyle: 'italic', paddingTop: 6, borderTop: '1px solid var(--border)' }}>💡 {block.tip}</p>}
+                        </div>
+                      </div>
+                    )
+                  })
+                }
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+                {todayPlan.movements.map((m, i) => (
+                  <span key={i} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-mid)' }}>{m}</span>
+                ))}
+              </div>
+            )}
             <Link href={`/calendar?date=${new Date().toISOString().split('T')[0]}`} style={{ display: 'block', padding: '14px', borderRadius: 12, background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%)', color: '#fff', fontWeight: 900, fontSize: 14, textAlign: 'center', textDecoration: 'none', letterSpacing: '0.03em', textTransform: 'uppercase', boxShadow: '0 6px 24px var(--accent-shadow)' }}>
               ▶ Start Session
             </Link>
