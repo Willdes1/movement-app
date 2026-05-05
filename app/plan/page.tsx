@@ -9,7 +9,7 @@ import { usePlanGeneration } from '@/components/PlanGenerationContext'
 type DailyBlock = { label: string; duration: string; exercises: string[]; tip?: string }
 type DailySession = { morning?: DailyBlock; warmup?: DailyBlock; workout?: DailyBlock; abs?: DailyBlock; cooldown?: DailyBlock; evening?: DailyBlock }
 type DayPlan = { day: string; label: string; type: string; movements: string[]; duration: string; focus?: string; rest?: { between_sets: string; between_rounds: string }; coaching?: string; daily_session?: DailySession }
-type Program = { id: string; startDate: string; totalWeeks: number; status: string }
+type Program = { id: string; startDate: string; totalWeeks: number; status: string; rebuildCount: number }
 type ExerciseDetail = { name_normalized: string; name_display: string; how: string; breathing: string; core: string; tip: string }
 type WorkoutLog = { id: string; exercise_normalized: string; logged_at: string; sets: number | null; reps: number | null; weight: number | null; weight_unit: string }
 type CompletionInsert = { user_id: string; program_id: string; week_number: number; day_index: number; skipped: boolean }
@@ -155,6 +155,7 @@ export default function PlanPage() {
   const [showAiModal, setShowAiModal] = useState(false)
   const [pendingRebuild, setPendingRebuild] = useState<{ numWeeks: number; label: string } | null>(null)
   const [dataLoading, setDataLoading] = useState(true)
+  const [showRebuildBlockedModal, setShowRebuildBlockedModal] = useState(false)
 
   const [exerciseLibrary, setExerciseLibrary] = useState<Record<string, ExerciseDetail>>({})
   const [selectedExercise, setSelectedExercise] = useState<ExerciseDetail | null>(null)
@@ -252,7 +253,7 @@ export default function PlanPage() {
       const { data: newProg } = await supabase.from('training_programs').insert({ user_id: userId, start_date: today, total_weeks: 13, status: 'active' }).select('id, start_date, total_weeks, status').single()
       setGenerating(false)
       if (!newProg) return
-      prog = { id: newProg.id, startDate: newProg.start_date, totalWeeks: newProg.total_weeks, status: newProg.status }
+      prog = { id: newProg.id, startDate: newProg.start_date, totalWeeks: newProg.total_weeks, status: newProg.status, rebuildCount: 0 }
       setProgram(prog); setCurrentWeek(1); setViewingWeek(1)
     }
     const profile = await fetchProfile()
@@ -260,6 +261,7 @@ export default function PlanPage() {
       setError('Set up your profile first so your AI coach knows what to build.')
       return
     }
+    if (!prog) return
     startGeneration({
       program: prog,
       numWeeks,
@@ -275,12 +277,12 @@ export default function PlanPage() {
     if (!user) return
     setDataLoading(true)
     const [{ data: existing }, { data: prof }] = await Promise.all([
-      supabase.from('training_programs').select('id, start_date, total_weeks, status').eq('user_id', userId).single(),
+      supabase.from('training_programs').select('*').eq('user_id', userId).single(),
       supabase.from('profiles').select('sport, goal').eq('id', userId).single(),
     ])
     setProfileReady(!!(prof?.sport || prof?.goal))
     if (!existing) { setDataLoading(false); return }
-    const prog: Program = { id: existing.id, startDate: existing.start_date, totalWeeks: existing.total_weeks, status: existing.status }
+    const prog: Program = { id: existing.id, startDate: existing.start_date, totalWeeks: existing.total_weeks, status: existing.status, rebuildCount: (existing as Record<string, unknown>).rebuild_count as number ?? 0 }
     setProgram(prog)
     const week = getCurrentWeek(prog.startDate)
     setCurrentWeek(week)
@@ -408,11 +410,17 @@ export default function PlanPage() {
   async function rebuildFullPlan(numWeeks: number) {
     if (!program) return
     setShowAiModal(false)
+    const currentCount = program.rebuildCount ?? 0
+    if (isFF && currentCount >= 2) { setShowRebuildBlockedModal(true); return }
+    const newCount = currentCount + 1
     await supabase.from('weekly_plans').delete().eq('program_id', program.id)
     setWeekPlans({})
+    supabase.from('training_programs').update({ rebuild_count: newCount }).eq('id', program.id)
+    const updatedProg = { ...program, rebuildCount: newCount }
+    setProgram(updatedProg)
     const profile = await fetchProfile()
     startGeneration({
-      program,
+      program: updatedProg,
       numWeeks: isFF ? Math.min(numWeeks, 4) : numWeeks,
       userId,
       profile,
@@ -431,10 +439,13 @@ export default function PlanPage() {
 
   async function continueProgram() {
     if (!program) return
+    const currentCount = program.rebuildCount ?? 0
+    if (isFF && currentCount >= 2) { setShowRebuildBlockedModal(true); return }
+    const newCount = currentCount + 1
     const today = new Date().toISOString().split('T')[0]
-    await supabase.from('training_programs').update({ start_date: today, status: 'active' }).eq('id', program.id)
+    await supabase.from('training_programs').update({ start_date: today, status: 'active', rebuild_count: newCount }).eq('id', program.id)
     await supabase.from('weekly_plans').delete().eq('program_id', program.id)
-    const updated = { ...program, startDate: today, status: 'active' }
+    const updated = { ...program, startDate: today, status: 'active', rebuildCount: newCount }
     setProgram(updated); setWeekPlans({}); setCurrentWeek(1); setViewingWeek(1); setProgramComplete(false)
     const profile = await fetchProfile()
     startGeneration({
@@ -1019,6 +1030,13 @@ export default function PlanPage() {
             <p style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 16, lineHeight: 1.6 }}>
               You selected: <strong style={{ color: 'var(--text)' }}>{pendingRebuild.label}</strong>
             </p>
+            {isFF && (
+              <div style={{ padding: '10px 14px', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 10, marginBottom: 12 }}>
+                <p style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.6, margin: 0 }}>
+                  F&F plan rebuilds used: <strong style={{ color: 'var(--text)' }}>{program?.rebuildCount ?? 0} of 2</strong>
+                </p>
+              </div>
+            )}
             <div style={{ padding: '12px 14px', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 10, marginBottom: 20 }}>
               <p style={{ fontSize: 13, color: '#fca5a5', lineHeight: 1.65 }}>
                 ⚠ This will <strong>permanently delete all existing weeks</strong> and rebuild from scratch. This cannot be undone.
@@ -1035,6 +1053,24 @@ export default function PlanPage() {
                 Yes, Rebuild →
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showRebuildBlockedModal && (
+        <div onClick={() => setShowRebuildBlockedModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 24 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 18, padding: 24, width: '100%', maxWidth: 400, border: '1px solid var(--border)' }}>
+            <p style={{ fontSize: 22, marginBottom: 8 }}>🔒</p>
+            <p style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>Plan Rebuild Limit Reached</p>
+            <p style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 20, lineHeight: 1.6 }}>
+              F&F accounts include <strong style={{ color: 'var(--text)' }}>2 full plan rebuilds</strong>. You&apos;ve used both. Your current plan is still active and ready to go.
+            </p>
+            <p style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 20, lineHeight: 1.6 }}>
+              Want more rebuilds? Reach out and we&apos;ll unlock them for you.
+            </p>
+            <button onClick={() => setShowRebuildBlockedModal(false)} style={{ width: '100%', padding: '13px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+              Got it
+            </button>
           </div>
         </div>
       )}
