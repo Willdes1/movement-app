@@ -45,7 +45,8 @@ function getGreeting() {
 }
 
 export default function TodayPage() {
-  const { user, loading: authLoading, effectiveUserId } = useAuth()
+  const { user, loading: authLoading, effectiveUserId, role, isAdmin } = useAuth()
+  const isFF = !isAdmin && role === 'ff'
   const userId = effectiveUserId ?? user?.id ?? ''
   const { activeRecovery } = useTheme()
   const router = useRouter()
@@ -54,8 +55,10 @@ export default function TodayPage() {
   const [currentWeek, setCurrentWeek] = useState<number | null>(null)
   const [todayPlan, setTodayPlan] = useState<DayPlan | null>(null)
   const [hasProgram, setHasProgram] = useState(false)
+  const [profileReady, setProfileReady] = useState(false)
   const [weekGenerated, setWeekGenerated] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !user) router.replace('/auth')
@@ -66,11 +69,12 @@ export default function TodayPage() {
     setLoading(true)
 
     const [{ data: profile }, { data: prog }] = await Promise.all([
-      supabase.from('profiles').select('name').eq('id', userId).single(),
+      supabase.from('profiles').select('name, sport, goal').eq('id', userId).single(),
       supabase.from('training_programs').select('id, start_date').eq('user_id', userId).single(),
     ])
 
     if (profile?.name) setFirstName(profile.name.split(' ')[0])
+    setProfileReady(!!(profile?.sport || profile?.goal))
 
     if (!prog) { setHasProgram(false); setLoading(false); return }
 
@@ -92,6 +96,15 @@ export default function TodayPage() {
   }, [user])
 
   useEffect(() => { if (user) loadData() }, [user, loadData])
+
+  useEffect(() => {
+    if (!user || loading) return
+    const key = `movement_welcomed_${userId}`
+    if (!localStorage.getItem(key)) {
+      setShowWelcomeModal(true)
+      localStorage.setItem(key, '1')
+    }
+  }, [user, userId, loading])
 
   const isRecovering = !!activeRecovery
   const isRestDay = todayPlan?.type === 'rest'
@@ -241,6 +254,73 @@ export default function TodayPage() {
         <div style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 800, marginBottom: 6, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Tip of the Day</div>
         <p style={{ fontSize: 13, color: 'var(--text-mid)', lineHeight: 1.6 }}>{tip}</p>
       </div>
+
+      {/* First-login welcome modal — shown once per user via localStorage */}
+      {showWelcomeModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000, padding: '0 0 0 0' }}>
+          <div style={{ background: 'var(--surface)', borderRadius: '20px 20px 0 0', padding: '28px 24px 36px', width: '100%', maxWidth: 480, border: '1px solid var(--border)', borderBottom: 'none' }}>
+            <p style={{ fontSize: 22, fontWeight: 900, marginBottom: 6, letterSpacing: '-0.02em' }}>
+              Welcome to Movement{firstName ? `, ${firstName}` : ''}! 👋
+            </p>
+            <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 24, lineHeight: 1.5 }}>
+              {isFF ? "You're in as a founding member. Here's how to get started." : "Here's how to get started in 3 steps."}
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginBottom: 28 }}>
+              {[
+                {
+                  title: 'Complete your profile',
+                  desc: 'Tell us your sport, goals, schedule, and any injuries.',
+                  done: profileReady,
+                },
+                {
+                  title: 'Generate your plan',
+                  desc: isFF
+                    ? 'Your AI coach builds a custom 1-month program in ~2 minutes.'
+                    : 'Your AI coach builds a personalized program in ~2 minutes.',
+                  done: hasProgram,
+                },
+                {
+                  title: 'Start training',
+                  desc: 'Follow daily workouts, log your sets, and track your progress.',
+                  done: false,
+                },
+              ].map((step, i) => (
+                <div key={i} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                  <div style={{
+                    width: 28, height: 28, borderRadius: '50%', flexShrink: 0, marginTop: 1,
+                    background: step.done ? 'var(--accent)' : 'var(--surface2)',
+                    border: `1.5px solid ${step.done ? 'var(--accent)' : 'var(--border)'}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 12, fontWeight: 800,
+                    color: step.done ? '#fff' : 'var(--text-dim)',
+                  }}>
+                    {step.done ? '✓' : i + 1}
+                  </div>
+                  <div>
+                    <p style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{step.title}</p>
+                    <p style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.5, margin: 0 }}>{step.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <Link
+              href={profileReady ? '/plan' : '/profile'}
+              onClick={() => setShowWelcomeModal(false)}
+              style={{ display: 'block', padding: '15px', borderRadius: 12, background: 'var(--accent)', color: '#fff', fontWeight: 800, fontSize: 15, textAlign: 'center', textDecoration: 'none', marginBottom: 10 }}
+            >
+              {profileReady ? 'Generate My Plan →' : 'Set Up Profile →'}
+            </Link>
+            <button
+              onClick={() => setShowWelcomeModal(false)}
+              style={{ width: '100%', padding: '12px', borderRadius: 12, border: 'none', background: 'transparent', color: 'var(--text-dim)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}
+            >
+              I&apos;ll explore first
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   )
