@@ -27,7 +27,7 @@ const C = {
 }
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
-type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad' | 'health'
+type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad' | 'health' | 'media'
 type TodoRow = { id: string; content: string; category: string; status: string; priority: string; created_at: string; updated_at: string }
 type IdeaRow = { id: string; content: string; category: string; created_at: string }
 type PromoRow = { id: string; code: string; role: string; max_uses: number; uses: number; created_at: string }
@@ -664,6 +664,195 @@ const OP_LABEL: Record<string, string> = {
   exercise_details: 'Ex Details',
 }
 
+// ─── MEDIA LIBRARY TAB ────────────────────────────────────────────────────────
+type MediaRow = { exercise_normalized: string; name_display: string; youtube_url: string | null; image_url: string | null; notes: string | null }
+type MediaEdits = { youtube_url: string; image_url: string; notes: string }
+
+function MediaLibraryTab() {
+  const [rows, setRows] = useState<MediaRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState<'all' | 'no_video' | 'no_image'>('all')
+  const [editingRow, setEditingRow] = useState<string | null>(null)
+  const [editValues, setEditValues] = useState<MediaEdits>({ youtube_url: '', image_url: '', notes: '' })
+  const [saving, setSaving] = useState(false)
+  const [flashSaved, setFlashSaved] = useState<string | null>(null)
+
+  async function load() {
+    const [{ data: lib }, { data: media }] = await Promise.all([
+      supabase.from('exercise_library').select('name_normalized, name_display').order('name_display'),
+      supabase.from('exercise_media').select('exercise_normalized, youtube_url, image_url, notes'),
+    ])
+    const mediaMap = new Map(media?.map(m => [m.exercise_normalized, m]) ?? [])
+    setRows((lib ?? []).map(l => ({
+      exercise_normalized: l.name_normalized,
+      name_display: l.name_display,
+      youtube_url: mediaMap.get(l.name_normalized)?.youtube_url ?? null,
+      image_url: mediaMap.get(l.name_normalized)?.image_url ?? null,
+      notes: mediaMap.get(l.name_normalized)?.notes ?? null,
+    })))
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [])
+
+  function startEdit(row: MediaRow) {
+    setEditingRow(row.exercise_normalized)
+    setEditValues({ youtube_url: row.youtube_url ?? '', image_url: row.image_url ?? '', notes: row.notes ?? '' })
+  }
+
+  async function saveRow() {
+    if (!editingRow) return
+    setSaving(true)
+    const payload = {
+      exercise_normalized: editingRow,
+      youtube_url: editValues.youtube_url.trim() || null,
+      image_url: editValues.image_url.trim() || null,
+      notes: editValues.notes.trim() || null,
+    }
+    await supabase.from('exercise_media').upsert(payload, { onConflict: 'exercise_normalized' })
+    setRows(prev => prev.map(r => r.exercise_normalized === editingRow ? { ...r, ...payload } : r))
+    setSaving(false)
+    setFlashSaved(editingRow)
+    setEditingRow(null)
+    setTimeout(() => setFlashSaved(null), 2000)
+  }
+
+  function exportCSV() {
+    function esc(v: string | null) { if (!v) return ''; const s = v.replace(/"/g, '""'); return /[,"\n\r]/.test(s) ? `"${s}"` : s }
+    const header = 'name_display,exercise_normalized,youtube_url,image_url,notes\n'
+    const body = rows.map(r => [esc(r.name_display), esc(r.exercise_normalized), esc(r.youtube_url), esc(r.image_url), esc(r.notes)].join(',')).join('\n')
+    const blob = new Blob(['﻿' + header + body], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'exercise_media.csv'; a.click(); URL.revokeObjectURL(url)
+  }
+
+  const filtered = rows.filter(r => {
+    const q = search.toLowerCase()
+    const matchSearch = !q || r.name_display.toLowerCase().includes(q) || r.exercise_normalized.includes(q)
+    const matchFilter = filter === 'all' || (filter === 'no_video' && !r.youtube_url) || (filter === 'no_image' && !r.image_url)
+    return matchSearch && matchFilter
+  })
+
+  const hasVideo = rows.filter(r => r.youtube_url).length
+  const hasImage = rows.filter(r => r.image_url).length
+  const inputSt: React.CSSProperties = { background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 6, color: C.text, fontSize: 12, padding: '5px 8px', width: '100%', fontFamily: 'inherit', boxSizing: 'border-box' }
+  const filterBtn = (id: typeof filter, label: string) => (
+    <button onClick={() => setFilter(id)} style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${filter === id ? C.accentBorder : C.border}`, background: filter === id ? C.accentDim : 'transparent', color: filter === id ? C.accent : C.textMid, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{label}</button>
+  )
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+        <div>
+          <p style={{ fontWeight: 700, fontSize: 15 }}>Media Library</p>
+          <p style={{ fontSize: 12, color: C.textDim, marginTop: 2 }}>
+            {rows.length} exercises · <span style={{ color: C.green }}>{hasVideo} with video</span> · <span style={{ color: C.accent }}>{hasImage} with image</span>
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button onClick={exportCSV} style={{ padding: '6px 12px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'transparent', color: C.textMid, fontSize: 12, cursor: 'pointer' }}>Export CSV</button>
+          <button onClick={() => load()} style={{ padding: '6px 12px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'transparent', color: C.textMid, fontSize: 12, cursor: 'pointer' }}>↻</button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search exercises…" style={{ ...inputSt, width: 220 }} />
+        {filterBtn('all', 'All')}
+        {filterBtn('no_video', `Missing video (${rows.filter(r => !r.youtube_url).length})`)}
+        {filterBtn('no_image', `Missing image (${rows.filter(r => !r.image_url).length})`)}
+      </div>
+
+      {loading && <p style={{ fontSize: 12, color: C.textDim }}>Loading…</p>}
+
+      {/* Table */}
+      {!loading && (
+        <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
+          {/* Column headers */}
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 2fr 1.5fr 80px', gap: 0, background: C.surface2, padding: '8px 14px', borderBottom: `1px solid ${C.border}` }}>
+            {['EXERCISE', 'YOUTUBE URL', 'IMAGE URL', 'NOTES', ''].map((h, i) => (
+              <span key={i} style={{ fontSize: 10, fontWeight: 700, color: C.textDim, letterSpacing: '0.07em' }}>{h}</span>
+            ))}
+          </div>
+
+          <div style={{ maxHeight: 600, overflowY: 'auto' }}>
+            {filtered.map(row => {
+              const isEditing = editingRow === row.exercise_normalized
+              const isSavedFlash = flashSaved === row.exercise_normalized
+              return (
+                <div
+                  key={row.exercise_normalized}
+                  style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 2fr 1.5fr 80px', gap: 0, padding: '10px 14px', borderBottom: `1px solid ${C.border}`, alignItems: 'center', background: isSavedFlash ? 'rgba(34,197,94,0.06)' : isEditing ? 'rgba(59,130,246,0.04)' : 'transparent', transition: 'background 0.3s' }}
+                >
+                  {/* Exercise name */}
+                  <div>
+                    <p style={{ fontSize: 13, fontWeight: 600 }}>{row.name_display}</p>
+                    <p style={{ fontSize: 10, color: C.textDim, fontFamily: 'monospace' }}>{row.exercise_normalized}</p>
+                  </div>
+
+                  {/* YouTube URL */}
+                  <div style={{ paddingRight: 8 }}>
+                    {isEditing
+                      ? <input value={editValues.youtube_url} onChange={e => setEditValues(v => ({ ...v, youtube_url: e.target.value }))} placeholder="https://youtube.com/watch?v=…" style={inputSt} />
+                      : <span style={{ fontSize: 12, color: row.youtube_url ? C.accent : C.textDim, wordBreak: 'break-all' }}>
+                          {row.youtube_url ? (row.youtube_url.length > 42 ? row.youtube_url.slice(0, 42) + '…' : row.youtube_url) : '—'}
+                        </span>
+                    }
+                  </div>
+
+                  {/* Image URL */}
+                  <div style={{ paddingRight: 8 }}>
+                    {isEditing
+                      ? <input value={editValues.image_url} onChange={e => setEditValues(v => ({ ...v, image_url: e.target.value }))} placeholder="https://…" style={inputSt} />
+                      : <span style={{ fontSize: 12, color: row.image_url ? C.accent : C.textDim, wordBreak: 'break-all' }}>
+                          {row.image_url ? (row.image_url.length > 42 ? row.image_url.slice(0, 42) + '…' : row.image_url) : '—'}
+                        </span>
+                    }
+                  </div>
+
+                  {/* Notes */}
+                  <div style={{ paddingRight: 8 }}>
+                    {isEditing
+                      ? <input value={editValues.notes} onChange={e => setEditValues(v => ({ ...v, notes: e.target.value }))} placeholder="Optional notes…" style={inputSt} />
+                      : <span style={{ fontSize: 12, color: row.notes ? C.textMid : C.textDim }}>
+                          {row.notes ? (row.notes.length > 30 ? row.notes.slice(0, 30) + '…' : row.notes) : '—'}
+                        </span>
+                    }
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                    {isEditing ? (
+                      <>
+                        <button onClick={saveRow} disabled={saving} style={{ padding: '5px 10px', borderRadius: 6, border: 'none', background: C.accent, color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                          {saving ? '…' : 'Save'}
+                        </button>
+                        <button onClick={() => setEditingRow(null)} style={{ padding: '5px 8px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'transparent', color: C.textDim, fontSize: 11, cursor: 'pointer' }}>✕</button>
+                      </>
+                    ) : (
+                      <button onClick={() => startEdit(row)} style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'transparent', color: C.textMid, fontSize: 11, cursor: 'pointer' }}>
+                        {isSavedFlash ? '✓' : 'Edit'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+            {filtered.length === 0 && !loading && (
+              <p style={{ padding: '20px 14px', fontSize: 12, color: C.textDim }}>No exercises match your search.</p>
+            )}
+          </div>
+
+          <div style={{ padding: '8px 14px', background: C.surface2, borderTop: `1px solid ${C.border}`, fontSize: 11, color: C.textDim }}>
+            Showing {filtered.length} of {rows.length} exercises
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── EXERCISE LIBRARY CARD ───────────────────────────────────────────────────
 type LibraryRow = { name_normalized: string; name_display: string; how: string | null; breathing: string | null; core: string | null; tip: string | null }
 
@@ -1124,6 +1313,12 @@ const NAV_GROUPS = [
     ],
   },
   {
+    label: 'Content',
+    items: [
+      { id: 'media' as Tab, label: 'Media Library' },
+    ],
+  },
+  {
     label: 'Dev Tools',
     items: [
       { id: 'health' as Tab, label: 'Health Monitor' },
@@ -1405,6 +1600,7 @@ export default function AdminPage() {
             <PlaceholderTab label="Partner Management" bullets={['Physical therapists, nutritionists, trainers, influencers', 'Track audience size, performance, revenue contribution', 'Revenue-sharing model — partners earn on referrals', 'Partner portal: their own login, analytics, expected pay']} />
           )}
           {tab === 'launchpad' && <LaunchpadTab />}
+          {tab === 'media' && <MediaLibraryTab />}
           {tab === 'health' && <><TokenUsageCard /><LibraryBackfillCard /><ExerciseLibraryCard /><HealthTab /></>}
         </main>
       </div>
