@@ -949,6 +949,7 @@ function LibraryBackfillCard() {
 
       if (missing.length === 0) { addLog('All exercises already have coaching details. Nothing to do.'); setStatus('done'); return }
       addLog(`${missing.length} exercises need coaching details. Generating in batches…`)
+      if (missing.length <= 15) addLog(`Missing: ${missing.join(' · ')}`)
 
       const BATCH = 8
       const totalBatches = Math.ceil(missing.length / BATCH)
@@ -1027,11 +1028,11 @@ function LibraryBackfillCard() {
           )}
         </div>
         <button
-          onClick={run}
+          onClick={status === 'done' ? () => { setStatus('idle'); setLog([]); setBatchProgress(null) } : run}
           disabled={status === 'running'}
           style={{ padding: '9px 18px', borderRadius: 8, border: `1px solid ${status === 'done' ? 'rgba(34,197,94,0.3)' : C.accentBorder}`, background: status === 'running' ? 'rgba(59,130,246,0.15)' : status === 'done' ? C.greenDim : C.accentDim, color: status === 'running' ? C.accent : status === 'done' ? C.green : C.accent, fontWeight: 700, fontSize: 13, cursor: status === 'running' ? 'not-allowed' : 'pointer', flexShrink: 0, whiteSpace: 'nowrap', animation: status === 'running' ? 'bfPulse 1.8s ease-in-out infinite' : 'none' }}
         >
-          {status === 'running' ? <span>● Running…</span> : status === 'done' ? '✓ Done' : 'Backfill Now'}
+          {status === 'running' ? <span>● Running…</span> : status === 'done' ? '✓ Done — click to reset' : 'Backfill Now'}
         </button>
       </div>
 
