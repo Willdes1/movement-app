@@ -909,12 +909,16 @@ function LibraryBackfillCard() {
 
   useEffect(() => {
     async function loadStats() {
-      const [{ count: libCount }, { data: plans }] = await Promise.all([
-        supabase.from('exercise_library').select('*', { count: 'exact', head: true }),
+      const [{ data: libRows }, { data: plans }] = await Promise.all([
+        supabase.from('exercise_library').select('name_normalized'),
         supabase.from('weekly_plans').select('plan'),
       ])
       const allNames = extractAllExerciseNames((plans ?? []).map(p => p.plan as unknown[]))
-      setStats({ library: libCount ?? 0, plan: allNames.length })
+      // Count by normalized-name coverage, not raw row count — avoids phantom
+      // mismatches when the library has extra entries not in the current plan.
+      const libSet = new Set(libRows?.map(r => r.name_normalized) ?? [])
+      const covered = allNames.filter(n => libSet.has(normalizeEx(n))).length
+      setStats({ library: covered, plan: allNames.length })
     }
     loadStats()
   }, [status])
