@@ -16,7 +16,7 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname()
-  const { user } = useAuth()
+  const { user, isAdmin, role } = useAuth()
   const [profile, setProfile] = useState<{ name: string | null; sports: string[] | null } | null>(null)
 
   useEffect(() => {
@@ -29,7 +29,7 @@ export default function Sidebar() {
       .then(({ data }) => setProfile(data))
   }, [user])
 
-  if (pathname.startsWith('/admin') || pathname.startsWith('/auth')) return null
+  if (pathname.startsWith('/admin') || pathname.startsWith('/auth') || pathname.startsWith('/coach')) return null
 
   const firstName = profile?.name?.split(' ')[0] ?? 'Athlete'
   const sport = profile?.sports?.[0] ?? 'Movement'
@@ -99,6 +99,33 @@ export default function Sidebar() {
           )
         })}
       </div>
+
+      {/* Coach portal link — coaches and admins only */}
+      {(isAdmin || role === 'coach') && (
+        <div style={{ padding: '0 8px 4px' }}>
+          <Link
+            href="/coach/dashboard"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '11px 20px',
+              borderRadius: 10,
+              fontSize: 13,
+              fontWeight: 500,
+              color: 'var(--text-dim)',
+              background: 'transparent',
+              textDecoration: 'none',
+              borderTop: '1px solid var(--border)',
+              marginTop: 4,
+              paddingTop: 12,
+            }}
+          >
+            <span style={{ fontSize: 15, width: 20, textAlign: 'center', flexShrink: 0 }}>🏋️</span>
+            Coach Portal
+          </Link>
+        </div>
+      )}
 
       {/* User section */}
       {user && (

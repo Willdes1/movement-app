@@ -63,6 +63,18 @@
 ## 🧹 Content Management Rules (added 2026-04-23)
 - [ ] **Deduplication enforcement** — When adding items to TODO or IDEAS, always check for existing related entries first. If overlap found: merge into the existing entry rather than creating a duplicate. If a task is done, mark it [x] immediately — never leave completed work in the active list.
 
+## 🏋️ Coach & Trainer Portal (added 2026-05-05)
+- [ ] **Layer 1–4 schema migration** — Run in Supabase SQL Editor: ALTER exercise_library (audience, source, notes, contraindications, modality, equipment_required, difficulty), CREATE 11 new tables (coaches, coach_clients, coach_program_templates, coach_programs, coach_program_weeks, coach_exercise_swaps, coach_check_ins, affiliate_referrals, affiliate_ledger, affiliate_payout_requests, coach_ai_generation_log), RLS enabled with stub policies on all new tables.
+- [ ] **Route scaffolding** — Empty shells for /coach/dashboard, /coach/clients, /coach/clients/[id], /coach/builder. Auth role-split: coach role gets coach routes, admin gets all, user gets user routes.
+- [ ] **PDF/DOCX import flow** — Parse uploaded program → normalize to coach_programs schema → assign to client.
+- [ ] **Exercise swap modal** — Search exercise_library (filter by movement pattern / equipment), writes swap to coach_exercise_swaps, can write new exercises to library.
+- [ ] **Two-agent coach generator** — Agent 1 (Planner): JSON skeleton for full program. Library lookup: no tokens (SQL). Agent 2 (Filler): only runs on unmatched slots. Coach-only pipeline, does not touch user generator.
+- [ ] **Affiliate system + admin coach management** — Admin tab for coach accounts, tier assignment, payout review.
+
+### Exercise Library Backfill (added 2026-05-05)
+- [ ] **58 missing SI joint exercises** — Only 24 of 82 SI joint playbook exercises are in exercise_library. Remaining 58 need individual review and manual addition with clinical-appropriate cues. Not blocking coach portal build, but must be done before coach clinical tool launch.
+- [ ] **Audience-tagging default logic** — When imports write new rows: tag as `clinical` if coach specialty is rehab/PT/therapy, else `both`. When AI generates new rows: tag as `both` unless client has active injury/restriction flag. Document this in the import and generation pipelines when built.
+
 ## 🗂️ Admin Tools (added 2026-04-23)
 - [ ] **PDF workout plan upload (admin only)** — Admin can upload a PDF of any existing workout program (e.g. Athlean-X Dragon). AI reads and analyzes the plan, then offers to: (1) replace the user's current generated plan with it, or (2) blend it in. If replacing, AI intelligently reschedules any missed days and adjusts the remaining weeks to fit the user's timeline.
 

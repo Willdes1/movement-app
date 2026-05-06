@@ -8,7 +8,7 @@ type AuthContextType = {
   session: Session | null
   loading: boolean
   isAdmin: boolean
-  role: 'admin' | 'beta' | 'free' | 'ff'
+  role: 'admin' | 'coach' | 'beta' | 'free' | 'ff'
   signOut: () => Promise<void>
   effectiveUserId: string | null
   impersonating: boolean
@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
-  const [role, setRole] = useState<'admin' | 'beta' | 'free' | 'ff'>('free')
+  const [role, setRole] = useState<'admin' | 'coach' | 'beta' | 'free' | 'ff'>('free')
   const [impersonatedUserId, setImpersonatedUserId] = useState<string | null>(null)
   const [impersonatedUserName, setImpersonatedUserName] = useState<string | null>(null)
 
