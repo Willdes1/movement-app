@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import LaunchpadTab from '@/components/admin/LaunchpadTab'
 import HealthTab from '@/components/admin/HealthTab'
+import ImpersonationActivityTab from '@/components/admin/ImpersonationActivityTab'
 
 // ─── PALETTE ─────────────────────────────────────────────────────────────────
 const C = {
@@ -27,7 +28,7 @@ const C = {
 }
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
-type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad' | 'health' | 'media'
+type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad' | 'health' | 'media' | 'impersonation'
 type TodoRow = { id: string; content: string; category: string; status: string; priority: string; created_at: string; updated_at: string }
 type IdeaRow = { id: string; content: string; category: string; created_at: string }
 type PromoRow = { id: string; code: string; role: string; max_uses: number; uses: number; created_at: string }
@@ -175,15 +176,103 @@ function OverviewTab({ users, events, kpis, isMobile }: {
   )
 }
 
+// ─── ZOOM IN MODAL ────────────────────────────────────────────────────────────
+function ZoomInModal({ target, onConfirm, onCancel, loading }: {
+  target: UserStat
+  onConfirm: (duration: 60 | 120, reason: string) => void
+  onCancel: () => void
+  loading: boolean
+}) {
+  const [duration, setDuration] = useState<60 | 120>(60)
+  const [reason, setReason] = useState('')
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)' }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: '28px 28px', width: 400, maxWidth: '90vw' }}>
+        <div style={{ marginBottom: 20 }}>
+          <p style={{ fontSize: 10, fontWeight: 800, color: C.red, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>Zoom In</p>
+          <p style={{ fontSize: 16, fontWeight: 700, color: C.text }}>View app as</p>
+          <p style={{ fontSize: 15, fontWeight: 700, color: C.accent, marginTop: 2 }}>{displayName(target)}</p>
+          <p style={{ fontSize: 11, color: C.textDim, fontFamily: 'monospace', marginTop: 4 }}>{target.email}</p>
+        </div>
+
+        <div style={{ marginBottom: 18 }}>
+          <p style={{ fontSize: 11, fontWeight: 700, color: C.textDim, marginBottom: 8, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Session Duration</p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {([60, 120] as const).map(d => (
+              <button
+                key={d}
+                onClick={() => setDuration(d)}
+                style={{
+                  flex: 1, padding: '10px', borderRadius: 8, fontWeight: 700, fontSize: 13,
+                  border: duration === d ? `2px solid ${C.red}` : `1px solid ${C.border}`,
+                  background: duration === d ? 'rgba(239,68,68,0.12)' : C.surface2,
+                  color: duration === d ? C.red : C.textMid, cursor: 'pointer',
+                }}
+              >
+                {d === 60 ? '1 Hour' : '2 Hours'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 22 }}>
+          <p style={{ fontSize: 11, fontWeight: 700, color: C.textDim, marginBottom: 8, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Reason <span style={{ fontWeight: 400, textTransform: 'none' }}>(optional)</span></p>
+          <input
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+            placeholder="e.g. investigating plan generation issue"
+            style={{ ...inputSt, width: '100%' }}
+          />
+        </div>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onCancel} style={{ flex: 1, padding: '10px', borderRadius: 8, border: `1px solid ${C.border}`, background: 'none', color: C.textMid, fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
+          <button
+            onClick={() => onConfirm(duration, reason)}
+            disabled={loading}
+            style={{
+              flex: 2, padding: '10px', borderRadius: 8, border: `1px solid rgba(239,68,68,0.5)`,
+              background: 'rgba(239,68,68,0.15)', color: loading ? C.textDim : C.red,
+              fontSize: 13, fontWeight: 800, cursor: loading ? 'not-allowed' : 'pointer',
+              letterSpacing: '0.04em',
+            }}
+          >
+            {loading ? 'Opening session…' : '🔴 Zoom In'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── USERS TAB ────────────────────────────────────────────────────────────────
-function UsersTab({ users, onRoleChange, onZoomIn, onImpersonate }: { users: UserStat[]; onRoleChange: (id: string, role: string) => Promise<void>; onZoomIn: (user: UserStat) => void; onImpersonate: (id: string, name: string) => void }) {
+function UsersTab({ users, onRoleChange, onZoomIn, onOpenZoomModal }: {
+  users: UserStat[]
+  onRoleChange: (id: string, role: string) => Promise<void>
+  onZoomIn: (user: UserStat) => void
+  onOpenZoomModal: (user: UserStat) => void
+}) {
+  const [search, setSearch] = useState('')
   const betaCount = users.filter(u => u.role === 'beta').length
   const ffCount = users.filter(u => u.role === 'ff').length
   const freeCount = users.filter(u => u.role === 'free').length
 
+  const filtered = users.filter(u => {
+    const q = search.toLowerCase()
+    return !q || u.email.toLowerCase().includes(q) || displayName(u).toLowerCase().includes(q)
+  })
+
   return (
     <>
       <SectionHead title="Users" sub={`${users.length} total · ${ffCount} f&f · ${betaCount} beta · ${freeCount} free`} />
+      <div style={{ marginBottom: 14 }}>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search by name or email…"
+          style={{ ...inputSt, width: '100%', maxWidth: 360 }}
+        />
+      </div>
       <Panel>
         <TableHeader cols={[
           { label: 'User', width: '2fr' },
@@ -195,11 +284,11 @@ function UsersTab({ users, onRoleChange, onZoomIn, onImpersonate }: { users: Use
           { label: 'Last Active', width: 100 },
           { label: 'Joined', width: 90 },
           { label: 'Promote', width: 110 },
-          { label: '', width: 110 },
+          { label: '', width: 120 },
         ]} />
-        {users.length === 0 && <EmptyState msg="No users yet" />}
-        {users.map((u, i) => (
-          <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '2fr 90px 70px 70px 60px 60px 100px 90px 110px 110px', padding: '13px 20px', borderBottom: i < users.length - 1 ? `1px solid ${C.border}` : 'none', alignItems: 'center', gap: 0 }}>
+        {filtered.length === 0 && <EmptyState msg={search ? 'No users match your search' : 'No users yet'} />}
+        {filtered.map((u, i) => (
+          <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '2fr 90px 70px 70px 60px 60px 100px 90px 110px 120px', padding: '13px 20px', borderBottom: i < filtered.length - 1 ? `1px solid ${C.border}` : 'none', alignItems: 'center', gap: 0 }}>
             <div>
               <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 2, color: C.text }}>{displayName(u)}</p>
               <p style={{ fontSize: 10, color: C.textDim, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220, fontFamily: 'monospace' }}>{u.email}</p>
@@ -223,11 +312,11 @@ function UsersTab({ users, onRoleChange, onZoomIn, onImpersonate }: { users: Use
             <div style={{ display: 'flex', gap: 4 }}>
               {!u.is_admin && (
                 <button
-                  onClick={() => onImpersonate(u.id, displayName(u))}
-                  title="View app as this user"
-                  style={{ padding: '4px 8px', borderRadius: 5, border: '1px solid rgba(239,68,68,0.35)', background: 'rgba(239,68,68,0.1)', color: '#f87171', fontSize: 11, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 700 }}
+                  onClick={() => onOpenZoomModal(u)}
+                  title="Zoom In as this user"
+                  style={{ padding: '4px 8px', borderRadius: 5, border: '1px solid rgba(239,68,68,0.35)', background: 'rgba(239,68,68,0.1)', color: '#f87171', fontSize: 10, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 800, letterSpacing: '0.04em' }}
                 >
-                  👁
+                  Zoom In
                 </button>
               )}
               <button onClick={() => onZoomIn(u)} title="View user details" style={{ padding: '4px 8px', borderRadius: 5, border: `1px solid ${C.accentBorder}`, background: C.accentDim, color: C.accent, fontSize: 12, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 700 }}>→</button>
@@ -1289,6 +1378,7 @@ const NAV_GROUPS = [
       { id: 'overview' as Tab, label: 'Overview' },
       { id: 'users' as Tab, label: 'Users' },
       { id: 'activity' as Tab, label: 'Live Activity' },
+      { id: 'impersonation' as Tab, label: 'Zoom Log' },
     ],
   },
   {
@@ -1331,10 +1421,6 @@ export default function AdminPage() {
   const { user, isAdmin, loading: authLoading, startImpersonation } = useAuth()
   const router = useRouter()
 
-  function handleImpersonate(userId: string, name: string) {
-    startImpersonation(userId, name)
-    router.push('/')
-  }
   const [tab, setTab] = useState<Tab>('overview')
   const [isMobile, setIsMobile] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -1348,6 +1434,19 @@ export default function AdminPage() {
   const [kpis, setKpis] = useState<{ label: string; value: string | number; sub: string; accent: string }[]>([])
   const [dataLoading, setDataLoading] = useState(true)
   const [selectedUser, setSelectedUser] = useState<UserStat | null>(null)
+
+  // Zoom In modal state
+  const [zoomTarget, setZoomTarget] = useState<UserStat | null>(null)
+  const [zoomLoading, setZoomLoading] = useState(false)
+
+  async function handleConfirmZoom(duration: 60 | 120, reason: string) {
+    if (!zoomTarget) return
+    setZoomLoading(true)
+    await startImpersonation(zoomTarget.id, displayName(zoomTarget), duration, reason || undefined)
+    setZoomLoading(false)
+    setZoomTarget(null)
+    router.push('/')
+  }
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768)
@@ -1588,7 +1687,8 @@ export default function AdminPage() {
         {/* Scrollable content */}
         <main style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '20px 16px 40px' : '28px 28px 60px' }}>
           {tab === 'overview' && <OverviewTab users={users} events={events} kpis={kpis} isMobile={isMobile} />}
-          {tab === 'users' && <UsersTab users={users} onRoleChange={handleRoleChange} onZoomIn={setSelectedUser} onImpersonate={handleImpersonate} />}
+          {tab === 'users' && <UsersTab users={users} onRoleChange={handleRoleChange} onZoomIn={setSelectedUser} onOpenZoomModal={setZoomTarget} />}
+          {tab === 'impersonation' && <ImpersonationActivityTab users={users} />}
           {tab === 'activity' && <ActivityTab events={events} />}
           {tab === 'todos' && <TodosTab todos={todos} onRefresh={loadAll} />}
           {tab === 'ideas' && <IdeasTab ideas={ideas} onRefresh={loadAll} />}
@@ -1611,6 +1711,15 @@ export default function AdminPage() {
         user={selectedUser}
         onClose={() => setSelectedUser(null)}
         onSaved={() => { loadAll(); setSelectedUser(prev => prev ? { ...prev } : null) }}
+      />
+    )}
+
+    {zoomTarget && (
+      <ZoomInModal
+        target={zoomTarget}
+        onConfirm={handleConfirmZoom}
+        onCancel={() => setZoomTarget(null)}
+        loading={zoomLoading}
       />
     )}
     </>

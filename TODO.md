@@ -139,6 +139,10 @@
   - Model used (claude-sonnet-4-6 or other)
 - [ ] Update automatically as new agents are added
 
+## ⚠️ Launch Blockers — DO NOT ship to non-admin users until resolved
+
+- [ ] **TOS / Privacy Policy disclosure (BLOCKS impersonation rollout)** — No TOS or Privacy Policy page exists. Required before any non-admin user can be subject to admin impersonation. Add this exact language to the Privacy Policy at signup: *"Authorized administrators of the Movement platform may access your account for purposes of customer support, technical debugging, and platform integrity. All such access is logged and subject to internal audit."* Do not enable Zoom In on real user accounts until this disclosure is live and agreed to at signup. Admin-only testing (Will's account) is fine to proceed without it.
+
 ## 🏗️ Infrastructure
 - [ ] Stripe billing integration (freemium → paid tier)
 - [ ] Push notifications (streaks, reminders, milestones)

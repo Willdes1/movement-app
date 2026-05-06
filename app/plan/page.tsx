@@ -133,7 +133,7 @@ function AIIcon({ size = 22 }: { size?: number }) {
 }
 
 export default function PlanPage() {
-  const { user, loading: authLoading, isAdmin, role, effectiveUserId } = useAuth()
+  const { user, loading: authLoading, isAdmin, role, effectiveUserId, loggedInsert } = useAuth()
   const userId = effectiveUserId ?? user?.id ?? ''
   const isFF = !isAdmin && role === 'ff'
   const router = useRouter()
@@ -329,7 +329,7 @@ export default function PlanPage() {
   async function logSet() {
     if (!user || !selectedExercise || logSaving || logSaved) return
     setLogSaving(true)
-    await supabase.from('workout_logs').insert({ user_id: userId, exercise_normalized: selectedExercise.name_normalized, sets: logSets ? parseInt(logSets) : null, reps: logReps ? parseInt(logReps) : null, weight: logWeight ? parseFloat(logWeight) : null, weight_unit: 'lbs' })
+    await loggedInsert('workout_logs', { user_id: userId, exercise_normalized: selectedExercise.name_normalized, sets: logSets ? parseInt(logSets) : null, reps: logReps ? parseInt(logReps) : null, weight: logWeight ? parseFloat(logWeight) : null, weight_unit: 'lbs' })
     const { data } = await supabase.from('workout_logs').select('id, exercise_normalized, logged_at, sets, reps, weight, weight_unit').eq('user_id', userId).eq('exercise_normalized', selectedExercise.name_normalized).order('logged_at', { ascending: false }).limit(1).single()
     if (data) setLastLog(data as WorkoutLog)
     setLogSaved(true); setLogSaving(false)

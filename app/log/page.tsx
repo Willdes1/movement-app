@@ -42,10 +42,11 @@ function logSummary(log: LogRow): string {
 }
 
 export default function LogPage() {
-  const { user, loading: authLoading, effectiveUserId } = useAuth()
+  const { user, loading: authLoading, effectiveUserId, loggedDelete } = useAuth()
   const userId = effectiveUserId ?? user?.id ?? ''
   const router = useRouter()
   const [groups, setGroups] = useState<GroupedDay[]>([])
+  const [deleting, setDeleting] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [total, setTotal] = useState(0)
 
@@ -92,6 +93,17 @@ export default function LogPage() {
   }, [user, userId])
 
   useEffect(() => { if (user) loadLogs() }, [user, loadLogs])
+
+  async function deleteLog(logId: string) {
+    setDeleting(logId)
+    await loggedDelete('workout_logs', logId)
+    setGroups(prev => prev
+      .map(g => ({ ...g, logs: g.logs.filter(l => l.id !== logId) }))
+      .filter(g => g.logs.length > 0)
+    )
+    setTotal(t => t - 1)
+    setDeleting(null)
+  }
 
   if (authLoading || loading) {
     return <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-dim)', fontSize: 14 }}>Loading…</div>
@@ -153,9 +165,26 @@ export default function LogPage() {
                       {logSummary(log)}
                     </p>
                   </div>
-                  <p style={{ fontSize: 11, color: 'var(--text-dim)', flexShrink: 0, marginLeft: 12 }}>
-                    {formatTime(log.logged_at)}
-                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, marginLeft: 12 }}>
+                    <p style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                      {formatTime(log.logged_at)}
+                    </p>
+                    <button
+                      onClick={() => deleteLog(log.id)}
+                      disabled={deleting === log.id}
+                      title="Delete this log entry"
+                      style={{
+                        background: 'none', border: 'none', cursor: deleting === log.id ? 'not-allowed' : 'pointer',
+                        color: 'var(--text-dim)', fontSize: 14, padding: '2px 4px',
+                        opacity: deleting === log.id ? 0.4 : 0.5, lineHeight: 1,
+                        transition: 'opacity 0.15s',
+                      }}
+                      onMouseEnter={e => { if (deleting !== log.id) (e.currentTarget as HTMLButtonElement).style.opacity = '1' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = deleting === log.id ? '0.4' : '0.5' }}
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
