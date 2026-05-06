@@ -1657,6 +1657,9 @@ export default function AdminPage() {
           <button onClick={() => router.push('/today')} style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'none', color: C.textDim, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
             ← Back to App
           </button>
+          <button onClick={() => router.push('/coach/dashboard')} style={{ width: '100%', marginTop: 6, padding: '7px 10px', borderRadius: 6, border: `1px solid ${C.purple}40`, background: `${C.purple}10`, color: C.purple, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+            🏋️ Preview Coach Portal
+          </button>
         </div>
       </aside>
 

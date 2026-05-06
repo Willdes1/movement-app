@@ -45,6 +45,7 @@
 
 ## 🧪 Testing & Dev Safety (added 2026-04-23)
 - [ ] **Test account isolation** — When testing new features, keep main account progress (SI joint recovery progress, 3-month workout plan) fully preserved. Ability to switch to a test account and jump back to main account without losing any data.
+- [ ] **⚠️ DELETE test QA accounts before production launch** — Three seeded accounts must be removed from Supabase before any real users are onboarded: `test-user@movement.local` (Alex Rivera, free), `test-coach@movement.local` (Morgan Lee, coach + affiliate), `test-client@movement.local` (Jamie Chen, ff/clinical). Delete from `auth.users` (cascades to profiles, workout_logs, coaches, coach_clients). Also delete any affiliate codes/ledger entries for Morgan Lee.
 
 ## 💰 Billing & Monetization (added 2026-04-23)
 - [ ] **Billing structure brainstorm** — Free tier: basic workouts only. Paid tier: full plan customization and AI generation. Options: (1) per-plan token cost, (2) monthly subscription with a token allowance. Beta tester promo codes grant limited or full protocol access for a set period. Finalize model before public launch.
