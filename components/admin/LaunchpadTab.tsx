@@ -230,6 +230,7 @@ function OverviewSection() {
     { phase: 'Phase 3', label: 'Professional B2B Portal', status: 'active', items: 'Trainer/PT/coach accounts (schema + scaffolding complete) · PDF/DOCX program import · Exercise swap modal · Two-agent coach program generator · Affiliate system · Client profile management · Client portal · Coach analytics dashboard' },
     { phase: 'Phase 4', label: 'Marketplace + Scale', status: 'upcoming', items: 'Hire local trainers in-app · Marketplace listings · Built-in marketing automation · Revenue-sharing · Platform data as B2B sales intelligence' },
     { phase: 'Phase 5', label: 'Enterprise + Partnerships', status: 'upcoming', items: 'White-label options · Insurance partnerships · University athletics licensing · International expansion · Strategic acquisition potential' },
+    { phase: 'Deferred', label: 'Exercise Video Curation Tool', status: 'upcoming', items: 'YouTube Data API + AI candidate scoring + admin review UI — see to-do/exercise-video-curation.md. Trigger: after impersonation smoke tests pass + coach portal at stable checkpoint.' },
   ]
 
   const dotColor = (s: string) => s === 'done' ? C.green : s === 'active' ? C.accent : C.border
