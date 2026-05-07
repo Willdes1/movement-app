@@ -119,6 +119,33 @@ function buildPrompt(profile: Record<string, unknown>, weekNumber: number, phase
     lines.push(`IMPORTANT: Only program exercises that use the equipment listed above. Do not program exercises requiring equipment not on this list.`)
   }
 
+  // Training background — injected from profiles.training_level / workout_background / activities
+  if (profile.training_level) {
+    lines.push('')
+    lines.push('TRAINING BACKGROUND:')
+    lines.push(`Experience level: ${profile.training_level}`)
+    const levelGuidance: Record<string, string> = {
+      beginner:     'Under 1 year of consistent training. Prioritise movement quality over load. Use basic compound patterns, higher reps, lower intensity. Avoid technical Olympic lifts.',
+      intermediate: '1–3 years of training. Familiar with compound lifts. Can handle moderate intensity and some technique complexity. Progress load systematically.',
+      expert:       '3–5 years. Programs their own training. Can handle periodization complexity, heavier loading, advanced technique cues. Treat as knowledgeable athlete.',
+      elite:        'Competitive athlete. Use periodization language (mesocycles, RIR, RPE). High intensity appropriate. Sport-specific performance is primary driver.',
+      pro:          'Professional or semi-professional athlete. Maximum specificity. Programming should reflect professional-level volume and intensity. No beginner scaffolding.',
+    }
+    if (levelGuidance[profile.training_level as string]) {
+      lines.push(`Level guidance: ${levelGuidance[profile.training_level as string]}`)
+    }
+  }
+  if (profile.workout_background) {
+    lines.push(`Training history: ${profile.workout_background}`)
+  }
+  if (profile.activities && Array.isArray(profile.activities) && (profile.activities as { name: string; level: string }[]).length > 0) {
+    const activityList = (profile.activities as { name: string; level: string }[])
+      .map(a => `${a.name} (${a.level})`)
+      .join(', ')
+    lines.push(`Sport/activity background: ${activityList}`)
+    lines.push(`Incorporate movement patterns and physical demands relevant to these activities where appropriate.`)
+  }
+
   if (instructions?.trim()) {
     lines.push('')
     lines.push(`SPECIFIC INSTRUCTIONS FROM USER: ${instructions.trim()}`)
