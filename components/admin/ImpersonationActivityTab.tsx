@@ -33,7 +33,7 @@ type Action = {
   created_at: string
 }
 
-type UserStat = { id: string; email: string; name: string | null; full_name: string | null }
+type UserStat = { id: string; name: string | null }
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
@@ -60,7 +60,7 @@ export default function ImpersonationActivityTab({ users }: { users: UserStat[] 
   const [reverseMsg, setReverseMsg] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
 
-  const userMap = new Map(users.map(u => [u.id, u.name ?? u.full_name ?? u.email]))
+  const userMap = new Map(users.map(u => [u.id, u.name ?? u.id.slice(0, 8) + '…']))
 
   const loadSessions = useCallback(async () => {
     setLoading(true)
