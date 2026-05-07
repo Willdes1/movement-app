@@ -6,6 +6,17 @@ import { supabase } from '@/lib/supabase'
 import { loadProfile } from '@/lib/storage'
 import type { UserProfile } from '@/lib/types'
 
+type Activity = { name: string; level: string }
+const LEVELS = ['beginner', 'intermediate', 'expert', 'elite', 'pro'] as const
+
+const LEVEL_COLOR: Record<string, { color: string; bg: string; border: string }> = {
+  beginner:     { color: 'var(--text-dim)',  bg: 'var(--surface2)',    border: 'var(--border)' },
+  intermediate: { color: 'var(--blue)',      bg: 'var(--blue-bg)',     border: 'var(--blue-border)' },
+  expert:       { color: 'var(--green)',     bg: 'var(--green-bg)',    border: 'var(--green-border)' },
+  elite:        { color: 'var(--purple)',    bg: 'var(--purple-bg)',   border: 'var(--purple-border)' },
+  pro:          { color: 'var(--accent)',    bg: 'var(--accent-bg)',   border: 'var(--accent-border)' },
+}
+
 export default function AccountPage() {
   const { user, isAdmin, role, signOut, loading, effectiveUserId } = useAuth()
   const userId = effectiveUserId ?? user?.id ?? ''
@@ -19,6 +30,15 @@ export default function AccountPage() {
   const [promoError, setPromoError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Training background
+  const [trainingLevel, setTrainingLevel] = useState('')
+  const [workoutBackground, setWorkoutBackground] = useState('')
+  const [activities, setActivities] = useState<Activity[]>([])
+  const [backgroundSaving, setBackgroundSaving] = useState(false)
+  const [backgroundSaved, setBackgroundSaved] = useState(false)
+  const [newActivityName, setNewActivityName] = useState('')
+  const [newActivityLevel, setNewActivityLevel] = useState<string>('beginner')
+
   useEffect(() => {
     if (!loading && !user) router.replace('/auth')
   }, [user, loading, router])
@@ -30,8 +50,17 @@ export default function AccountPage() {
 
   useEffect(() => {
     if (!user) return
-    supabase.from('profiles').select('avatar_url').eq('id', userId).single()
-      .then(({ data }) => { if (data?.avatar_url) setAvatarUrl(data.avatar_url) })
+    supabase
+      .from('profiles')
+      .select('avatar_url, training_level, workout_background, activities')
+      .eq('id', userId)
+      .single()
+      .then(({ data }) => {
+        if (data?.avatar_url) setAvatarUrl(data.avatar_url)
+        setTrainingLevel(data?.training_level ?? '')
+        setWorkoutBackground(data?.workout_background ?? '')
+        setActivities(Array.isArray(data?.activities) ? data.activities : [])
+      })
   }, [user])
 
   async function uploadAvatar(file: File) {
@@ -66,29 +95,24 @@ export default function AccountPage() {
     setPromoMsg('')
     const code = promoCode.trim().toUpperCase()
     try {
-      // Check if user already redeemed any code
       const { data: existing } = await supabase
         .from('promo_redemptions').select('id').eq('user_id', userId).single()
       if (existing) { setPromoError('You have already redeemed a promo code.'); return }
 
-      // Find the code
       const { data: promo } = await supabase
         .from('promo_codes').select('id, role, max_uses, uses, expires_at').eq('code', code).single()
       if (!promo) { setPromoError('Code not found. Check spelling and try again.'); return }
 
-      // Check expiry
       if (promo.expires_at && new Date(promo.expires_at) < new Date()) {
         setPromoError('This code has expired.'); return
       }
 
-      // Check max uses by counting redemptions
       if (promo.max_uses > 0) {
         const { count } = await supabase
           .from('promo_redemptions').select('*', { count: 'exact', head: true }).eq('code_id', promo.id)
         if ((count ?? 0) >= promo.max_uses) { setPromoError('This code has reached its maximum uses.'); return }
       }
 
-      // Grant access
       await supabase.from('profiles').update({ role: promo.role }).eq('id', userId)
       await supabase.from('promo_redemptions').insert({ user_id: userId, code_id: promo.id })
 
@@ -101,6 +125,31 @@ export default function AccountPage() {
     }
   }
 
+  async function saveBackground() {
+    if (!user) return
+    setBackgroundSaving(true)
+    await supabase.from('profiles').update({
+      training_level: trainingLevel || null,
+      workout_background: workoutBackground.trim() || null,
+      activities,
+    }).eq('id', userId)
+    setBackgroundSaving(false)
+    setBackgroundSaved(true)
+    setTimeout(() => setBackgroundSaved(false), 2500)
+  }
+
+  function addActivity() {
+    const name = newActivityName.trim()
+    if (!name) return
+    setActivities(prev => [...prev, { name, level: newActivityLevel }])
+    setNewActivityName('')
+    setNewActivityLevel('beginner')
+  }
+
+  function removeActivity(index: number) {
+    setActivities(prev => prev.filter((_, i) => i !== index))
+  }
+
   if (loading || !user) return null
 
   const firstName = profile?.name?.split(' ')[0]
@@ -111,6 +160,7 @@ export default function AccountPage() {
   const sports = profile?.sport ? profile.sport.split(', ') : []
   const goals = profile?.goal ? profile.goal.split(', ') : []
   const profileComplete = !!(profile?.name && profile?.sport && profile?.goal)
+  const backgroundComplete = !!(trainingLevel)
 
   return (
     <div style={{ padding: '24px 16px 100px', maxWidth: 480, margin: '0 auto' }}>
@@ -164,11 +214,11 @@ export default function AccountPage() {
       {/* Plan tier badge */}
       {(() => {
         const tiers = {
-          admin: { label: 'Admin', color: 'var(--orange)', bg: 'rgba(255,150,50,0.1)', border: 'rgba(255,150,50,0.25)' },
-          beta:  { label: 'Beta Access', color: 'var(--green)', bg: 'rgba(78,201,122,0.1)', border: 'rgba(78,201,122,0.25)' },
-          ff:    { label: 'F&F Beta', color: '#00b4ff', bg: 'rgba(0,180,255,0.1)', border: 'rgba(0,180,255,0.25)' },
-          coach: { label: 'Coach', color: '#a78bfa', bg: 'rgba(167,139,250,0.1)', border: 'rgba(167,139,250,0.25)' },
-          free:  { label: 'Free Plan', color: 'var(--accent)', bg: 'var(--accent-bg)', border: 'var(--accent-border)' },
+          admin: { label: 'Admin',      color: 'var(--orange)', bg: 'rgba(255,150,50,0.1)', border: 'rgba(255,150,50,0.25)' },
+          beta:  { label: 'Beta Access',color: 'var(--green)',  bg: 'rgba(78,201,122,0.1)', border: 'rgba(78,201,122,0.25)' },
+          ff:    { label: 'F&F Beta',   color: '#00b4ff',       bg: 'rgba(0,180,255,0.1)',  border: 'rgba(0,180,255,0.25)' },
+          coach: { label: 'Coach',      color: '#a78bfa',       bg: 'rgba(167,139,250,0.1)',border: 'rgba(167,139,250,0.25)' },
+          free:  { label: 'Free Plan',  color: 'var(--accent)', bg: 'var(--accent-bg)',     border: 'var(--accent-border)' },
         }
         const tier = tiers[role] ?? tiers.free
         return (
@@ -217,10 +267,188 @@ export default function AccountPage() {
             ? <span style={{ fontSize: 11, fontWeight: 700, color: '#4ec97a' }}>✓ Complete</span>
             : <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)' }}>Incomplete</span>}
         </div>
-        <SummaryRow label="Name" value={profile?.name ?? 'Not set'} dim={!profile?.name} />
-        <SummaryRow label="Sport(s)" value={sports.length ? sports.join(', ') : 'Not set'} dim={!sports.length} />
-        <SummaryRow label="Goal(s)" value={goals.length ? goals.slice(0,2).join(', ') + (goals.length > 2 ? '…' : '') : 'Not set'} dim={!goals.length} />
-        <SummaryRow label="Days/week" value={profile?.daysPerWeek ? `${profile.daysPerWeek} days` : 'Not set'} dim={!profile?.daysPerWeek} last />
+        <SummaryRow label="Name"     value={profile?.name ?? 'Not set'}                                          dim={!profile?.name} />
+        <SummaryRow label="Sport(s)" value={sports.length ? sports.join(', ') : 'Not set'}                      dim={!sports.length} />
+        <SummaryRow label="Goal(s)"  value={goals.length ? goals.slice(0,2).join(', ') + (goals.length > 2 ? '…' : '') : 'Not set'} dim={!goals.length} />
+        <SummaryRow label="Days/week" value={profile?.daysPerWeek ? `${profile.daysPerWeek} days` : 'Not set'}  dim={!profile?.daysPerWeek} last />
+      </div>
+
+      {/* ── Training Background card ── */}
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, marginBottom: 16, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-mid)' }}>Training Background</span>
+            <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>Helps the AI tailor your plan to your real experience level</p>
+          </div>
+          {backgroundComplete
+            ? <span style={{ fontSize: 11, fontWeight: 700, color: '#4ec97a', flexShrink: 0 }}>✓ Set</span>
+            : <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', flexShrink: 0 }}>Not set</span>}
+        </div>
+
+        <div style={{ padding: '16px' }}>
+
+          {/* Training level */}
+          <div style={{ marginBottom: 20 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-dim)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>
+              Training Level
+            </p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {LEVELS.map(level => {
+                const active = trainingLevel === level
+                const c = LEVEL_COLOR[level]
+                return (
+                  <button
+                    key={level}
+                    onClick={() => setTrainingLevel(active ? '' : level)}
+                    style={{
+                      padding: '8px 14px', borderRadius: 20,
+                      border: `1px solid ${active ? c.border : 'var(--border)'}`,
+                      background: active ? c.bg : 'var(--surface2)',
+                      color: active ? c.color : 'var(--text-dim)',
+                      fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      textTransform: 'capitalize', letterSpacing: '0.04em',
+                      touchAction: 'manipulation',
+                    }}
+                  >
+                    {level}
+                  </button>
+                )
+              })}
+            </div>
+            {trainingLevel && (
+              <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8, lineHeight: 1.5 }}>
+                {trainingLevel === 'beginner'     && 'Less than 1 year of consistent training.'}
+                {trainingLevel === 'intermediate' && '1–3 years of training. Familiar with compound movements.'}
+                {trainingLevel === 'expert'       && '3–5 years. Programs your own training with good technique.'}
+                {trainingLevel === 'elite'        && 'Competitive athlete. Sport-specific periodization.'}
+                {trainingLevel === 'pro'          && 'Professional or semi-professional athlete.'}
+              </p>
+            )}
+          </div>
+
+          {/* Workout background */}
+          <div style={{ marginBottom: 20 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-dim)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>
+              Workout Background
+            </p>
+            <textarea
+              value={workoutBackground}
+              onChange={e => setWorkoutBackground(e.target.value)}
+              placeholder="Describe your training history — programs you've followed, lifting style, sports background, anything the AI should know."
+              rows={4}
+              style={{
+                width: '100%', padding: '11px 14px', borderRadius: 10,
+                border: '1px solid var(--border)', background: 'var(--surface2)',
+                color: 'var(--text)', fontSize: 13, outline: 'none',
+                resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6,
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
+
+          {/* Sport / activity background */}
+          <div style={{ marginBottom: 20 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-dim)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>
+              Sport & Activity Background
+            </p>
+
+            {/* Existing activities */}
+            {activities.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                {activities.map((act, i) => {
+                  const c = LEVEL_COLOR[act.level] ?? LEVEL_COLOR.beginner
+                  return (
+                    <div key={i} style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '10px 12px', borderRadius: 10,
+                      background: 'var(--surface2)', border: '1px solid var(--border)',
+                    }}>
+                      <div style={{ flex: 1 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{act.name}</span>
+                      </div>
+                      <span style={{
+                        padding: '3px 10px', borderRadius: 12,
+                        fontSize: 10, fontWeight: 700, textTransform: 'capitalize',
+                        letterSpacing: '0.05em',
+                        background: c.bg, color: c.color, border: `1px solid ${c.border}`,
+                        flexShrink: 0,
+                      }}>
+                        {act.level}
+                      </span>
+                      <button
+                        onClick={() => removeActivity(i)}
+                        style={{
+                          background: 'none', border: 'none', color: 'var(--text-dim)',
+                          cursor: 'pointer', fontSize: 16, padding: '4px 6px',
+                          lineHeight: 1, flexShrink: 0, touchAction: 'manipulation',
+                        }}
+                        title="Remove"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Add new activity */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <input
+                value={newActivityName}
+                onChange={e => setNewActivityName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addActivity() } }}
+                placeholder="e.g. Skateboarding, Golf, MMA…"
+                style={{
+                  flex: 1, minWidth: 140, padding: '9px 12px', borderRadius: 8,
+                  border: '1px solid var(--border)', background: 'var(--surface2)',
+                  color: 'var(--text)', fontSize: 13, outline: 'none', fontFamily: 'inherit',
+                }}
+              />
+              <select
+                value={newActivityLevel}
+                onChange={e => setNewActivityLevel(e.target.value)}
+                style={{
+                  padding: '9px 10px', borderRadius: 8,
+                  border: '1px solid var(--border)', background: 'var(--surface2)',
+                  color: 'var(--text)', fontSize: 13, outline: 'none', fontFamily: 'inherit',
+                  cursor: 'pointer',
+                }}
+              >
+                {LEVELS.map(l => <option key={l} value={l}>{l.charAt(0).toUpperCase() + l.slice(1)}</option>)}
+              </select>
+              <button
+                onClick={addActivity}
+                disabled={!newActivityName.trim()}
+                style={{
+                  padding: '9px 16px', borderRadius: 8, border: 'none',
+                  background: newActivityName.trim() ? 'var(--accent)' : 'var(--surface2)',
+                  color: newActivityName.trim() ? '#fff' : 'var(--text-dim)',
+                  fontSize: 13, fontWeight: 700, cursor: newActivityName.trim() ? 'pointer' : 'default',
+                  touchAction: 'manipulation', whiteSpace: 'nowrap',
+                }}
+              >
+                + Add
+              </button>
+            </div>
+          </div>
+
+          {/* Save button */}
+          <button
+            onClick={saveBackground}
+            disabled={backgroundSaving}
+            style={{
+              width: '100%', padding: '13px', borderRadius: 10, border: 'none',
+              background: backgroundSaved ? 'var(--green-bg)' : 'var(--accent)',
+              color: backgroundSaved ? 'var(--green)' : '#fff',
+              fontWeight: 700, fontSize: 14, cursor: backgroundSaving ? 'default' : 'pointer',
+              transition: 'background 0.3s, color 0.3s', touchAction: 'manipulation',
+              border: backgroundSaved ? '1px solid var(--green-border)' : 'none',
+            } as React.CSSProperties}
+          >
+            {backgroundSaving ? 'Saving…' : backgroundSaved ? '✓ Saved' : 'Save Background'}
+          </button>
+        </div>
       </div>
 
       {/* Actions */}
