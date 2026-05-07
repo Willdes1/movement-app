@@ -175,12 +175,10 @@ export default function LogPage() {
                       title="Delete this log entry"
                       style={{
                         background: 'none', border: 'none', cursor: deleting === log.id ? 'not-allowed' : 'pointer',
-                        color: 'var(--text-dim)', fontSize: 14, padding: '2px 4px',
-                        opacity: deleting === log.id ? 0.4 : 0.5, lineHeight: 1,
-                        transition: 'opacity 0.15s',
+                        color: 'var(--text-dim)', fontSize: 18, padding: '6px 8px',
+                        opacity: deleting === log.id ? 0.3 : 0.8, lineHeight: 1,
+                        transition: 'opacity 0.15s', touchAction: 'manipulation',
                       }}
-                      onMouseEnter={e => { if (deleting !== log.id) (e.currentTarget as HTMLButtonElement).style.opacity = '1' }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = deleting === log.id ? '0.4' : '0.5' }}
                     >
                       ×
                     </button>

@@ -27,15 +27,13 @@ export default function CoachLayout({ children }: { children: React.ReactNode })
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
-      {/* Coach sidebar */}
-      <nav style={{
+      {/* Coach sidebar — hidden on mobile via CSS class */}
+      <nav className="coach-sidebar" style={{
         position: 'fixed',
         top: 0, left: 0, bottom: 0,
         width: 230,
         background: 'var(--surface)',
         borderRight: '1px solid var(--border)',
-        display: 'flex',
-        flexDirection: 'column',
         zIndex: 40,
       }}>
         {/* Brand */}
@@ -107,10 +105,60 @@ export default function CoachLayout({ children }: { children: React.ReactNode })
         </div>
       </nav>
 
-      {/* Main content */}
-      <main style={{ marginLeft: 230, flex: 1, minHeight: '100vh' }}>
+      {/* Main content — margin-left handled by CSS class on desktop */}
+      <main className="coach-main">
         {children}
       </main>
+
+      {/* Mobile bottom nav — hidden on desktop via CSS class */}
+      <nav className="coach-mobile-nav">
+        {coachNav.map(item => {
+          const active = pathname === item.href || pathname.startsWith(item.href + '/')
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 3,
+                padding: '4px 0',
+                color: active ? 'var(--accent)' : 'var(--text-dim)',
+                textDecoration: 'none',
+                fontSize: 8,
+                fontWeight: 800,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+              }}
+            >
+              <span style={{ fontSize: 18 }}>{item.emoji}</span>
+              {item.label}
+            </Link>
+          )
+        })}
+        <Link
+          href="/today"
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 3,
+            padding: '4px 0',
+            color: 'var(--text-dim)',
+            textDecoration: 'none',
+            fontSize: 8,
+            fontWeight: 800,
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+          }}
+        >
+          <span style={{ fontSize: 18 }}>←</span>
+          My App
+        </Link>
+      </nav>
     </div>
   )
 }

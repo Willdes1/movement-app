@@ -137,7 +137,7 @@ function OverviewTab({ users, events, kpis, isMobile }: {
       </div>
 
       {/* Activity + Users */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
         <Panel>
           <div style={{ padding: '14px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <p style={{ fontWeight: 700, fontSize: 12, color: C.accent, fontFamily: 'monospace', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Recent Activity</p>
