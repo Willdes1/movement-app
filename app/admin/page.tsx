@@ -32,7 +32,7 @@ type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'm
 type TodoRow = { id: string; content: string; category: string; status: string; priority: string; created_at: string; updated_at: string }
 type IdeaRow = { id: string; content: string; category: string; created_at: string }
 type PromoRow = { id: string; code: string; role: string; max_uses: number; uses: number; created_at: string }
-type ProfileRow = { id: string; email: string; name: string | null; full_name: string | null; role: string; is_admin: boolean; created_at: string }
+type ProfileRow = { id: string; name: string | null; role: string; is_admin: boolean; updated_at: string }
 type UserStat = ProfileRow & { hasProgram: boolean; programId: string | null; weeksGenerated: number; daysCompleted: number; exerciseLogs: number; lastActive: string | null }
 type ActivityEvent = { key: string; type: 'signup' | 'week' | 'complete' | 'log'; userName: string; detail: string; timestamp: string }
 
@@ -52,7 +52,7 @@ function fmtRelative(iso: string) {
   return fmtDate(iso)
 }
 function displayName(p: ProfileRow) {
-  return p.name ?? p.full_name ?? p.email
+  return p.name ?? 'Unknown User'
 }
 
 // ─── SHARED UI ────────────────────────────────────────────────────────────────
@@ -164,7 +164,7 @@ function OverviewTab({ users, events, kpis, isMobile }: {
                 {displayName(u)[0]?.toUpperCase() ?? '?'}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: C.text }}>{u.email}</p>
+                <p style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: C.text }}>{displayName(u)}</p>
                 <p style={{ fontSize: 10, color: C.textDim }}>{u.hasProgram ? `${u.weeksGenerated}w · ${u.daysCompleted} days` : 'No plan'}</p>
               </div>
               <RoleBadge role={u.role} />
@@ -192,7 +192,7 @@ function ZoomInModal({ target, onConfirm, onCancel, loading }: {
           <p style={{ fontSize: 10, fontWeight: 800, color: C.red, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>Zoom In</p>
           <p style={{ fontSize: 16, fontWeight: 700, color: C.text }}>View app as</p>
           <p style={{ fontSize: 15, fontWeight: 700, color: C.accent, marginTop: 2 }}>{displayName(target)}</p>
-          <p style={{ fontSize: 11, color: C.textDim, fontFamily: 'monospace', marginTop: 4 }}>{target.email}</p>
+          <p style={{ fontSize: 11, color: C.textDim, fontFamily: 'monospace', marginTop: 4 }}>{target.id.slice(0, 12)}…</p>
         </div>
 
         <div style={{ marginBottom: 18 }}>
@@ -259,7 +259,7 @@ function UsersTab({ users, onRoleChange, onZoomIn, onOpenZoomModal }: {
 
   const filtered = users.filter(u => {
     const q = search.toLowerCase()
-    return !q || u.email.toLowerCase().includes(q) || displayName(u).toLowerCase().includes(q)
+    return !q || displayName(u).toLowerCase().includes(q) || u.id.toLowerCase().includes(q)
   })
 
   return (
@@ -291,15 +291,15 @@ function UsersTab({ users, onRoleChange, onZoomIn, onOpenZoomModal }: {
           <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '2fr 90px 70px 70px 60px 60px 100px 90px 110px 120px', padding: '13px 20px', borderBottom: i < filtered.length - 1 ? `1px solid ${C.border}` : 'none', alignItems: 'center', gap: 0 }}>
             <div>
               <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 2, color: C.text }}>{displayName(u)}</p>
-              <p style={{ fontSize: 10, color: C.textDim, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220, fontFamily: 'monospace' }}>{u.email}</p>
+              <p style={{ fontSize: 10, color: C.textDim, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220, fontFamily: 'monospace' }}>{u.id.slice(0, 16)}…</p>
             </div>
             <RoleBadge role={u.role} />
             <span style={{ fontSize: 11, color: u.hasProgram ? C.green : C.textDim, fontWeight: u.hasProgram ? 700 : 400, fontFamily: 'monospace' }}>{u.hasProgram ? 'Active' : '—'}</span>
             <span style={{ fontSize: 13, fontWeight: 600, color: u.weeksGenerated > 0 ? C.accent : C.textDim, fontFamily: 'monospace' }}>{u.weeksGenerated || '—'}</span>
             <span style={{ fontSize: 13, fontWeight: 600, color: u.daysCompleted > 0 ? C.text : C.textDim, fontFamily: 'monospace' }}>{u.daysCompleted || '—'}</span>
             <span style={{ fontSize: 13, fontWeight: 600, color: u.exerciseLogs > 0 ? C.text : C.textDim, fontFamily: 'monospace' }}>{u.exerciseLogs || '—'}</span>
-            <span style={{ fontSize: 10, color: C.textDim, fontFamily: 'monospace' }}>{u.lastActive ? fmtRelative(u.lastActive) : fmtDate(u.created_at)}</span>
-            <span style={{ fontSize: 11, color: C.textDim, fontFamily: 'monospace' }}>{fmtDate(u.created_at)}</span>
+            <span style={{ fontSize: 10, color: C.textDim, fontFamily: 'monospace' }}>{u.lastActive ? fmtRelative(u.lastActive) : fmtDate(u.updated_at)}</span>
+            <span style={{ fontSize: 11, color: C.textDim, fontFamily: 'monospace' }}>{fmtDate(u.updated_at)}</span>
             {u.is_admin ? (
               <span style={{ fontSize: 10, color: C.amber, fontFamily: 'monospace' }}>Admin</span>
             ) : (
@@ -567,7 +567,7 @@ function UserDetailPanel({ user, onClose, onSaved }: { user: UserStat; onClose: 
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ fontWeight: 700, fontSize: 15, color: C.text }}>{displayName(user)}</p>
-            <p style={{ fontSize: 11, color: C.textDim, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</p>
+            <p style={{ fontSize: 11, color: C.textDim, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.id.slice(0, 16)}…</p>
           </div>
           <RoleBadge role={user.role} />
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.textDim, fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: '0 4px', marginLeft: 4 }}>×</button>
@@ -579,7 +579,7 @@ function UserDetailPanel({ user, onClose, onSaved }: { user: UserStat; onClose: 
             { label: 'Weeks', value: user.weeksGenerated || '—', color: user.weeksGenerated > 0 ? C.accent : C.textDim },
             { label: 'Days Done', value: user.daysCompleted || '—', color: user.daysCompleted > 0 ? C.green : C.textDim },
             { label: 'Logs', value: user.exerciseLogs || '—', color: user.exerciseLogs > 0 ? C.purple : C.textDim },
-            { label: 'Joined', value: fmtDate(user.created_at), color: C.textDim },
+            { label: 'Joined', value: fmtDate(user.updated_at), color: C.textDim },
           ].map((s, i) => (
             <div key={s.label} style={{ padding: '10px', textAlign: 'center', borderRight: i < 3 ? `1px solid ${C.border}` : 'none' }}>
               <p style={{ fontSize: 15, fontWeight: 800, color: s.color }}>{s.value}</p>
@@ -1467,7 +1467,7 @@ export default function AdminPage() {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
     const [profilesRes, programsRes, weekPlansRes, completionsRes, logsRes, todosRes, ideasRes, promosRes, recentSignupsRes] = await Promise.all([
-      supabase.from('profiles').select('id, email, name, full_name, role, is_admin, created_at').order('created_at', { ascending: false }),
+      supabase.from('profiles').select('id, name, role, is_admin, updated_at').order('updated_at', { ascending: false }),
       supabase.from('training_programs').select('id, user_id'),
       supabase.from('weekly_plans').select('program_id, week_number, created_at').order('created_at', { ascending: false }).limit(50),
       supabase.from('day_completions').select('user_id, week_number, day_index, created_at').order('created_at', { ascending: false }).limit(100),
@@ -1475,7 +1475,7 @@ export default function AdminPage() {
       supabase.from('todos').select('*').order('created_at', { ascending: false }),
       supabase.from('ideas').select('*').order('created_at', { ascending: false }),
       supabase.from('promo_codes').select('*').order('created_at', { ascending: false }),
-      supabase.from('profiles').select('id', { count: 'exact', head: true }).gte('created_at', sevenDaysAgo.toISOString()),
+      supabase.from('profiles').select('id', { count: 'exact', head: true }).gte('updated_at', sevenDaysAgo.toISOString()),
     ])
 
     const profiles: ProfileRow[] = profilesRes.data ?? []
@@ -1525,7 +1525,7 @@ export default function AdminPage() {
     const activityEvents: ActivityEvent[] = []
 
     profiles.slice(0, 10).forEach(p => {
-      activityEvents.push({ key: `signup-${p.id}`, type: 'signup', userName: displayName(p), detail: `Joined · ${p.role} tier`, timestamp: p.created_at })
+      activityEvents.push({ key: `signup-${p.id}`, type: 'signup', userName: displayName(p), detail: `Joined · ${p.role} tier`, timestamp: p.updated_at })
     })
     weekPlans.slice(0, 15).forEach(wp => {
       const userId = programIdToUserId.get(wp.program_id)
