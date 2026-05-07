@@ -112,12 +112,13 @@ export default function TodayPage() {
 
   useEffect(() => {
     if (!user || loading) return
+    if (isAdmin || role === 'admin') return  // admins never see the welcome modal
     const key = `movement_welcomed_${userId}`
     if (!localStorage.getItem(key)) {
       setShowWelcomeModal(true)
       localStorage.setItem(key, '1')
     }
-  }, [user, userId, loading])
+  }, [user, userId, loading, isAdmin, role])
 
   const isRecovering = !!activeRecovery
   const isRestDay = todayPlan?.type === 'rest'

@@ -219,6 +219,15 @@ All three feed the same search index. Different shapes, one search surface.
 
 ---
 
+## 🔒 DB Safety Rules — Profiles Table (added 2026-05-07)
+> Incident: recursive RLS policy on profiles caused fetchUserStatus to return null, silently locking admin out. Root cause was an admin read-all policy with a self-referencing subquery. Fixed with SECURITY DEFINER function pattern.
+
+- **Bulk operations on profiles are catastrophic-risk.** Any seeding, migration, or test script that touches `profiles` must guard admin rows. Pattern: `WHERE role != 'admin'` or `WHERE id != '<admin-uuid>'` on every UPDATE/UPSERT. No exceptions.
+- **`role` column has no default** (removed 2026-05-07). Any INSERT that omits `role` will fail loudly. This is intentional — forces explicit role assignment on every new profile.
+- **BEFORE UPDATE trigger `protect_admin_role_trigger`** on `profiles` — raises exception if any UPDATE attempts to change `role` away from `'admin'` or revoke `is_admin`. Database-level guarantee that no app code or migration can accidentally demote an admin.
+- **RLS admin read-all must use `SECURITY DEFINER` function** — never a recursive subquery on the same table. Pattern: `CREATE FUNCTION is_admin_user() RETURNS boolean SECURITY DEFINER` → call it from the policy. Direct subquery `(SELECT is_admin FROM profiles WHERE id = auth.uid())` inside a profiles policy causes PostgREST to return null for all rows.
+- **Admin modal override** — `today/page.tsx` welcome modal is gated by localStorage key `movement_welcomed_${userId}`. Added `if (isAdmin || role === 'admin') return` guard so even if localStorage is missing (new device/browser), admin never sees the onboarding modal.
+
 ## ⚠️ Launch Blockers — DO NOT ship to non-admin users until resolved
 
 - [ ] **TOS / Privacy Policy disclosure (BLOCKS impersonation rollout)** — No TOS or Privacy Policy page exists. Required before any non-admin user can be subject to admin impersonation. Add this exact language to the Privacy Policy at signup: *"Authorized administrators of the Movement platform may access your account for purposes of customer support, technical debugging, and platform integrity. All such access is logged and subject to internal audit."* Do not enable Zoom In on real user accounts until this disclosure is live and agreed to at signup. Admin-only testing (Will's account) is fine to proceed without it.
