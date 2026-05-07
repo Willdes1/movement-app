@@ -140,6 +140,85 @@
   - Model used (claude-sonnet-4-6 or other)
 - [ ] Update automatically as new agents are added
 
+## 🧠 Admin Portal v2 — Modular Architecture + AI Search Layer (added 2026-05-07)
+> Strategic reframe: treat the admin portal as a potential standalone SaaS product (Movement is the first app running on it). Architectural decisions now must not paint us into a corner. Does NOT mean over-engineering V1.
+
+### ⛔ Trigger Gates — Do NOT start until ALL THREE are met
+- [ ] Impersonation (Zoom In) smoke-tested and fully verified
+- [ ] Coach portal at a stable checkpoint (at least dashboard + clients live)
+- [ ] At least one beta tester actively using the platform
+
+### Architectural Principles (non-negotiable)
+- **Module pattern, not feature pattern** — each major area is a self-contained module with its own route, table(s), and UI. Shared shell: top nav, AI search bar, breadcrumbs, consistent design tokens.
+- **org_id on every new table from day one** — default to a single hardcoded Movement org UUID. No org-switching UI yet. One column now prevents weeks of migration later.
+- **AI search bar lives in the shell, not a tab** — searches across ALL modules. RAG only (retrieves real records, never invents). Pluggable source registry: new module = register table + columns, no search engine rewrite.
+
+### Modules — existing (refactor into shell) + new (build fresh)
+| Module | Status | Notes |
+|---|---|---|
+| Users | Existing | Refactor into module shell, don't rebuild |
+| Coaches | In progress | Bring into shell when stable |
+| Impersonation Log + Reversal | In progress | Bring into shell when stable |
+| Media Library | Existing | Refactor into shell |
+| Exercise Library + Curation | Planned/deferred | — |
+| **Knowledge Base** | New | Highest-frequency; build first |
+| **Launchpad** | New | Revenue projections, competitor diff, branding prompts, trademark/legal drafts, active Claude Code prompts |
+| **Investor Materials** | New | Pitch deck uploads, investor summary angles, AI-draft generation |
+| **Ideas + Decisions Log** | New | Structured replacement for ideas/ and to-do/ folders; import existing on first run, keep folders as git-backed offline mirror |
+
+### Search Infrastructure
+- Table: `search_index` (source_module, source_id, text_content, embedding vector, created_at)
+- pgvector via Supabase native support
+- Hybrid search: semantic (embeddings) + keyword (Postgres full-text) — semantic catches intent, keyword catches exact strings
+- Result format: synthesized answer + source records pulled + clickable links to those records. Never "here's what I think" — always "here's what I found and where it came from."
+- Bar placement V1: single global bar in admin shell header
+- Bar placement V2 (gate on V1 usage): per-module contextual pre-filter
+
+### Knowledge Base table: `admin_knowledge_entries`
+Columns: id, org_id, title, body (markdown), tags (text[]), category, module_link (optional cross-link to another module), created_at, updated_at, created_by, updated_by, archived (bool)
+Features: markdown editor + live preview, tag/category selectors, cross-link suggestions, list view with filters.
+Seed entries to write on day one:
+- F&F beta onboarding playbook
+- How to create a test/beta user
+- How to mark a user as F&F / extend free trial / set role to coach
+- How to approve a coach
+- How to run impersonation + reversal
+- How to add an approved YouTube channel for curation
+- Common troubleshooting: smoke test failures, RLS issues, missing migrations
+- Trigger gates for every deferred feature in to-do/ (so they're searchable, not just buried in markdown)
+
+### "Save to Admin Memory" — global capture pattern
+Three flavors available across every module:
+1. **Save to Knowledge Base** — opens markdown editor pre-filled
+2. **Save to Decisions Log** — append-only "we decided X because Y on date Z"
+3. **Save to Ideas** — append-only, lowest friction
+
+All three feed the same search index. Different shapes, one search surface.
+
+### What is deliberately NOT in V1
+- Multi-user admin (org_id column is there for later, not the UI)
+- External sharing of any module (no public links, no investor read-only views)
+- Mobile admin (desktop only)
+- Voice-to-admin-memory capture (separate workstream)
+- Any client-facing features
+
+### Build order (when trigger gates are met)
+1. Read CLAUDE.md, to-do/, ideas/ — identify overlaps with existing modules before touching anything
+2. Propose schema for new tables (admin_knowledge_entries, admin_decisions_log, admin_ideas, launchpad_entries, investor_materials, search_index) + org_id migration for existing tables — show before migrating
+3. Admin shell refactor first — new top nav, module switcher, empty AI search bar in header. No content yet, just the clickable structure
+4. Search infrastructure — search_index table, pgvector setup, source-registration pattern, hybrid query logic. Test on fake seeded data before wiring real modules
+5. Knowledge Base module (highest frequency)
+6. Launchpad → Ideas + Decisions Log → Investor Materials
+7. Refactor existing modules (Users, Coaches, Media, Impersonation Log) into new shell last — don't break what's working
+
+### Smoke test acceptance (definition of done)
+- [ ] Type "how do I create a beta user" → synthesized answer from actual Knowledge Base entry + clickable link
+- [ ] Type "kris" → finds Kris McKenna's coach record from Coaches module
+- [ ] Type "competitor pricing" → finds the relevant Launchpad entry
+- All three from the same bar, no module switching
+
+---
+
 ## ⚠️ Launch Blockers — DO NOT ship to non-admin users until resolved
 
 - [ ] **TOS / Privacy Policy disclosure (BLOCKS impersonation rollout)** — No TOS or Privacy Policy page exists. Required before any non-admin user can be subject to admin impersonation. Add this exact language to the Privacy Policy at signup: *"Authorized administrators of the Movement platform may access your account for purposes of customer support, technical debugging, and platform integrity. All such access is logged and subject to internal audit."* Do not enable Zoom In on real user accounts until this disclosure is live and agreed to at signup. Admin-only testing (Will's account) is fine to proceed without it.
@@ -171,4 +250,4 @@
 - [x] Account tab with sign out, edit profile, admin link
 
 ---
-*Last updated: 2026-04-29*
+*Last updated: 2026-05-07*
