@@ -16,7 +16,7 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname()
-  const { user, isAdmin, role } = useAuth()
+  const { user, isAdmin, role, impersonating } = useAuth()
   const [profile, setProfile] = useState<{ name: string | null; sports: string[] | null } | null>(null)
 
   useEffect(() => {
@@ -100,8 +100,8 @@ export default function Sidebar() {
         })}
       </div>
 
-      {/* Coach portal link — coaches and admins only */}
-      {(isAdmin || role === 'coach') && (
+      {/* Coach portal link — coaches and admins only; hidden during impersonation */}
+      {!impersonating && (isAdmin || role === 'coach') && (
         <div style={{ padding: '0 8px 4px' }}>
           <Link
             href="/coach/dashboard"
