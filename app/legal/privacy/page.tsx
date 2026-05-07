@@ -109,8 +109,7 @@ export default function PrivacyPage() {
       </Section>
 
       <Section title="10. Contact">
-        <P>For privacy questions, data requests, or to report a concern:</P>
-        <P><a href="mailto:dentalseowill@gmail.com" style={{ color: 'var(--accent)', textDecoration: 'none' }}>dentalseowill@gmail.com</a></P>
+        <P>For privacy questions, data requests, or to report a concern, use the feedback option in the Account page inside the app or the support channel listed there.</P>
       </Section>
 
       <div style={{ marginTop: 40, paddingTop: 24, borderTop: '1px solid var(--border)', display: 'flex', gap: 20, flexWrap: 'wrap' }}>

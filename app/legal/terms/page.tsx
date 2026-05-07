@@ -90,7 +90,7 @@ export default function TermsPage() {
       </Section>
 
       <Section title="12. Contact">
-        <P>Questions about these terms? Reach us at <a href="mailto:dentalseowill@gmail.com" style={{ color: 'var(--accent)', textDecoration: 'none' }}>dentalseowill@gmail.com</a>.</P>
+        <P>Questions about these terms? Use the feedback option in the Account page inside the app, or reach out through the support channel listed there.</P>
       </Section>
 
       <div style={{ marginTop: 40, paddingTop: 24, borderTop: '1px solid var(--border)', display: 'flex', gap: 20, flexWrap: 'wrap' }}>
