@@ -63,7 +63,7 @@ export default function BottomNav() {
   const pathname = usePathname()
   const { activeRecovery } = useTheme()
 
-  if (pathname.startsWith('/admin') || pathname.startsWith('/coach')) return null
+  if (pathname.startsWith('/admin') || pathname.startsWith('/coach') || pathname.startsWith('/legal') || pathname.startsWith('/auth')) return null
 
   return (
     <nav style={{

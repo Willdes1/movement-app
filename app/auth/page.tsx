@@ -36,12 +36,17 @@ export default function AuthPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [promoCode, setPromoCode] = useState('')
+  const [tosAccepted, setTosAccepted] = useState(false)
   const [error, setError] = useState(oauthError ? 'Google sign-in failed or was cancelled. Please try again.' : '')
   const [loading, setLoading] = useState(false)
   const [confirmSent, setConfirmSent] = useState(false)
 
   async function handleGoogleAuth() {
     setError('')
+    if (mode === 'signup' && !tosAccepted) {
+      setError('Please accept the Terms of Service and Privacy Policy to continue.')
+      return
+    }
     setLoading(true)
 
     if (mode === 'signup') {
@@ -76,6 +81,10 @@ export default function AuthPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    if (mode === 'signup' && !tosAccepted) {
+      setError('Please accept the Terms of Service and Privacy Policy to continue.')
+      return
+    }
     setLoading(true)
 
     if (mode === 'signup') {
@@ -252,6 +261,28 @@ export default function AuthPage() {
           </div>
         )}
 
+        {mode === 'signup' && (
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', userSelect: 'none' }}>
+            <input
+              type="checkbox"
+              checked={tosAccepted}
+              onChange={e => setTosAccepted(e.target.checked)}
+              style={{ marginTop: 2, accentColor: 'var(--accent)', width: 15, height: 15, flexShrink: 0, cursor: 'pointer' }}
+            />
+            <span style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.55 }}>
+              I agree to the{' '}
+              <a href="/legal/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>
+                Terms of Service
+              </a>
+              {' '}and{' '}
+              <a href="/legal/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>
+                Privacy Policy
+              </a>
+              , including that admins may access my account for support purposes with full audit logging.
+            </span>
+          </label>
+        )}
+
         {error && (
           <div style={{ fontSize: 13, color: 'var(--red)', padding: '10px 14px', background: 'rgba(255,77,77,0.08)', borderRadius: 8, border: '1px solid rgba(255,77,77,0.2)' }}>
             {error}
@@ -281,7 +312,7 @@ export default function AuthPage() {
       <p style={{ marginTop: 24, textAlign: 'center', fontSize: 14, color: 'var(--text-dim)' }}>
         {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
         <button
-          onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError('') }}
+          onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(''); setTosAccepted(false) }}
           style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
         >
           {mode === 'login' ? 'Sign up' : 'Sign in'}

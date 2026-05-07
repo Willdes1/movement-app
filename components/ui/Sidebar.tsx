@@ -29,7 +29,7 @@ export default function Sidebar() {
       .then(({ data }) => setProfile(data))
   }, [user])
 
-  if (pathname.startsWith('/admin') || pathname.startsWith('/auth') || pathname.startsWith('/coach')) return null
+  if (pathname.startsWith('/admin') || pathname.startsWith('/auth') || pathname.startsWith('/coach') || pathname.startsWith('/legal')) return null
 
   const firstName = profile?.name?.split(' ')[0] ?? 'Athlete'
   const sport = profile?.sports?.[0] ?? 'Movement'
