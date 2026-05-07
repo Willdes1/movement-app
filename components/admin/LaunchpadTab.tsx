@@ -193,9 +193,11 @@ function OverviewSection() {
     'Multi-sport profile, equipment constraints, injury restrictions, home/gym awareness',
     'Anatomy Explorer — Jarvis HUD with clickable skeleton, joint matrix, recovery protocols',
     'Responsive desktop sidebar + mobile bottom nav with active state routing',
-    'Admin Mission Control portal (analytics, users, todos, ideas, promos, launchpad)',
+    'Admin Mission Control portal (analytics, users, todos, ideas, promos, launchpad, zoom log)',
     'Auth gates, promo code system, F&F beta role, Vercel + Supabase + GitHub CI/CD',
-    'Admin user impersonation — view the full app as any user via sessionStorage, red sticky banner, exit button',
+    'Zoom In (admin impersonation V2) — ZoomIn modal with duration + reason, red countdown banner, auto-exit timer, full write logging, soft-delete queue, 30-day reversal UI in Zoom Log tab',
+    'Coach portal scaffolding — /coach/dashboard, /coach/clients, /coach/builder route shells with coach/admin role-gated layout',
+    'DB safety layer — protect_admin_role trigger (blocks accidental admin demotion at DB level), SECURITY DEFINER admin read-all RLS pattern, role column default removed',
     'Health Monitor — one-click scan of all pages, API routes, and DB tables with copy-paste Claude Code fix prompts',
   ]
   const COMING = [
@@ -225,7 +227,7 @@ function OverviewSection() {
   const ROADMAP = [
     { phase: 'Phase 1', label: 'Core Consumer App', status: 'done', items: 'AI plan generator (bulk 1/2/3-month) · Phase-based training with rest times · 6-block daily sessions · Exercise library · SI Joint + custom injury recovery · Return-to-sport agent · Calendar + undo completion · Workout logging · For You feed · Anatomy Explorer · Auth · Admin portal · CI/CD' },
     { phase: 'Phase 2', label: 'AI Agents + Monetization', status: 'active', items: 'Injury→training handoff (AI-modified safe plan during rehab) · Nutrition AI (3-month meal plan) · Stripe billing · Push notifications · Native iOS/Android · Wearable integration (Oura, Apple Watch)' },
-    { phase: 'Phase 3', label: 'Professional B2B Portal', status: 'upcoming', items: 'Trainer/PT/coach accounts · Client profile management · Client portal · Admin impersonation (beta support) · Professional analytics dashboard · Engagement tracking' },
+    { phase: 'Phase 3', label: 'Professional B2B Portal', status: 'active', items: 'Trainer/PT/coach accounts (schema + scaffolding complete) · PDF/DOCX program import · Exercise swap modal · Two-agent coach program generator · Affiliate system · Client profile management · Client portal · Coach analytics dashboard' },
     { phase: 'Phase 4', label: 'Marketplace + Scale', status: 'upcoming', items: 'Hire local trainers in-app · Marketplace listings · Built-in marketing automation · Revenue-sharing · Platform data as B2B sales intelligence' },
     { phase: 'Phase 5', label: 'Enterprise + Partnerships', status: 'upcoming', items: 'White-label options · Insurance partnerships · University athletics licensing · International expansion · Strategic acquisition potential' },
   ]
