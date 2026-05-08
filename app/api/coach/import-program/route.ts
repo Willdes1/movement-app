@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import mammoth from 'mammoth'
-// pdf-parse ships CommonJS only; require avoids ESM default-export mismatch
+// pdf-parse is excluded from bundling via serverExternalPackages in next.config.ts
+// so it runs as a native Node.js require and avoids the pdfjs-dist canvas issue.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfParse = require('pdf-parse') as (buffer: Buffer) => Promise<{ text: string }>
 

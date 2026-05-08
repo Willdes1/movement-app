@@ -394,7 +394,7 @@ function OverviewSection() {
             { label: 'PT / Rehab Agent', desc: 'Injury contraindications, tissue healing, pain science. Has veto power over all other agents.', color: C.red },
             { label: 'Sports Specialist', desc: 'Movement demands, energy systems, periodization for every sport and activity worldwide.', color: C.purple },
             { label: 'Mobility Specialist', desc: 'FRC, DNS, PRI principles. Owns warmup and cooldown block design.', color: C.amber },
-            { label: 'Recovery Agent', desc: 'HRV, sleep science, fatigue management, deload programming. Future: wearable data input.', color: C.blue ?? C.accent },
+            { label: 'Recovery Agent', desc: 'HRV, sleep science, fatigue management, deload programming. Future: wearable data input.', color: C.accent },
             { label: 'Mindset Agent', desc: 'Japanese warrior philosophy (Mushin, Kaizen, Zanshin). Owns For You feed and coaching cues.', color: C.textMid },
             { label: 'Critic / Verification', desc: 'Validates assembled output against ruleset. Flags specific blocks for re-run — not full regeneration.', color: C.amber },
             { label: 'Knowledge Curator', desc: 'Async background agent. Monitors research sources, flags updates, keeps DKS current.', color: C.green },

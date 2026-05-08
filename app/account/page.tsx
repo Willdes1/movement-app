@@ -438,7 +438,7 @@ export default function AccountPage() {
             onClick={saveBackground}
             disabled={backgroundSaving}
             style={{
-              width: '100%', padding: '13px', borderRadius: 10, border: 'none',
+              width: '100%', padding: '13px', borderRadius: 10,
               background: backgroundSaved ? 'var(--green-bg)' : 'var(--accent)',
               color: backgroundSaved ? 'var(--green)' : '#fff',
               fontWeight: 700, fontSize: 14, cursor: backgroundSaving ? 'default' : 'pointer',
