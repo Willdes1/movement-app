@@ -1,9 +1,4 @@
 import Anthropic from '@anthropic-ai/sdk'
-import mammoth from 'mammoth'
-// pdf-parse is excluded from bundling via serverExternalPackages in next.config.ts
-// so it runs as a native Node.js require and avoids the pdfjs-dist canvas issue.
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require('pdf-parse') as (buffer: Buffer) => Promise<{ text: string }>
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -66,9 +61,15 @@ export async function POST(request: Request) {
     let rawText = ''
 
     if (ext === 'docx') {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const mammoth = require('mammoth')
       const result = await mammoth.extractRawText({ buffer })
       rawText = result.value
     } else {
+      // Lazy require keeps pdf-parse out of module scope — prevents Vercel
+      // from crashing the route on load due to pdfjs-dist canvas dependencies.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const pdfParse = require('pdf-parse') as (b: Buffer) => Promise<{ text: string }>
       const data = await pdfParse(buffer)
       rawText = data.text
     }
@@ -80,7 +81,6 @@ export async function POST(request: Request) {
       )
     }
 
-    // Trim to 20k chars to keep token cost reasonable
     const truncated = rawText.length > 20000 ? rawText.slice(0, 20000) + '\n[document truncated]' : rawText
 
     const message = await client.messages.create({
