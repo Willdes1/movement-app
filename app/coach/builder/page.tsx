@@ -89,10 +89,20 @@ export default function CoachBuilderPage() {
     setStep('saving')
     setError('')
 
+    // Verify session is alive before writing — FK/RLS both need a valid JWT
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      setError('Session expired — please refresh the page and try again.')
+      setStep('preview')
+      return
+    }
+
+    const coachId = session.user.id
+
     const { data: prog, error: progErr } = await supabase
       .from('coach_programs')
       .insert({
-        coach_id: user.id,
+        coach_id: coachId,
         name: programTitle || program.title,
         source: 'import',
         import_filename: fileName,
