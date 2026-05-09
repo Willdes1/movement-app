@@ -5,9 +5,10 @@ import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 
 const coachNav = [
-  { href: '/coach/dashboard', label: 'Dashboard',  emoji: '📊' },
-  { href: '/coach/clients',   label: 'Clients',    emoji: '👥' },
-  { href: '/coach/builder',   label: 'Builder',    emoji: '🛠️' },
+  { href: '/coach/dashboard',  label: 'Dashboard', emoji: '📊' },
+  { href: '/coach/programs',   label: 'Programs',  emoji: '📋' },
+  { href: '/coach/clients',    label: 'Clients',   emoji: '👥' },
+  { href: '/coach/builder',    label: 'Builder',   emoji: '🛠️' },
 ]
 
 export default function CoachLayout({ children }: { children: React.ReactNode }) {

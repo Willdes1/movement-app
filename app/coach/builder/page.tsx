@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -32,6 +33,7 @@ interface ParsedProgram {
 
 export default function CoachBuilderPage() {
   const { user } = useAuth()
+  const router = useRouter()
   const [step, setStep] = useState<Step>('pick')
   const [program, setProgram] = useState<ParsedProgram | null>(null)
   const [programTitle, setProgramTitle] = useState('')
@@ -253,12 +255,20 @@ export default function CoachBuilderPage() {
         <div style={{ fontSize: 14, color: 'var(--text-dim)' }}>
           <strong style={{ color: 'var(--text)' }}>{programTitle}</strong> — {program?.weeks_total} week{program?.weeks_total !== 1 ? 's' : ''}
         </div>
-        <button
-          onClick={() => { setStep('pick'); setProgram(null); setError(''); setFileName('') }}
-          style={{ marginTop: 8, padding: '10px 24px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
-        >
-          Import Another Program
-        </button>
+        <div style={{ display: 'flex', gap: 10, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <button
+            onClick={() => router.push('/coach/programs')}
+            style={{ padding: '10px 24px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
+          >
+            View My Programs
+          </button>
+          <button
+            onClick={() => { setStep('pick'); setProgram(null); setError(''); setFileName('') }}
+            style={{ padding: '10px 24px', background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
+          >
+            Import Another
+          </button>
+        </div>
       </div>
     )
   }
