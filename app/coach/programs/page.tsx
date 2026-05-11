@@ -188,8 +188,16 @@ export default function CoachProgramsPage() {
                   gap: 16,
                   flexWrap: 'wrap',
                   opacity: isActioning ? 0.6 : 1,
-                  transition: 'opacity 0.15s',
+                  transition: 'opacity 0.15s, border-color 0.15s',
+                  cursor: 'pointer',
                 }}
+                onClick={e => {
+                  // Don't navigate when clicking action buttons
+                  if ((e.target as HTMLElement).closest('button')) return
+                  router.push(`/coach/programs/${prog.id}`)
+                }}
+                onMouseEnter={e => { if (!isActioning) e.currentTarget.style.borderColor = 'var(--accent)' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
               >
                 {/* Source icon */}
                 <div style={{ fontSize: 26, flexShrink: 0, width: 36, textAlign: 'center' }}>
