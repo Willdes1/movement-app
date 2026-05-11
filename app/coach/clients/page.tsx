@@ -8,10 +8,12 @@ import { useAuth } from '@/contexts/AuthContext'
 interface Assignment {
   id: string
   program_id: string
+  client_id: string
   start_date: string
   status: string
   created_at: string
-  coach_programs: { name: string; weeks_total: number } | null
+  // Supabase returns joined relations as an array
+  coach_programs: { name: string; weeks_total: number }[] | null
 }
 
 interface ClientRow {
@@ -184,10 +186,10 @@ export default function CoachClientsPage() {
                         <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                           <span style={{ width: 7, height: 7, borderRadius: '50%', background: ASSIGN_STATUS_COLOR[a.status] ?? '#6b7280', flexShrink: 0 }} />
                           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
-                            {a.coach_programs?.name ?? 'Program'}
+                            {a.coach_programs?.[0]?.name ?? 'Program'}
                           </span>
                           <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                            {a.coach_programs?.weeks_total}w · starts {formatDate(a.start_date)}
+                            {a.coach_programs?.[0]?.weeks_total}w · starts {formatDate(a.start_date)}
                           </span>
                           <span style={{ fontSize: 10, color: ASSIGN_STATUS_COLOR[a.status] ?? '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                             {a.status}
