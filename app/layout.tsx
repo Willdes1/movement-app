@@ -9,6 +9,7 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { PlanGenerationProvider } from '@/components/PlanGenerationContext'
 import GenerationBanner from '@/components/GenerationBanner'
+import ReportBugButton from '@/components/ReportBugButton'
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -60,6 +61,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <div className="mobile-nav-wrapper">
                 <BottomNav />
               </div>
+              <ReportBugButton />
             </PlanGenerationProvider>
           </ThemeProvider>
         </AuthProvider>

@@ -10,6 +10,7 @@ import RetentionTab from '@/components/admin/RetentionTab'
 import NotesTab from '@/components/admin/NotesTab'
 import BillingTab from '@/components/admin/BillingTab'
 import CEOBriefingTab from '@/components/admin/CEOBriefingTab'
+import BugReportsTab from '@/components/admin/BugReportsTab'
 
 // ─── PALETTE ─────────────────────────────────────────────────────────────────
 const C = {
@@ -32,7 +33,7 @@ const C = {
 }
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
-type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad' | 'health' | 'media' | 'impersonation' | 'retention' | 'notes' | 'billing' | 'ceo'
+type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad' | 'health' | 'media' | 'impersonation' | 'retention' | 'notes' | 'billing' | 'ceo' | 'bugs'
 type TodoRow = { id: string; content: string; category: string; status: string; priority: string; created_at: string; updated_at: string }
 type IdeaRow = { id: string; content: string; category: string; created_at: string }
 type PromoRow = { id: string; code: string; role: string; max_uses: number; uses: number; created_at: string }
@@ -1395,6 +1396,7 @@ const NAV_GROUPS = [
   {
     label: 'Operations',
     items: [
+      { id: 'bugs'  as Tab, label: 'Bug Reports' },
       { id: 'notes' as Tab, label: 'Notes' },
       { id: 'todos' as Tab, label: 'Todos' },
       { id: 'ideas' as Tab, label: 'Ideas' },
@@ -1447,6 +1449,7 @@ export default function AdminPage() {
   const [kpis, setKpis] = useState<{ label: string; value: string | number; sub: string; accent: string }[]>([])
   const [dataLoading, setDataLoading] = useState(true)
   const [selectedUser, setSelectedUser] = useState<UserStat | null>(null)
+  const [newBugCount, setNewBugCount] = useState(0)
 
   // Zoom In modal state
   const [zoomTarget, setZoomTarget] = useState<UserStat | null>(null)
@@ -1479,7 +1482,7 @@ export default function AdminPage() {
     const sevenDaysAgo = new Date()
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
-    const [profilesRes, programsRes, weekPlansRes, completionsRes, logsRes, todosRes, ideasRes, promosRes, recentSignupsRes] = await Promise.all([
+    const [profilesRes, programsRes, weekPlansRes, completionsRes, logsRes, todosRes, ideasRes, promosRes, recentSignupsRes, bugCountRes] = await Promise.all([
       supabase.from('profiles').select('id, name, role, is_admin, updated_at').order('updated_at', { ascending: false }),
       supabase.from('training_programs').select('id, user_id'),
       supabase.from('weekly_plans').select('program_id, week_number, created_at').order('created_at', { ascending: false }).limit(50),
@@ -1489,6 +1492,7 @@ export default function AdminPage() {
       supabase.from('ideas').select('*').order('created_at', { ascending: false }),
       supabase.from('promo_codes').select('*').order('created_at', { ascending: false }),
       supabase.from('profiles').select('id', { count: 'exact', head: true }).gte('updated_at', sevenDaysAgo.toISOString()),
+      supabase.from('bug_reports').select('id', { count: 'exact', head: true }).eq('status', 'new'),
     ])
 
     const profiles: ProfileRow[] = profilesRes.data ?? []
@@ -1579,6 +1583,7 @@ export default function AdminPage() {
     setTodos(todosRes.data ?? [])
     setIdeas(ideasRes.data ?? [])
     setPromos(promosRes.data ?? [])
+    setNewBugCount(bugCountRes.count ?? 0)
     setDataLoading(false)
   }, [isAdmin])
 
@@ -1649,6 +1654,7 @@ export default function AdminPage() {
                 const active = tab === item.id
                 const badge = item.id === 'todos' ? (activeTodoCount > 0 ? activeTodoCount : null)
                            : item.id === 'ideas' ? (ideas.length > 0 ? ideas.length : null)
+                           : item.id === 'bugs'  ? (newBugCount > 0 ? newBugCount : null)
                            : null
                 return (
                   <button key={item.id} onClick={() => selectTab(item.id)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', borderRadius: 6, border: 'none', background: active ? C.accentDim : 'none', color: active ? C.accent : C.textMid, fontWeight: active ? 600 : 400, fontSize: 13, cursor: 'pointer', marginBottom: 2, textAlign: 'left', transition: 'all 0.1s', fontFamily: 'inherit' }}>
@@ -1718,6 +1724,7 @@ export default function AdminPage() {
           {tab === 'partners' && (
             <PlaceholderTab label="Partner Management" bullets={['Physical therapists, nutritionists, trainers, influencers', 'Track audience size, performance, revenue contribution', 'Revenue-sharing model — partners earn on referrals', 'Partner portal: their own login, analytics, expected pay']} />
           )}
+          {tab === 'bugs' && <BugReportsTab onCountChange={setNewBugCount} />}
           {tab === 'launchpad' && <LaunchpadTab />}
           {tab === 'ceo' && <CEOBriefingTab />}
           {tab === 'media' && <MediaLibraryTab />}
