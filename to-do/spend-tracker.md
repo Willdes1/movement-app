@@ -24,6 +24,13 @@ Admin Portal → new **"Spend"** tab (or sub-tab of the existing Health Monitor)
 
 ---
 
+## Design Requirements
+- **Mobile-first** — fully usable on phone for on-the-go expense entry (e.g. snap a receipt at a coffee shop and log it immediately)
+- **Receipt photo capture** — camera/gallery upload on mobile; file upload on desktop. Stored in Supabase storage bucket `receipts`.
+- Fast entry: category + amount + photo should be submittable in under 10 seconds
+
+---
+
 ## Features
 
 ### Auto-Populated: Token Costs
@@ -37,12 +44,13 @@ Show:
 
 ### Manual Entry: Everything Else
 A form to log any project expense:
-- Date
+- Date (defaults to today)
 - Category (dropdown)
 - Description (text)
 - Amount (USD)
 - Vendor / source
-- Receipt / notes (optional)
+- Receipt photo — camera capture on mobile, file upload on desktop (stored in `receipts` Supabase bucket)
+- Notes (optional)
 
 ### Dashboard View
 - **Total project spend** (AI + manual entries)
@@ -79,11 +87,11 @@ Token costs are read live from the existing `token_usage` table — no new schem
 ---
 
 ## Build Phases
-1. Schema + RLS migration
+1. Schema + RLS migration + Supabase `receipts` storage bucket
 2. Spend tab UI — token costs auto-pulled, monthly breakdown
-3. Manual expense entry form
+3. Manual expense entry form (mobile-optimized, receipt photo upload)
 4. Total dashboard (all categories combined)
-5. CSV export
+5. CSV export with receipt URL column
 6. Monthly trend chart
 
 ---
