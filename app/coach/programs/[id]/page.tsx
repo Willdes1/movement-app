@@ -34,10 +34,17 @@ interface Program {
   created_at: string
 }
 
-interface ClientResult {
-  id: string
-  name: string | null
-  role: string
+interface SwapTarget {
+  weekId: string
+  dayIndex: number
+  movementIndex: number
+  current: string
+}
+
+interface ExerciseResult {
+  name_display: string
+  name_normalized: string
+  tip: string | null
 }
 
 const STATUS_COLOR: Record<string, { bg: string; color: string }> = {
@@ -46,6 +53,12 @@ const STATUS_COLOR: Record<string, { bg: string; color: string }> = {
   published: { bg: '#3b82f618', color: '#3b82f6' },
   archived:  { bg: '#6b728018', color: '#9ca3af' },
   paused:    { bg: '#ef444418', color: '#ef4444' },
+}
+
+// Extract "4x5" / "3x8-12" scheme from a movement string
+function extractScheme(movement: string): string {
+  const match = movement.match(/\d+\s*[x×]\s*[\d][\d\-]*(\s*(each|side|arm|leg|min|sec))?/i)
+  return match ? match[0].trim() : ''
 }
 
 export default function ProgramDetailPage() {
@@ -63,18 +76,29 @@ export default function ProgramDetailPage() {
   const [savingTitle, setSavingTitle] = useState(false)
   const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(new Set([1]))
   const [error, setError] = useState('')
+  const [hoveredMovement, setHoveredMovement] = useState<string | null>(null)
 
   // Assign modal state
   const [showAssign, setShowAssign] = useState(false)
   const [assignSearch, setAssignSearch] = useState('')
-  const [assignResults, setAssignResults] = useState<ClientResult[]>([])
+  const [assignResults, setAssignResults] = useState<{ id: string; name: string | null; role: string }[]>([])
   const [assignSearching, setAssignSearching] = useState(false)
-  const [selectedClient, setSelectedClient] = useState<ClientResult | null>(null)
+  const [selectedClient, setSelectedClient] = useState<{ id: string; name: string | null; role: string } | null>(null)
   const [assignStartDate, setAssignStartDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [assigning, setAssigning] = useState(false)
   const [assignSuccess, setAssignSuccess] = useState('')
   const [assignError, setAssignError] = useState('')
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const assignSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Swap modal state
+  const [swapTarget, setSwapTarget] = useState<SwapTarget | null>(null)
+  const [swapSearch, setSwapSearch] = useState('')
+  const [swapResults, setSwapResults] = useState<ExerciseResult[]>([])
+  const [swapSearching, setSwapSearching] = useState(false)
+  const [customSwap, setCustomSwap] = useState('')
+  const [swapping, setSwapping] = useState(false)
+  const [swapError, setSwapError] = useState('')
+  const swapSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (!user || !id) return
@@ -107,10 +131,7 @@ export default function ProgramDetailPage() {
   async function saveTitle() {
     if (!program || titleDraft.trim() === program.name) { setEditingTitle(false); return }
     setSavingTitle(true)
-    const { error } = await supabase
-      .from('coach_programs')
-      .update({ name: titleDraft.trim() })
-      .eq('id', id).eq('coach_id', user!.id)
+    const { error } = await supabase.from('coach_programs').update({ name: titleDraft.trim() }).eq('id', id).eq('coach_id', user!.id)
     if (error) setError(error.message)
     else setProgram(prev => prev ? { ...prev, name: titleDraft.trim() } : prev)
     setSavingTitle(false)
@@ -118,10 +139,7 @@ export default function ProgramDetailPage() {
   }
 
   async function updateStatus(newStatus: string) {
-    const { error } = await supabase
-      .from('coach_programs')
-      .update({ status: newStatus })
-      .eq('id', id).eq('coach_id', user!.id)
+    const { error } = await supabase.from('coach_programs').update({ status: newStatus }).eq('id', id).eq('coach_id', user!.id)
     if (error) setError(error.message)
     else setProgram(prev => prev ? { ...prev, status: newStatus } : prev)
   }
@@ -134,81 +152,113 @@ export default function ProgramDetailPage() {
     })
   }
 
-  // ── Assign modal logic ─────────────────────────────────────────────────────
+  // ── Assign modal ──────────────────────────────────────────────────────────
   function openAssignModal() {
-    setAssignSearch('')
-    setAssignResults([])
-    setSelectedClient(null)
+    setAssignSearch(''); setAssignResults([]); setSelectedClient(null)
     setAssignStartDate(new Date().toISOString().slice(0, 10))
-    setAssignSuccess('')
-    setAssignError('')
-    setShowAssign(true)
+    setAssignSuccess(''); setAssignError(''); setShowAssign(true)
   }
 
-  function handleSearchChange(val: string) {
-    setAssignSearch(val)
-    setSelectedClient(null)
-    if (searchTimer.current) clearTimeout(searchTimer.current)
+  function handleAssignSearchChange(val: string) {
+    setAssignSearch(val); setSelectedClient(null)
+    if (assignSearchTimer.current) clearTimeout(assignSearchTimer.current)
     if (!val.trim()) { setAssignResults([]); return }
-    searchTimer.current = setTimeout(() => searchProfiles(val.trim()), 350)
+    assignSearchTimer.current = setTimeout(() => searchProfiles(val.trim()), 350)
   }
 
   async function searchProfiles(q: string) {
     setAssignSearching(true)
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, name, role')
-      .ilike('name', `%${q}%`)
-      .neq('id', user!.id)
-      .limit(8)
+    const { data } = await supabase.from('profiles').select('id, name, role').ilike('name', `%${q}%`).neq('id', user!.id).limit(8)
     setAssignResults(data ?? [])
     setAssignSearching(false)
   }
 
   async function handleAssign() {
     if (!selectedClient || !program) return
-    setAssigning(true)
-    setAssignError('')
-
+    setAssigning(true); setAssignError('')
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      setAssignError('Session expired — please refresh.')
-      setAssigning(false)
+    if (!session) { setAssignError('Session expired — please refresh.'); setAssigning(false); return }
+
+    const { error: rosterErr } = await supabase.from('coach_clients')
+      .upsert({ coach_id: session.user.id, client_id: selectedClient.id, status: 'active' }, { onConflict: 'coach_id,client_id' })
+    if (rosterErr) { setAssignError(rosterErr.message); setAssigning(false); return }
+
+    const { error: assignErr } = await supabase.from('coach_program_assignments').insert({
+      program_id: program.id, coach_id: session.user.id,
+      client_id: selectedClient.id, start_date: assignStartDate, status: 'active',
+    })
+    if (assignErr) { setAssignError(assignErr.message); setAssigning(false); return }
+    setAssignSuccess(`Assigned to ${selectedClient.name ?? 'client'} — starting ${assignStartDate}`)
+    setAssigning(false)
+  }
+
+  // ── Swap modal ────────────────────────────────────────────────────────────
+  function openSwap(weekId: string, dayIndex: number, movementIndex: number, current: string) {
+    setSwapTarget({ weekId, dayIndex, movementIndex, current })
+    setSwapSearch(''); setSwapResults([]); setCustomSwap('')
+    setSwapError(''); setSwapping(false)
+  }
+
+  function handleSwapSearchChange(val: string) {
+    setSwapSearch(val)
+    if (swapSearchTimer.current) clearTimeout(swapSearchTimer.current)
+    if (!val.trim()) { setSwapResults([]); return }
+    swapSearchTimer.current = setTimeout(() => searchExercises(val.trim()), 300)
+  }
+
+  async function searchExercises(q: string) {
+    setSwapSearching(true)
+    const { data } = await supabase
+      .from('exercise_library')
+      .select('name_display, name_normalized, tip')
+      .ilike('name_display', `%${q}%`)
+      .order('name_display')
+      .limit(8)
+    setSwapResults(data ?? [])
+    setSwapSearching(false)
+  }
+
+  async function confirmSwap(newExerciseName: string) {
+    if (!swapTarget || swapping) return
+    setSwapping(true); setSwapError('')
+
+    const week = weeks.find(w => w.id === swapTarget.weekId)
+    if (!week) { setSwapping(false); return }
+
+    // Preserve the sets/reps scheme from the original movement
+    const scheme = extractScheme(swapTarget.current)
+    const newMovement = scheme ? `${newExerciseName} ${scheme}` : newExerciseName
+
+    const updatedDays = week.days.map((day, di) => {
+      if (di !== swapTarget.dayIndex) return day
+      return {
+        ...day,
+        movements: day.movements.map((m, mi) => mi === swapTarget.movementIndex ? newMovement : m),
+      }
+    })
+
+    const { error } = await supabase
+      .from('coach_program_weeks')
+      .update({ days: updatedDays })
+      .eq('id', swapTarget.weekId)
+
+    if (error) {
+      setSwapError(error.message)
+      setSwapping(false)
       return
     }
 
-    // Upsert into coach_clients roster
-    const { error: rosterErr } = await supabase
-      .from('coach_clients')
-      .upsert({ coach_id: session.user.id, client_id: selectedClient.id, status: 'active' },
-               { onConflict: 'coach_id,client_id' })
-
-    if (rosterErr) { setAssignError(rosterErr.message); setAssigning(false); return }
-
-    // Insert assignment
-    const { error: assignErr } = await supabase
-      .from('coach_program_assignments')
-      .insert({
-        program_id: program.id,
-        coach_id:   session.user.id,
-        client_id:  selectedClient.id,
-        start_date: assignStartDate,
-        status:     'active',
-      })
-
-    if (assignErr) { setAssignError(assignErr.message); setAssigning(false); return }
-
-    setAssignSuccess(`Assigned to ${selectedClient.name ?? 'client'} — starting ${assignStartDate}`)
-    setAssigning(false)
+    // Update local state
+    setWeeks(prev => prev.map(w => w.id === swapTarget.weekId ? { ...w, days: updatedDays } : w))
+    setSwapTarget(null)
+    setSwapping(false)
   }
 
   function formatDate(iso: string) {
     return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
 
-  if (loading) return (
-    <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-dim)', fontSize: 14 }}>Loading program…</div>
-  )
+  if (loading) return <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-dim)', fontSize: 14 }}>Loading program…</div>
 
   if (notFound || !program) return (
     <div style={{ padding: 48, textAlign: 'center' }}>
@@ -226,8 +276,6 @@ export default function ProgramDetailPage() {
 
   return (
     <div style={{ padding: '40px 40px 80px', maxWidth: 1100 }}>
-
-      {/* Back */}
       <button onClick={() => router.push('/coach/programs')}
         style={{ fontSize: 12, color: 'var(--text-dim)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 4 }}>
         ← My Programs
@@ -242,18 +290,13 @@ export default function ProgramDetailPage() {
       {/* Title row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 8, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>
-            Coach Portal
-          </div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>Coach Portal</div>
           {editingTitle ? (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <input
-                value={titleDraft}
-                onChange={e => setTitleDraft(e.target.value)}
+              <input value={titleDraft} onChange={e => setTitleDraft(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') saveTitle(); if (e.key === 'Escape') setEditingTitle(false) }}
                 autoFocus
-                style={{ fontSize: 26, fontWeight: 900, letterSpacing: '-0.03em', background: 'var(--surface2)', border: '1px solid var(--accent)', borderRadius: 8, color: 'var(--text)', padding: '4px 10px', minWidth: 280, maxWidth: 500 }}
-              />
+                style={{ fontSize: 26, fontWeight: 900, letterSpacing: '-0.03em', background: 'var(--surface2)', border: '1px solid var(--accent)', borderRadius: 8, color: 'var(--text)', padding: '4px 10px', minWidth: 280, maxWidth: 500 }} />
               <button onClick={saveTitle} disabled={savingTitle}
                 style={{ padding: '6px 16px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
                 {savingTitle ? 'Saving…' : 'Save'}
@@ -274,7 +317,6 @@ export default function ProgramDetailPage() {
           )}
         </div>
 
-        {/* Status + actions */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', padding: '4px 12px', borderRadius: 20, background: statusStyle.bg, color: statusStyle.color }}>
             {program.status}
@@ -320,12 +362,16 @@ export default function ProgramDetailPage() {
         ))}
       </div>
 
-      {/* Description */}
       {program.notes && (
         <div style={{ marginBottom: 28, fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, maxWidth: 720, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 18px' }}>
           {program.notes}
         </div>
       )}
+
+      {/* Swap hint */}
+      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12 }}>
+        Hover any exercise and click <strong style={{ color: 'var(--text)' }}>↔ Swap</strong> to replace it.
+      </div>
 
       {/* Week accordion */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -366,11 +412,43 @@ export default function ProgramDetailPage() {
                           )}
                         </div>
                       </div>
+
+                      {/* Movements with swap buttons */}
                       {day.type !== 'rest' && day.movements.length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                          {day.movements.map((m, mi) => (
-                            <div key={mi} style={{ fontSize: 12, color: 'var(--text-dim)', paddingLeft: 36 }}>• {m}</div>
-                          ))}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          {day.movements.map((m, mi) => {
+                            const key = `${week.id}-${di}-${mi}`
+                            const hovered = hoveredMovement === key
+                            return (
+                              <div
+                                key={mi}
+                                onMouseEnter={() => setHoveredMovement(key)}
+                                onMouseLeave={() => setHoveredMovement(null)}
+                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '2px 0', borderRadius: 6 }}
+                              >
+                                <span style={{ fontSize: 12, color: 'var(--text-dim)', paddingLeft: 36 }}>• {m}</span>
+                                {hovered && (
+                                  <button
+                                    onClick={() => openSwap(week.id, di, mi, m)}
+                                    style={{
+                                      flexShrink: 0,
+                                      padding: '2px 8px',
+                                      background: 'var(--accent)18',
+                                      color: 'var(--accent)',
+                                      border: '1px solid var(--accent)40',
+                                      borderRadius: 6,
+                                      fontSize: 11,
+                                      fontWeight: 700,
+                                      cursor: 'pointer',
+                                      whiteSpace: 'nowrap',
+                                    }}
+                                  >
+                                    ↔ Swap
+                                  </button>
+                                )}
+                              </div>
+                            )
+                          })}
                         </div>
                       )}
                     </div>
@@ -383,37 +461,125 @@ export default function ProgramDetailPage() {
       </div>
 
       {weeks.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '60px 40px', color: 'var(--text-dim)', fontSize: 14 }}>
-          No weeks found for this program.
+        <div style={{ textAlign: 'center', padding: '60px 40px', color: 'var(--text-dim)', fontSize: 14 }}>No weeks found for this program.</div>
+      )}
+
+      {/* ── Swap Modal ──────────────────────────────────────────────────────── */}
+      {swapTarget && (
+        <div
+          onClick={e => { if (e.target === e.currentTarget && !swapping) setSwapTarget(null) }}
+          style={{ position: 'fixed', inset: 0, background: '#00000085', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+        >
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 18, padding: 28, width: '100%', maxWidth: 460, display: 'flex', flexDirection: 'column', gap: 16, maxHeight: '90vh', overflowY: 'auto' }}>
+
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 4 }}>Swap Exercise</div>
+                <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                  Replacing: <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{swapTarget.current}</span>
+                </div>
+              </div>
+              <button onClick={() => setSwapTarget(null)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: 4, flexShrink: 0 }}>
+                ✕
+              </button>
+            </div>
+
+            {/* Search library */}
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 6 }}>
+                Search exercise library
+              </label>
+              <input
+                value={swapSearch}
+                onChange={e => handleSwapSearchChange(e.target.value)}
+                placeholder="e.g. Leg Press, Romanian Deadlift…"
+                autoFocus
+                style={{ width: '100%', padding: '10px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, boxSizing: 'border-box' }}
+              />
+            </div>
+
+            {/* Library results */}
+            {swapSearching && (
+              <div style={{ fontSize: 13, color: 'var(--text-dim)', textAlign: 'center' }}>Searching…</div>
+            )}
+            {!swapSearching && swapResults.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>From library</div>
+                {swapResults.map(r => (
+                  <button
+                    key={r.name_normalized}
+                    onClick={() => confirmSwap(r.name_display)}
+                    disabled={swapping}
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '10px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, cursor: swapping ? 'not-allowed' : 'pointer', textAlign: 'left', width: '100%', gap: 2, transition: 'border-color 0.15s' }}
+                    onMouseEnter={e => { if (!swapping) e.currentTarget.style.borderColor = 'var(--accent)' }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
+                  >
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{r.name_display}</span>
+                    {r.tip && <span style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.4 }}>{r.tip}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+            {!swapSearching && swapSearch.length > 1 && swapResults.length === 0 && (
+              <div style={{ fontSize: 13, color: 'var(--text-dim)', textAlign: 'center' }}>
+                Not in library — use the custom field below.
+              </div>
+            )}
+
+            {/* Divider */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+              <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600 }}>or enter custom</span>
+              <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+            </div>
+
+            {/* Custom exercise */}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                value={customSwap}
+                onChange={e => setCustomSwap(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && customSwap.trim()) confirmSwap(customSwap.trim()) }}
+                placeholder="Type any exercise name…"
+                style={{ flex: 1, padding: '10px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14 }}
+              />
+              <button
+                onClick={() => customSwap.trim() && confirmSwap(customSwap.trim())}
+                disabled={!customSwap.trim() || swapping}
+                style={{ padding: '10px 16px', background: customSwap.trim() ? 'var(--accent)' : 'var(--surface2)', color: customSwap.trim() ? '#fff' : 'var(--text-dim)', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: customSwap.trim() && !swapping ? 'pointer' : 'not-allowed', flexShrink: 0 }}
+              >
+                {swapping ? '…' : 'Use'}
+              </button>
+            </div>
+
+            {swapError && (
+              <div style={{ background: '#ff3b3020', border: '1px solid #ff3b30', borderRadius: 8, padding: '10px 14px', color: '#ff3b30', fontSize: 13 }}>
+                {swapError}
+              </div>
+            )}
+
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+              Sets/reps from the original exercise are preserved automatically.
+            </div>
+          </div>
         </div>
       )}
 
-      {/* ── Assign to Client modal ────────────────────────────────────────── */}
+      {/* ── Assign Modal ────────────────────────────────────────────────────── */}
       {showAssign && (
         <div
           onClick={e => { if (e.target === e.currentTarget) setShowAssign(false) }}
-          style={{
-            position: 'fixed', inset: 0, background: '#00000080', zIndex: 100,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: 24,
-          }}
+          style={{ position: 'fixed', inset: 0, background: '#00000080', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
         >
-          <div style={{
-            background: 'var(--surface)', border: '1px solid var(--border)',
-            borderRadius: 18, padding: 28, width: '100%', maxWidth: 480,
-            display: 'flex', flexDirection: 'column', gap: 18,
-            maxHeight: '90vh', overflowY: 'auto',
-          }}>
-            {/* Modal header */}
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 18, padding: 28, width: '100%', maxWidth: 480, display: 'flex', flexDirection: 'column', gap: 18, maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <div style={{ fontSize: 16, fontWeight: 800 }}>Assign to Client</div>
                 <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>{program.name}</div>
               </div>
               <button onClick={() => setShowAssign(false)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: 4 }}>
-                ✕
-              </button>
+                style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: 4 }}>✕</button>
             </div>
 
             {assignSuccess ? (
@@ -421,8 +587,7 @@ export default function ProgramDetailPage() {
                 <div style={{ fontSize: 40 }}>✅</div>
                 <div style={{ fontSize: 14, fontWeight: 700 }}>{assignSuccess}</div>
                 <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                  <button
-                    onClick={() => { setAssignSuccess(''); setSelectedClient(null); setAssignSearch(''); setAssignResults([]) }}
+                  <button onClick={() => { setAssignSuccess(''); setSelectedClient(null); setAssignSearch(''); setAssignResults([]) }}
                     style={{ padding: '8px 18px', background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
                     Assign Another
                   </button>
@@ -434,46 +599,20 @@ export default function ProgramDetailPage() {
               </div>
             ) : (
               <>
-                {/* Search */}
                 <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 6 }}>
-                    Search by name
-                  </label>
-                  <input
-                    value={assignSearch}
-                    onChange={e => handleSearchChange(e.target.value)}
-                    placeholder="Type a client's name…"
-                    autoFocus
-                    style={{ width: '100%', padding: '10px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, boxSizing: 'border-box' }}
-                  />
+                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 6 }}>Search by name</label>
+                  <input value={assignSearch} onChange={e => handleAssignSearchChange(e.target.value)} placeholder="Type a client's name…" autoFocus
+                    style={{ width: '100%', padding: '10px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, boxSizing: 'border-box' }} />
                 </div>
-
-                {/* Results */}
-                {assignSearching && (
-                  <div style={{ fontSize: 13, color: 'var(--text-dim)', textAlign: 'center' }}>Searching…</div>
-                )}
+                {assignSearching && <div style={{ fontSize: 13, color: 'var(--text-dim)', textAlign: 'center' }}>Searching…</div>}
                 {!assignSearching && assignResults.length > 0 && !selectedClient && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {assignResults.map(r => (
-                      <button
-                        key={r.id}
-                        onClick={() => setSelectedClient(r)}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 12,
-                          padding: '10px 14px', background: 'var(--surface2)',
-                          border: '1px solid var(--border)', borderRadius: 10,
-                          cursor: 'pointer', textAlign: 'left', width: '100%',
-                          transition: 'border-color 0.15s',
-                        }}
+                      <button key={r.id} onClick={() => setSelectedClient(r)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, cursor: 'pointer', textAlign: 'left', width: '100%' }}
                         onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
-                        onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
-                      >
-                        <div style={{
-                          width: 34, height: 34, borderRadius: '50%',
-                          background: 'var(--accent)22', color: 'var(--accent)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 13, fontWeight: 800, flexShrink: 0,
-                        }}>
+                        onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+                        <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'var(--accent)22', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, flexShrink: 0 }}>
                           {(r.name ?? '?')[0].toUpperCase()}
                         </div>
                         <div>
@@ -487,8 +626,6 @@ export default function ProgramDetailPage() {
                 {!assignSearching && assignSearch.length > 1 && assignResults.length === 0 && (
                   <div style={{ fontSize: 13, color: 'var(--text-dim)', textAlign: 'center' }}>No users found — try a different name.</div>
                 )}
-
-                {/* Selected client */}
                 {selectedClient && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'var(--accent)12', border: '1px solid var(--accent)40', borderRadius: 10 }}>
                     <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'var(--accent)22', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, flexShrink: 0 }}>
@@ -502,38 +639,16 @@ export default function ProgramDetailPage() {
                       style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 16, cursor: 'pointer' }}>✕</button>
                   </div>
                 )}
-
-                {/* Start date */}
                 <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 6 }}>
-                    Start date
-                  </label>
-                  <input
-                    type="date"
-                    value={assignStartDate}
-                    onChange={e => setAssignStartDate(e.target.value)}
-                    style={{ padding: '10px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, colorScheme: 'dark' }}
-                  />
+                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 6 }}>Start date</label>
+                  <input type="date" value={assignStartDate} onChange={e => setAssignStartDate(e.target.value)}
+                    style={{ padding: '10px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, colorScheme: 'dark' }} />
                 </div>
-
                 {assignError && (
-                  <div style={{ background: '#ff3b3020', border: '1px solid #ff3b30', borderRadius: 8, padding: '10px 14px', color: '#ff3b30', fontSize: 13 }}>
-                    {assignError}
-                  </div>
+                  <div style={{ background: '#ff3b3020', border: '1px solid #ff3b30', borderRadius: 8, padding: '10px 14px', color: '#ff3b30', fontSize: 13 }}>{assignError}</div>
                 )}
-
-                {/* Submit */}
-                <button
-                  onClick={handleAssign}
-                  disabled={!selectedClient || assigning}
-                  style={{
-                    padding: '12px 24px', background: selectedClient ? 'var(--accent)' : 'var(--surface2)',
-                    color: selectedClient ? '#fff' : 'var(--text-dim)',
-                    border: 'none', borderRadius: 10, fontWeight: 800, fontSize: 14,
-                    cursor: selectedClient && !assigning ? 'pointer' : 'not-allowed',
-                    opacity: assigning ? 0.6 : 1,
-                  }}
-                >
+                <button onClick={handleAssign} disabled={!selectedClient || assigning}
+                  style={{ padding: '12px 24px', background: selectedClient ? 'var(--accent)' : 'var(--surface2)', color: selectedClient ? '#fff' : 'var(--text-dim)', border: 'none', borderRadius: 10, fontWeight: 800, fontSize: 14, cursor: selectedClient && !assigning ? 'pointer' : 'not-allowed', opacity: assigning ? 0.6 : 1 }}>
                   {assigning ? 'Assigning…' : selectedClient ? `Assign to ${selectedClient.name ?? 'client'}` : 'Select a client first'}
                 </button>
               </>
