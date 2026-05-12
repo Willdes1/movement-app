@@ -6,6 +6,9 @@ import { useAuth } from '@/contexts/AuthContext'
 import LaunchpadTab from '@/components/admin/LaunchpadTab'
 import HealthTab from '@/components/admin/HealthTab'
 import ImpersonationActivityTab from '@/components/admin/ImpersonationActivityTab'
+import RetentionTab from '@/components/admin/RetentionTab'
+import NotesTab from '@/components/admin/NotesTab'
+import BillingTab from '@/components/admin/BillingTab'
 
 // ─── PALETTE ─────────────────────────────────────────────────────────────────
 const C = {
@@ -28,7 +31,7 @@ const C = {
 }
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
-type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad' | 'health' | 'media' | 'impersonation'
+type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad' | 'health' | 'media' | 'impersonation' | 'retention' | 'notes' | 'billing'
 type TodoRow = { id: string; content: string; category: string; status: string; priority: string; created_at: string; updated_at: string }
 type IdeaRow = { id: string; content: string; category: string; created_at: string }
 type PromoRow = { id: string; code: string; role: string; max_uses: number; uses: number; created_at: string }
@@ -1379,11 +1382,19 @@ const NAV_GROUPS = [
       { id: 'users' as Tab, label: 'Users' },
       { id: 'activity' as Tab, label: 'Live Activity' },
       { id: 'impersonation' as Tab, label: 'Zoom Log' },
+      { id: 'retention' as Tab, label: 'Retention' },
+    ],
+  },
+  {
+    label: 'Revenue',
+    items: [
+      { id: 'billing' as Tab, label: 'Billing' },
     ],
   },
   {
     label: 'Operations',
     items: [
+      { id: 'notes' as Tab, label: 'Notes' },
       { id: 'todos' as Tab, label: 'Todos' },
       { id: 'ideas' as Tab, label: 'Ideas' },
       { id: 'promos' as Tab, label: 'Promos' },
@@ -1696,6 +1707,9 @@ export default function AdminPage() {
           {tab === 'todos' && <TodosTab todos={todos} onRefresh={loadAll} />}
           {tab === 'ideas' && <IdeasTab ideas={ideas} onRefresh={loadAll} />}
           {tab === 'promos' && <PromosTab promos={promos} onRefresh={loadAll} />}
+          {tab === 'retention' && <RetentionTab users={users} />}
+          {tab === 'notes' && <NotesTab currentAdminId={user!.id} users={users} />}
+          {tab === 'billing' && <BillingTab users={users} />}
           {tab === 'marketing' && (
             <PlaceholderTab label="Marketing Control Panel" bullets={['SEO recommendations & LLM visibility', 'Facebook/Meta · LinkedIn · PPC campaign management', 'Reddit content strategy & educational calendar', 'Ad spend ROI tracking & conversion funnels']} />
           )}
