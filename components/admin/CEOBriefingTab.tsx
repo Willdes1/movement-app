@@ -167,6 +167,10 @@ function BriefSkeleton() {
   )
 }
 
+const CACHE_KEY_ARTICLE = 'ceo_brief_article'
+const CACHE_KEY_TYPE    = 'ceo_brief_article_type'
+const CACHE_KEY_SEEN    = 'ceo_brief_seen_types'
+
 // ─── DAILY BRIEF SUB-TAB ─────────────────────────────────────────────────────
 function DailyBriefTab() {
   const [article, setArticle] = useState<Article | null>(null)
@@ -175,23 +179,26 @@ function DailyBriefTab() {
   const [error, setError] = useState('')
   const [seenTypes, setSeenTypes] = useState<string[]>([])
 
-  async function generate() {
+  async function generate(currentSeen: string[] = seenTypes) {
     setLoading(true)
     setError('')
     try {
       const res = await fetch('/api/admin/ceo-brief', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ excludeTypes: seenTypes }),
+        body: JSON.stringify({ excludeTypes: currentSeen }),
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setArticle(data.article)
       setArticleType(data.type)
-      setSeenTypes(prev => {
-        const next = [...prev, data.type.id]
-        return next.length >= 7 ? [] : next // reset after all 7 types shown
-      })
+      const nextSeen = [...currentSeen, data.type.id]
+      const finalSeen = nextSeen.length >= 7 ? [] : nextSeen
+      setSeenTypes(finalSeen)
+      // Persist to session so navigating away and back doesn't re-generate
+      sessionStorage.setItem(CACHE_KEY_ARTICLE, JSON.stringify(data.article))
+      sessionStorage.setItem(CACHE_KEY_TYPE, JSON.stringify(data.type))
+      sessionStorage.setItem(CACHE_KEY_SEEN, JSON.stringify(finalSeen))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Generation failed')
     } finally {
@@ -199,15 +206,28 @@ function DailyBriefTab() {
     }
   }
 
-  // Auto-generate on first load
-  useEffect(() => { generate() }, [])
+  // Load from session cache; only hit the API if nothing cached
+  useEffect(() => {
+    try {
+      const cachedArticle = sessionStorage.getItem(CACHE_KEY_ARTICLE)
+      const cachedType    = sessionStorage.getItem(CACHE_KEY_TYPE)
+      const cachedSeen    = sessionStorage.getItem(CACHE_KEY_SEEN)
+      if (cachedArticle && cachedType) {
+        setArticle(JSON.parse(cachedArticle))
+        setArticleType(JSON.parse(cachedType))
+        if (cachedSeen) setSeenTypes(JSON.parse(cachedSeen))
+        return
+      }
+    } catch { /* ignore parse errors */ }
+    generate([])
+  }, [])
 
   if (loading && !article) return <BriefSkeleton />
 
   if (error) return (
     <div style={{ padding: '20px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 12, marginTop: 16 }}>
       <p style={{ color: C.red, fontSize: 13 }}>{error}</p>
-      <button onClick={generate} style={{ marginTop: 10, padding: '7px 16px', borderRadius: 7, border: `1px solid ${C.border}`, background: 'transparent', color: C.textMid, fontSize: 12, cursor: 'pointer' }}>Try Again</button>
+      <button onClick={() => generate(seenTypes)} style={{ marginTop: 10, padding: '7px 16px', borderRadius: 7, border: `1px solid ${C.border}`, background: 'transparent', color: C.textMid, fontSize: 12, cursor: 'pointer' }}>Try Again</button>
     </div>
   )
 
@@ -223,7 +243,7 @@ function DailyBriefTab() {
           </div>
         </div>
       )}
-      <ArticleView article={article} articleType={articleType} onRefresh={generate} loading={loading} />
+      <ArticleView article={article} articleType={articleType} onRefresh={() => generate(seenTypes)} loading={loading} />
     </div>
   )
 }
