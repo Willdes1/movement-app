@@ -197,7 +197,8 @@ function OverviewSection() {
     'Admin Mission Control portal (analytics, users, todos, ideas, promos, launchpad, zoom log)',
     'Auth gates, promo code system, F&F beta role, Vercel + Supabase + GitHub CI/CD',
     'Zoom In (admin impersonation V2) — ZoomIn modal with duration + reason, red countdown banner, auto-exit timer, full write logging, soft-delete queue, 30-day reversal UI in Zoom Log tab',
-    'Coach portal scaffolding — /coach/dashboard, /coach/clients, /coach/builder route shells with coach/admin role-gated layout',
+    'Coach portal — full build: programs library, program detail view (inline title editing + status management), assign-to-client modal with debounced search + date picker, exercise swap modal with sets/reps preservation, AI generate with brief form (periodized Claude Sonnet 4.6), template library (zero-cost program reuse per coach account), real clients roster with assignment history',
+    'Admin Portal V2 — Retention dashboard (5 auto-calculated user segments: Active / At Risk / Churned / Plan-No-Log / No-Plan, drill-down lists + CSV export per segment); Notes system (platform notes + user-attached notes with setup SQL inline); Billing overview (tier breakdown bar chart, engagement KPIs, Stripe integration roadmap)',
     'DB safety layer — protect_admin_role trigger (blocks accidental admin demotion at DB level), SECURITY DEFINER admin read-all RLS pattern, role column default removed',
     'Health Monitor — one-click scan of all pages, API routes, and DB tables with copy-paste Claude Code fix prompts',
     'Training Background profile — training level (beginner→pro), workout history, sport/activity background with skill levels; all fields stored in profiles and fed to AI at plan generation',
@@ -213,7 +214,7 @@ function OverviewSection() {
     'Injury → training handoff: AI-modified safe training plan that runs alongside recovery',
     'Nutrition AI: 3-month meal plan synced to training phases + macro targets (eventual dedicated MIE sub-engine)',
     'Stripe billing: Free → Pro → Plus → Supreme consumer tiers',
-    'Coach portal: PDF/DOCX import, exercise swap modal, two-agent program generator, affiliate system',
+    'Coach portal affiliate system — referral tracking, revenue-sharing per referral, coach analytics dashboard',
     'Wearable integration: Oura Ring, Apple Watch, Samsung Health — feeds MIE Recovery Agent',
     'Native iOS + Android via Capacitor wrapper',
     'Push notifications, streak system, accountability nudges',
@@ -234,10 +235,10 @@ function OverviewSection() {
   const ROADMAP = [
     { phase: 'Phase 1', label: 'Core Consumer App', status: 'done', items: 'AI plan generator (bulk 1/2/3-month) · Phase-based training with rest times · 6-block daily sessions · Exercise library · SI Joint + custom injury recovery · Return-to-sport agent · Calendar + undo completion · Workout logging · For You feed · Anatomy Explorer · Auth · Admin portal · CI/CD · Training background profile · TOS/Privacy + RLS security hardening' },
     { phase: 'Phase 2', label: 'Movement Intelligence Engine (MIE)', status: 'active', items: 'Multi-Agent Agentic RAG Pipeline — Domain Knowledge Store (pgvector + curated expert knowledge from NSCA, NASM, PT guidelines, sport biomechanics) · Orchestrator Agent · Strength & Conditioning Agent · PT/Rehab Agent (veto power) · Sports Specialist Agent (all sports taxonomy) · Mobility, Recovery, Mindset agents · Critic/Verification Agent · Knowledge Curator Agent (async research monitor) · Token efficiency via RAG retrieval instead of scratch generation' },
-    { phase: 'Phase 3', label: 'Monetization + Professional Portal', status: 'active', items: 'Stripe billing (Free → Pro → Plus → Supreme) · Coach portal: PDF/DOCX import, exercise swap, two-agent program generator, affiliate system · Injury→training AI handoff · Nutrition AI (3-month meal plan, eventual dedicated MIE sub-engine) · Push notifications · Native iOS/Android · Wearable integration (Oura, Apple Watch → feeds MIE Recovery Agent)' },
+    { phase: 'Phase 3', label: 'Monetization + Professional Portal', status: 'active', items: '✓ Coach portal: programs library, assign-to-client, AI generate, exercise swap modal, template library, clients roster · ✓ Admin Portal V2: retention dashboard, notes system, billing overview · Stripe billing (Free → Pro → Plus → Supreme) · Coach affiliate system · Injury→training AI handoff · Nutrition AI (3-month meal plan, eventual dedicated MIE sub-engine) · Push notifications · Native iOS/Android · Wearable integration (Oura, Apple Watch → feeds MIE Recovery Agent)' },
     { phase: 'Phase 4', label: 'Marketplace + Scale', status: 'upcoming', items: 'Hire local trainers in-app · Marketplace listings · Built-in marketing automation · Revenue-sharing · Platform data as B2B sales intelligence · Client portal' },
     { phase: 'Phase 5', label: 'Enterprise + Partnerships', status: 'upcoming', items: 'White-label options · Insurance partnerships · University athletics licensing · International expansion · Strategic acquisition potential' },
-    { phase: 'Deferred', label: 'Exercise Video Curation + Admin Portal v2', status: 'upcoming', items: 'YouTube Data API + AI candidate scoring + admin review UI · Admin Portal v2 modular architecture + pgvector semantic search across todos, ideas, knowledge base · Trigger: coach portal stable checkpoint' },
+    { phase: 'Deferred', label: 'Exercise Video Curation', status: 'upcoming', items: 'YouTube Data API + AI candidate scoring + admin review UI · Trigger: stable platform checkpoint before content spend' },
   ]
 
   const dotColor = (s: string) => s === 'done' ? C.green : s === 'active' ? C.accent : C.border
