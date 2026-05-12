@@ -587,7 +587,7 @@ export default function CoachBuilderPage() {
           <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px', marginTop: 8 }}>
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>📚 Save to My Library?</div>
             <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 14 }}>
-              Templates let you reuse this program structure for future clients — zero tokens, instant.
+              Save this program to your library for instant reuse with future clients.
             </div>
             {templateSaved ? (
               <div style={{ fontSize: 13, color: '#22c55e', fontWeight: 700 }}>✓ Saved to your library</div>
