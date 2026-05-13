@@ -11,6 +11,7 @@ import NotesTab from '@/components/admin/NotesTab'
 import BillingTab from '@/components/admin/BillingTab'
 import CEOBriefingTab from '@/components/admin/CEOBriefingTab'
 import BugReportsTab from '@/components/admin/BugReportsTab'
+import KnowledgeBaseTab from '@/components/admin/KnowledgeBaseTab'
 
 // ─── PALETTE ─────────────────────────────────────────────────────────────────
 const C = {
@@ -33,7 +34,7 @@ const C = {
 }
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
-type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad' | 'health' | 'media' | 'impersonation' | 'retention' | 'notes' | 'billing' | 'ceo' | 'bugs'
+type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad' | 'health' | 'media' | 'impersonation' | 'retention' | 'notes' | 'billing' | 'ceo' | 'bugs' | 'kb'
 type TodoRow = { id: string; content: string; category: string; status: string; priority: string; created_at: string; updated_at: string }
 type IdeaRow = { id: string; content: string; category: string; created_at: string }
 type PromoRow = { id: string; code: string; role: string; max_uses: number; uses: number; created_at: string }
@@ -1415,6 +1416,7 @@ const NAV_GROUPS = [
     items: [
       { id: 'launchpad' as Tab, label: 'Launchpad' },
       { id: 'ceo' as Tab, label: 'CEO Briefing' },
+      { id: 'kb' as Tab, label: 'Knowledge Base' },
     ],
   },
   {
@@ -1725,6 +1727,7 @@ export default function AdminPage() {
             <PlaceholderTab label="Partner Management" bullets={['Physical therapists, nutritionists, trainers, influencers', 'Track audience size, performance, revenue contribution', 'Revenue-sharing model — partners earn on referrals', 'Partner portal: their own login, analytics, expected pay']} />
           )}
           {tab === 'bugs' && <BugReportsTab onCountChange={setNewBugCount} />}
+          {tab === 'kb' && <KnowledgeBaseTab />}
           {tab === 'launchpad' && <LaunchpadTab />}
           {tab === 'ceo' && <CEOBriefingTab />}
           {tab === 'media' && <MediaLibraryTab />}
