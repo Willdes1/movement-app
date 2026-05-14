@@ -56,6 +56,12 @@ const CACHE_KEY_ARTICLE = 'ceo_brief_article'
 const CACHE_KEY_TYPE    = 'ceo_brief_article_type'
 const CACHE_KEY_SEEN    = 'ceo_brief_seen_types'
 const CACHE_KEY_SAVED   = 'ceo_brief_article_saved'
+const CACHE_KEY_TS      = 'ceo_brief_cached_at'
+const CACHE_TTL_MS      = 24 * 60 * 60 * 1000 // 24 hours
+
+function cacheGet(key: string) { try { return localStorage.getItem(key) } catch { return null } }
+function cacheSet(key: string, val: string) { try { localStorage.setItem(key, val) } catch {} }
+function cacheDel(key: string) { try { localStorage.removeItem(key) } catch {} }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 function fmtLibraryDate(iso: string) {
@@ -304,7 +310,7 @@ async function saveToLibrary(article: Article, type: ArticleType) {
     our_angle:  article.our_angle,
     one_liner:  article.one_liner,
   })
-  if (!error) sessionStorage.setItem(CACHE_KEY_SAVED, 'true')
+  if (!error) cacheSet(CACHE_KEY_SAVED, 'true')
 }
 
 function DailyBriefTab() {
@@ -330,10 +336,11 @@ function DailyBriefTab() {
       const nextSeen = [...currentSeen, data.type.id]
       const finalSeen = nextSeen.length >= 7 ? [] : nextSeen
       setSeenTypes(finalSeen)
-      sessionStorage.setItem(CACHE_KEY_ARTICLE, JSON.stringify(data.article))
-      sessionStorage.setItem(CACHE_KEY_TYPE, JSON.stringify(data.type))
-      sessionStorage.setItem(CACHE_KEY_SEEN, JSON.stringify(finalSeen))
-      sessionStorage.removeItem(CACHE_KEY_SAVED) // new article, not yet saved
+      cacheSet(CACHE_KEY_ARTICLE, JSON.stringify(data.article))
+      cacheSet(CACHE_KEY_TYPE, JSON.stringify(data.type))
+      cacheSet(CACHE_KEY_SEEN, JSON.stringify(finalSeen))
+      cacheSet(CACHE_KEY_TS, String(Date.now()))
+      cacheDel(CACHE_KEY_SAVED)
       // Save to library (non-blocking)
       saveToLibrary(data.article, data.type)
     } catch (e) {
@@ -343,24 +350,25 @@ function DailyBriefTab() {
     }
   }
 
-  // Load from session cache; save to library if not yet persisted
+  // Load from localStorage cache (24-hour TTL); generate fresh if stale or missing
   useEffect(() => {
-    try {
-      const cachedArticle = sessionStorage.getItem(CACHE_KEY_ARTICLE)
-      const cachedType    = sessionStorage.getItem(CACHE_KEY_TYPE)
-      const cachedSeen    = sessionStorage.getItem(CACHE_KEY_SEEN)
-      const cachedSaved   = sessionStorage.getItem(CACHE_KEY_SAVED)
-      if (cachedArticle && cachedType) {
+    const cachedArticle = cacheGet(CACHE_KEY_ARTICLE)
+    const cachedType    = cacheGet(CACHE_KEY_TYPE)
+    const cachedTs      = cacheGet(CACHE_KEY_TS)
+    const cachedSeen    = cacheGet(CACHE_KEY_SEEN)
+    const cachedSaved   = cacheGet(CACHE_KEY_SAVED)
+    const fresh = cachedTs && (Date.now() - Number(cachedTs)) < CACHE_TTL_MS
+    if (cachedArticle && cachedType && fresh) {
+      try {
         const art  = JSON.parse(cachedArticle) as Article
         const type = JSON.parse(cachedType) as ArticleType
         setArticle(art)
         setArticleType(type)
         if (cachedSeen) setSeenTypes(JSON.parse(cachedSeen))
-        // Persist to DB if this is a pre-library article (e.g. generated before this feature shipped)
         if (!cachedSaved) saveToLibrary(art, type)
         return
-      }
-    } catch { /* ignore */ }
+      } catch { /* fall through to generate */ }
+    }
     generate([])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
