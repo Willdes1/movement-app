@@ -12,6 +12,7 @@ import BillingTab from '@/components/admin/BillingTab'
 import CEOBriefingTab from '@/components/admin/CEOBriefingTab'
 import BugReportsTab from '@/components/admin/BugReportsTab'
 import KnowledgeBaseTab from '@/components/admin/KnowledgeBaseTab'
+import SpendTab from '@/components/admin/SpendTab'
 
 // ─── PALETTE ─────────────────────────────────────────────────────────────────
 const C = {
@@ -34,7 +35,7 @@ const C = {
 }
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
-type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad' | 'health' | 'media' | 'impersonation' | 'retention' | 'notes' | 'billing' | 'ceo' | 'bugs' | 'kb'
+type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad' | 'health' | 'media' | 'impersonation' | 'retention' | 'notes' | 'billing' | 'ceo' | 'bugs' | 'kb' | 'spend'
 type TodoRow = { id: string; content: string; category: string; status: string; priority: string; created_at: string; updated_at: string }
 type IdeaRow = { id: string; content: string; category: string; created_at: string }
 type PromoRow = { id: string; code: string; role: string; max_uses: number; uses: number; created_at: string }
@@ -1452,6 +1453,7 @@ const NAV_GROUPS = [
     label: 'Revenue',
     items: [
       { id: 'billing' as Tab, label: 'Billing' },
+      { id: 'spend'   as Tab, label: 'Spend Tracker' },
     ],
   },
   {
@@ -1788,6 +1790,7 @@ export default function AdminPage() {
           )}
           {tab === 'bugs' && <BugReportsTab onCountChange={setNewBugCount} />}
           {tab === 'kb' && <KnowledgeBaseTab />}
+          {tab === 'spend' && <SpendTab />}
           {tab === 'launchpad' && <LaunchpadTab />}
           {tab === 'ceo' && <CEOBriefingTab />}
           {tab === 'media' && <MediaLibraryTab />}
