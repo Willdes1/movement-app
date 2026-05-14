@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -535,6 +535,23 @@ function UserDetailPanel({ user, onClose, onSaved }: { user: UserStat; onClose: 
       .then(({ data }) => { if (data) setProfile(data as Record<string, unknown>); setLoading(false) })
   }, [user.id])
 
+  type TokenRow = { operation: string | null; input_tokens: number | null; output_tokens: number | null; created_at: string }
+  const [tokenRows, setTokenRows] = useState<TokenRow[]>([])
+  const [tokenLoading, setTokenLoading] = useState(false)
+  useEffect(() => {
+    setTokenLoading(true)
+    supabase.from('token_usage')
+      .select('operation, input_tokens, output_tokens, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50)
+      .then(({ data }) => { setTokenRows((data ?? []) as TokenRow[]); setTokenLoading(false) })
+  }, [user.id])
+  const totalCost = useMemo(() =>
+    tokenRows.reduce((sum, r) => sum + ((r.input_tokens ?? 0) * 3 + (r.output_tokens ?? 0) * 15) / 1_000_000, 0),
+    [tokenRows]
+  )
+
   function setField(key: string, value: unknown) { setEdits(prev => ({ ...prev, [key]: value })) }
   function val(key: string) { return String((key in edits ? edits[key] : profile?.[key]) ?? '') }
   function showFlash(m: string) { setFlashMsg(m); setTimeout(() => setFlashMsg(''), 3000) }
@@ -636,6 +653,49 @@ function UserDetailPanel({ user, onClose, onSaved }: { user: UserStat; onClose: 
                     <option value="">—</option><option value="gym">Gym</option><option value="home">Home</option><option value="both">Both</option>
                   </select>
                 </div>
+              </div>
+
+              {/* ── API Token Usage ── */}
+              <div style={{ marginTop: 28, paddingTop: 20, borderTop: `1px solid ${C.border}` }}>
+                <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: C.textDim, marginBottom: 12, fontFamily: 'monospace' }}>API Token Usage</p>
+                {tokenLoading ? (
+                  <p style={{ fontSize: 12, color: C.textDim, fontFamily: 'monospace', padding: '12px 0' }}>Loading…</p>
+                ) : tokenRows.length === 0 ? (
+                  <div style={{ padding: '14px 16px', background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 8 }}>
+                    <p style={{ fontSize: 12, color: C.textDim }}>No API calls recorded for this user yet.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
+                      {[
+                        { label: 'Total Spend', value: `$${totalCost.toFixed(4)}`, color: C.amber },
+                        { label: 'Operations', value: tokenRows.length, color: C.accent },
+                        { label: 'Avg / Call', value: `$${(totalCost / tokenRows.length).toFixed(4)}`, color: C.purple },
+                      ].map(s => (
+                        <div key={s.label} style={{ padding: '10px 12px', background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 8, textAlign: 'center' }}>
+                          <p style={{ fontSize: 15, fontWeight: 800, color: s.color, fontFamily: 'monospace' }}>{s.value}</p>
+                          <p style={{ fontSize: 9, color: C.textDim, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: 3 }}>{s.label}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      {tokenRows.map((row, i) => {
+                        const cost = ((row.input_tokens ?? 0) * 3 + (row.output_tokens ?? 0) * 15) / 1_000_000
+                        return (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 7 }}>
+                            <div>
+                              <p style={{ fontSize: 12, fontWeight: 600, color: C.text, marginBottom: 2 }}>{row.operation ?? 'unknown'}</p>
+                              <p style={{ fontSize: 10, color: C.textDim, fontFamily: 'monospace' }}>
+                                {(row.input_tokens ?? 0).toLocaleString()} in · {(row.output_tokens ?? 0).toLocaleString()} out · {fmtRelative(row.created_at)}
+                              </p>
+                            </div>
+                            <p style={{ fontSize: 12, fontWeight: 700, color: cost >= 0.001 ? C.amber : C.textDim, fontFamily: 'monospace', flexShrink: 0, marginLeft: 12 }}>${cost.toFixed(4)}</p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </>
+                )}
               </div>
             </>
           )}

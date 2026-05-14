@@ -1,5 +1,6 @@
 'use client'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
 
 const C = {
   bg: '#0d1117', surface: '#161b22', surface2: '#21262d', border: '#30363d',
@@ -79,6 +80,25 @@ function exportSegmentCSV(users: UserStat[], segId: Segment) {
 
 export default function RetentionTab({ users }: { users: UserStat[] }) {
   const [selected, setSelected] = useState<Segment | null>(null)
+  const [tokenSpend, setTokenSpend] = useState<Record<string, number>>({})
+
+  useEffect(() => {
+    supabase.from('token_usage')
+      .select('user_id, input_tokens, output_tokens')
+      .not('user_id', 'is', null)
+      .then(({ data }) => {
+        const agg: Record<string, number> = {}
+        for (const r of (data ?? [])) {
+          if (!r.user_id) continue
+          agg[r.user_id] = (agg[r.user_id] ?? 0) + ((r.input_tokens ?? 0) * 3 + (r.output_tokens ?? 0) * 15) / 1_000_000
+        }
+        setTokenSpend(agg)
+      })
+  }, [])
+
+  const totalApiSpend = Object.values(tokenSpend).reduce((s, v) => s + v, 0)
+  const usersWithSpend = Object.keys(tokenSpend).length
+  const avgCostPerUser = usersWithSpend > 0 ? totalApiSpend / usersWithSpend : 0
 
   const groups = useMemo(() => {
     const g: Record<Segment, UserStat[]> = { active: [], at_risk: [], churned: [], plan_no_log: [], no_plan: [] }
@@ -94,6 +114,20 @@ export default function RetentionTab({ users }: { users: UserStat[] }) {
       <div style={{ marginBottom: 24 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, color: C.text, marginBottom: 4 }}>Retention Dashboard</h2>
         <p style={{ fontSize: 13, color: C.textDim }}>User engagement segments — click any card to drill in</p>
+      </div>
+
+      {/* API Cost KPIs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 24 }}>
+        {[
+          { label: 'Total API Spend', value: `$${totalApiSpend.toFixed(4)}`, color: C.amber },
+          { label: 'Avg Cost / User', value: `$${avgCostPerUser.toFixed(4)}`, color: C.purple },
+          { label: 'Users w/ API Activity', value: usersWithSpend, color: C.accent },
+        ].map(k => (
+          <div key={k.label} style={{ padding: '14px 16px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10 }}>
+            <p style={{ fontSize: 18, fontWeight: 800, color: k.color, fontFamily: 'monospace', letterSpacing: '-0.02em' }}>{k.value}</p>
+            <p style={{ fontSize: 10, color: C.textDim, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', marginTop: 4 }}>{k.label}</p>
+          </div>
+        ))}
       </div>
 
       {/* Segment cards */}
