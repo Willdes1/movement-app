@@ -56,8 +56,7 @@ const CACHE_KEY_ARTICLE = 'ceo_brief_article'
 const CACHE_KEY_TYPE    = 'ceo_brief_article_type'
 const CACHE_KEY_SEEN    = 'ceo_brief_seen_types'
 const CACHE_KEY_SAVED   = 'ceo_brief_article_saved'
-const CACHE_KEY_TS      = 'ceo_brief_cached_at'
-const CACHE_TTL_MS      = 24 * 60 * 60 * 1000 // 24 hours
+const CACHE_KEY_TS      = 'ceo_brief_cached_at' // kept for legacy cleanup only
 
 function cacheGet(key: string) { try { return localStorage.getItem(key) } catch { return null } }
 function cacheSet(key: string, val: string) { try { localStorage.setItem(key, val) } catch {} }
@@ -354,11 +353,9 @@ function DailyBriefTab() {
   useEffect(() => {
     const cachedArticle = cacheGet(CACHE_KEY_ARTICLE)
     const cachedType    = cacheGet(CACHE_KEY_TYPE)
-    const cachedTs      = cacheGet(CACHE_KEY_TS)
     const cachedSeen    = cacheGet(CACHE_KEY_SEEN)
     const cachedSaved   = cacheGet(CACHE_KEY_SAVED)
-    const fresh = cachedTs && (Date.now() - Number(cachedTs)) < CACHE_TTL_MS
-    if (cachedArticle && cachedType && fresh) {
+    if (cachedArticle && cachedType) {
       try {
         const art  = JSON.parse(cachedArticle) as Article
         const type = JSON.parse(cachedType) as ArticleType
