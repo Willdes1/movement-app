@@ -222,7 +222,7 @@ export default function ReturnToSportPage() {
         const res = await fetch('/api/generate-recovery-plan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ injury: intake.injury, doctorVisit: intake.doctorVisit, doctorRecommendations: intake.doctorRecs, sport, age, gender }),
+          body: JSON.stringify({ injury: intake.injury, doctorVisit: intake.doctorVisit, doctorRecommendations: intake.doctorRecs, sport, age, gender, userId }),
         })
         const data = await res.json()
         if (!data.phases) throw new Error('No phases')

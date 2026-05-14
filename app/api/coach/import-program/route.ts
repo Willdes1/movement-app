@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { logTokens } from '@/lib/log-tokens'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -47,6 +48,7 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData()
     const file = formData.get('file') as File | null
+    const coachId = formData.get('coachId') as string | null
 
     if (!file) {
       return Response.json({ error: 'No file provided' }, { status: 400 })
@@ -100,6 +102,7 @@ export async function POST(request: Request) {
 
     program.raw_text = rawText
 
+    logTokens({ operation: 'coach_import_program', route: '/api/coach/import-program', input_tokens: message.usage.input_tokens, output_tokens: message.usage.output_tokens, user_id: coachId })
     return Response.json({
       program,
       usage: { input_tokens: message.usage.input_tokens, output_tokens: message.usage.output_tokens },

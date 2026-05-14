@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { logTokens } from '@/lib/log-tokens'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -58,6 +59,7 @@ export async function POST(request: Request) {
 
     if (!Array.isArray(cards)) throw new Error('Expected array')
 
+    logTokens({ operation: 'generate_feed', route: '/api/generate-feed', input_tokens: message.usage.input_tokens, output_tokens: message.usage.output_tokens, user_id: profile?.id ?? null })
     return Response.json({ cards })
   } catch (err) {
     console.error('Feed generation error:', err)

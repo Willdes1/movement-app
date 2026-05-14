@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { logTokens } from '@/lib/log-tokens'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -95,7 +96,7 @@ interface Message {
 
 export async function POST(request: Request) {
   try {
-    const { question, history = [] }: { question: string; history: Message[] } = await request.json()
+    const { question, history = [], userId }: { question: string; history: Message[]; userId?: string } = await request.json()
 
     if (!question?.trim()) {
       return Response.json({ error: 'No question provided' }, { status: 400 })
@@ -121,6 +122,7 @@ export async function POST(request: Request) {
     const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()
     const response = JSON.parse(cleaned)
 
+    logTokens({ operation: 'ceo_ask', route: '/api/admin/ceo-ask', input_tokens: message.usage.input_tokens, output_tokens: message.usage.output_tokens, user_id: userId ?? null })
     return Response.json({
       response,
       usage: { input_tokens: message.usage.input_tokens, output_tokens: message.usage.output_tokens },

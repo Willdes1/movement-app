@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { logTokens } from '@/lib/log-tokens'
 
 export const runtime = 'nodejs'
 export const maxDuration = 120
@@ -128,6 +129,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}))
     const excludeTypes: string[] = body.excludeTypes ?? []
+    const userId: string | null = body.userId ?? null
 
     // Pick random article type, avoiding recently seen ones
     const available = ARTICLE_TYPES.filter(t => !excludeTypes.includes(t.id))
@@ -160,6 +162,7 @@ Make it specific, sharp, and genuinely educational. Use real industry terminolog
     const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()
     const article = JSON.parse(cleaned)
 
+    logTokens({ operation: 'ceo_brief', route: '/api/admin/ceo-brief', input_tokens: message.usage.input_tokens, output_tokens: message.usage.output_tokens, user_id: userId })
     return Response.json({
       article: { ...article, type_id: articleType.id },
       type: articleType,

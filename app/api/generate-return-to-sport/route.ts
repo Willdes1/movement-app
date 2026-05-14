@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { logTokens } from '@/lib/log-tokens'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
       throw new Error(`Expected steps array, got ${Array.isArray(steps) ? steps.length : typeof steps}`)
     }
 
+    logTokens({ operation: 'generate_return_to_sport', route: '/api/generate-return-to-sport', input_tokens: message.usage.input_tokens, output_tokens: message.usage.output_tokens })
     return Response.json({ steps })
   } catch (err) {
     console.error('Return-to-sport generation error:', err)

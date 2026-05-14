@@ -52,7 +52,7 @@ Return ONLY valid JSON, no markdown wrapper:
 
 export async function POST(request: Request) {
   try {
-    const { query } = await request.json()
+    const { query, userId } = await request.json()
     if (!query?.trim()) return Response.json({ error: 'No query provided' }, { status: 400 })
 
     const message = await client.messages.create({
@@ -79,6 +79,7 @@ export async function POST(request: Request) {
         route: '/api/admin/knowledge-search',
         input_tokens: message.usage.input_tokens,
         output_tokens: message.usage.output_tokens,
+        ...(userId ? { user_id: userId } : {}),
       }),
     }).catch(() => {})
 

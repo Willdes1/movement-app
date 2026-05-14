@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { logTokens } from '@/lib/log-tokens'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -46,7 +47,7 @@ Return nothing except the raw JSON array of phase objects.`
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { injury, doctorVisit, doctorRecommendations, sport, age, gender } = body
+    const { injury, doctorVisit, doctorRecommendations, sport, age, gender, userId } = body
 
     if (!injury) return Response.json({ error: 'Injury description is required' }, { status: 400 })
 
@@ -74,6 +75,7 @@ export async function POST(request: Request) {
       throw new Error(`Expected phases array, got ${Array.isArray(phases) ? phases.length : typeof phases}`)
     }
 
+    logTokens({ operation: 'generate_recovery_plan', route: '/api/generate-recovery-plan', input_tokens: message.usage.input_tokens, output_tokens: message.usage.output_tokens, user_id: userId ?? null })
     return Response.json({ phases })
   } catch (err) {
     console.error('Recovery plan generation error:', err)

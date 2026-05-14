@@ -1,6 +1,7 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/contexts/AuthContext'
 
 const C = {
   bg: '#0d1117', surface: '#161b22', surface2: '#21262d', border: '#30363d',
@@ -312,7 +313,7 @@ async function saveToLibrary(article: Article, type: ArticleType) {
   if (!error) cacheSet(CACHE_KEY_SAVED, 'true')
 }
 
-function DailyBriefTab() {
+function DailyBriefTab({ userId }: { userId?: string }) {
   const [article, setArticle]       = useState<Article | null>(null)
   const [articleType, setArticleType] = useState<ArticleType | null>(null)
   const [loading, setLoading]       = useState(false)
@@ -326,7 +327,7 @@ function DailyBriefTab() {
       const res = await fetch('/api/admin/ceo-brief', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ excludeTypes: currentSeen }),
+        body: JSON.stringify({ excludeTypes: currentSeen, userId }),
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
@@ -507,7 +508,7 @@ function ArticleLibraryTab() {
 }
 
 // ─── ASK ME ANYTHING SUB-TAB ─────────────────────────────────────────────────
-function AskMeAnythingTab() {
+function AskMeAnythingTab({ userId }: { userId?: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput]       = useState('')
   const [loading, setLoading]   = useState(false)
@@ -535,7 +536,7 @@ function AskMeAnythingTab() {
       const res = await fetch('/api/admin/ceo-ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: q, history }),
+        body: JSON.stringify({ question: q, history, userId }),
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
@@ -674,6 +675,7 @@ function AskMeAnythingTab() {
 
 // ─── MAIN EXPORT ─────────────────────────────────────────────────────────────
 export default function CEOBriefingTab() {
+  const { user } = useAuth()
   const [subTab, setSubTab] = useState<SubTab>('brief')
 
   const SUB_TABS: { id: SubTab; label: string }[] = [
@@ -708,8 +710,8 @@ export default function CEOBriefingTab() {
         ))}
       </div>
 
-      {subTab === 'brief'   && <DailyBriefTab />}
-      {subTab === 'ask'     && <AskMeAnythingTab />}
+      {subTab === 'brief'   && <DailyBriefTab userId={user?.id} />}
+      {subTab === 'ask'     && <AskMeAnythingTab userId={user?.id} />}
       {subTab === 'library' && <ArticleLibraryTab />}
     </div>
   )

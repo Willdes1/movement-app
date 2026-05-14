@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/contexts/AuthContext'
 
 const C = {
   bg: '#0d1117', surface: '#161b22', surface2: '#21262d', border: '#30363d',
@@ -208,6 +209,7 @@ function EntryModal({ entry, defaultCategory, onSave, onClose }: {
 
 // ─── MAIN EXPORT ─────────────────────────────────────────────────────────────
 export default function KnowledgeBaseTab() {
+  const { user } = useAuth()
   const [query, setQuery]             = useState('')
   const [searching, setSearching]     = useState(false)
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null)
@@ -239,7 +241,7 @@ export default function KnowledgeBaseTab() {
       const res = await fetch('/api/admin/knowledge-search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q }),
+        body: JSON.stringify({ query: q, userId: user?.id }),
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)

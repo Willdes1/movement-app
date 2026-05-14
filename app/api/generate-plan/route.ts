@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { logTokens } from '@/lib/log-tokens'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -183,6 +184,7 @@ export async function POST(request: Request) {
       throw new Error(`Day at index ${missingDs} is missing daily_session`)
     }
 
+    logTokens({ operation: 'generate_plan', route: '/api/generate-plan', input_tokens: message.usage.input_tokens, output_tokens: message.usage.output_tokens, user_id: profile?.id ?? null })
     return Response.json({ plan, usage: { input_tokens: message.usage.input_tokens, output_tokens: message.usage.output_tokens } })
   } catch (err) {
     console.error('Plan generation error:', err)

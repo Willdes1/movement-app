@@ -122,6 +122,7 @@ export default function CoachBuilderPage() {
 
     const formData = new FormData()
     formData.append('file', file)
+    if (user?.id) formData.append('coachId', user.id)
 
     try {
       const res = await fetch('/api/coach/import-program', { method: 'POST', body: formData })
@@ -169,7 +170,7 @@ export default function CoachBuilderPage() {
       const res = await fetch('/api/coach/generate-program', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(brief),
+        body: JSON.stringify({ ...brief, coachId: user?.id }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Generation failed')

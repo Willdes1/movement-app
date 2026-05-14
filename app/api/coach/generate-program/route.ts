@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { logTokens } from '@/lib/log-tokens'
 
 export const runtime = 'nodejs'
 export const maxDuration = 120
@@ -74,6 +75,7 @@ export interface CoachBrief {
   equipment: string[]
   restrictions: string
   notes: string
+  coachId?: string
 }
 
 export async function POST(request: Request) {
@@ -130,6 +132,7 @@ export async function POST(request: Request) {
       throw new Error('AI returned invalid program structure')
     }
 
+    logTokens({ operation: 'coach_generate_program', route: '/api/coach/generate-program', input_tokens: message.usage.input_tokens, output_tokens: message.usage.output_tokens, user_id: brief.coachId ?? null })
     return Response.json({
       program,
       usage: { input_tokens: message.usage.input_tokens, output_tokens: message.usage.output_tokens },
