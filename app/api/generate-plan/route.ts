@@ -159,8 +159,10 @@ function buildPrompt(profile: Record<string, unknown>, weekNumber: number, phase
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
+    const body = await request.json().catch(() => ({}))
     const { profile, weekNumber = 1, phaseLabel = 'Foundation Phase', intensity = 'RPE 6-7. Build base fitness and movement quality.', instructions = '' } = body
+
+    if (!profile) return Response.json({ error: 'Profile is required' }, { status: 400 })
 
     const prompt = buildPrompt(profile, weekNumber, phaseLabel, intensity, instructions)
 

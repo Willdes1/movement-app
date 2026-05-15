@@ -35,7 +35,9 @@ Return nothing but the raw JSON array of exactly 6 cards.`
 
 export async function POST(request: Request) {
   try {
-    const { profile } = await request.json()
+    const { profile } = await request.json().catch(() => ({}))
+
+    if (!profile) return Response.json({ error: 'Profile is required' }, { status: 400 })
 
     const lines: string[] = ['ATHLETE PROFILE:']
     if (profile.name) lines.push(`Name: ${profile.name}`)
