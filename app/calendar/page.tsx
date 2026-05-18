@@ -250,7 +250,7 @@ function CalendarInner() {
     if (cached) { setSelectedExercise(cached); return }
 
     // Show loading placeholder immediately
-    setSelectedExercise({ name_normalized: key, name_display: name, how: 'Loading coaching details…', breathing: null as unknown as string, core: null as unknown as string, tip: null as unknown as string })
+    setSelectedExercise({ name_normalized: key, name_display: name, how: 'Loading coaching details…', breathing: null as unknown as string, core: null as unknown as string, tip: null as unknown as string, video_url: null, video_source: null })
     setExerciseFetching(true)
     try {
       // Check DB before calling AI — avoids charges on every tap
@@ -261,7 +261,7 @@ function CalendarInner() {
         return
       }
       // Not in library — coaching tips are pre-generated at plan generation time
-      setSelectedExercise({ name_normalized: key, name_display: name, how: 'Coaching tips for this exercise are not yet available. Generate your plan to load all coaching details automatically.', breathing: null as unknown as string, core: null as unknown as string, tip: null as unknown as string })
+      setSelectedExercise({ name_normalized: key, name_display: name, how: 'Coaching tips for this exercise are not yet available. Generate your plan to load all coaching details automatically.', breathing: null as unknown as string, core: null as unknown as string, tip: null as unknown as string, video_url: null, video_source: null })
     } catch { /* keep placeholder visible */ }
     finally { setExerciseFetching(false) }
   }, [exerciseLibrary])

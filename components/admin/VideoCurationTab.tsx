@@ -265,10 +265,9 @@ export default function VideoCurationTab() {
             onClick={discoverChannels}
             disabled={discovering}
             style={{
-              padding: '8px 18px', borderRadius: 8, border: 'none', cursor: discovering ? 'not-allowed' : 'pointer',
+              padding: '8px 18px', borderRadius: 8, border: hasChannels ? `1px solid ${C.border}` : 'none', cursor: discovering ? 'not-allowed' : 'pointer',
               background: discovering ? C.surface2 : hasChannels ? 'transparent' : C.amber,
               color: discovering ? C.textDim : hasChannels ? C.textMid : '#000',
-              border: hasChannels ? `1px solid ${C.border}` : 'none',
               fontSize: 13, fontWeight: 700, fontFamily: 'inherit', whiteSpace: 'nowrap',
             }}>
             {discovering ? '⏳ Discovering…' : hasChannels ? '↺ Re-discover Channels' : '🔍 Auto-Discover Channels'}
