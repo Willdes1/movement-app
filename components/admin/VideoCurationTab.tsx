@@ -7,11 +7,14 @@ const C = {
   bg: '#0d1117', surface: '#161b22', surface2: '#21262d', border: '#30363d',
   accent: '#3b82f6', accentDim: 'rgba(59,130,246,0.12)', accentBorder: 'rgba(59,130,246,0.3)',
   green: '#22c55e', greenDim: 'rgba(34,197,94,0.1)', greenBorder: 'rgba(34,197,94,0.25)',
-  amber: '#f59e0b', amberDim: 'rgba(245,158,11,0.1)',
+  amber: '#f59e0b', amberDim: 'rgba(245,158,11,0.1)', amberBorder: 'rgba(245,158,11,0.25)',
   red: '#ef4444', purple: '#a78bfa',
   text: '#e6edf3', textMid: '#b1bac4', textDim: '#6e7681',
 }
 
+type Channel = {
+  channel_id: string; channel_name: string; audience_focus: string; priority: number
+}
 type Candidate = {
   id: string; exercise_id: string; youtube_video_id: string; url: string
   title: string; channel_title: string; thumbnail_url: string
@@ -41,6 +44,14 @@ function scoreColor(s: number) {
 
 export default function VideoCurationTab() {
   const { user } = useAuth()
+
+  // ── Channel state ──────────────────────────────────────────────────────────
+  const [channels, setChannels]           = useState<Channel[]>([])
+  const [channelsLoading, setChLoading]   = useState(true)
+  const [discovering, setDiscovering]     = useState(false)
+  const [discoverLog, setDiscoverLog]     = useState<string[]>([])
+
+  // ── Exercise / candidate state ─────────────────────────────────────────────
   const [exercises, setExercises]   = useState<Exercise[]>([])
   const [loading, setLoading]       = useState(true)
   const [running, setRunning]       = useState(false)
@@ -51,9 +62,42 @@ export default function VideoCurationTab() {
   const [pasteUrls, setPasteUrls]   = useState<Record<string, string>>({})
   const [acting, setActing]         = useState<string | null>(null)
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { loadChannels(); loadExercises() }, [])
 
-  async function load() {
+  // ── Channel helpers ────────────────────────────────────────────────────────
+  async function loadChannels() {
+    setChLoading(true)
+    const { data } = await supabase
+      .from('approved_yt_channels')
+      .select('channel_id, channel_name, audience_focus, priority')
+      .eq('active', true)
+      .order('priority')
+    setChannels(data ?? [])
+    setChLoading(false)
+  }
+
+  async function discoverChannels() {
+    setDiscovering(true)
+    setDiscoverLog(['Searching YouTube for certified fitness channels…'])
+    try {
+      const res = await fetch('/api/admin/discover-channels', { method: 'POST' })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setDiscoverLog([
+        `✓ Discovered ${data.discovered} high-quality channels`,
+        ...(data.channels ?? []).map((c: { channel_name: string; score: number; reasoning: string }) =>
+          `  · ${c.channel_name} — ${Math.round(c.score * 100)}% quality — ${c.reasoning}`
+        ),
+      ])
+      await loadChannels()
+    } catch (err) {
+      setDiscoverLog([`Error: ${err instanceof Error ? err.message : 'Discovery failed'}`])
+    }
+    setDiscovering(false)
+  }
+
+  // ── Exercise helpers ───────────────────────────────────────────────────────
+  async function loadExercises() {
     setLoading(true)
     const { data: exList } = await supabase
       .from('exercise_library')
@@ -73,8 +117,7 @@ export default function VideoCurationTab() {
     }
 
     setExercises((exList ?? []).map((e: Omit<Exercise, 'candidates'>) => ({
-      ...e,
-      candidates: candMap[e.id] ?? [],
+      ...e, candidates: candMap[e.id] ?? [],
     })))
     setLoading(false)
   }
@@ -94,7 +137,7 @@ export default function VideoCurationTab() {
         `${r.status === 'proposed' ? '✓' : r.status === 'no_results' ? '○' : '⚠'} ${r.exercise}${r.candidates ? ` — ${r.candidates} candidates` : ` — ${r.status}`}`
       )
       setRunLog([`Done — ${data.processed} exercises processed`, ...lines])
-      await load()
+      await loadExercises()
     } catch (err) {
       setRunLog(prev => [...prev, `Error: ${err instanceof Error ? err.message : 'Failed'}`])
     }
@@ -109,27 +152,24 @@ export default function VideoCurationTab() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ exerciseId }),
       })
-      await load()
+      await loadExercises()
     } catch { /* ignore */ }
     setActing(null)
   }
 
   async function approve(candidate: Candidate) {
     setActing(candidate.id)
-    // Supersede other candidates for this exercise
     await supabase.from('exercise_video_candidates')
       .update({ status: 'superseded' })
       .eq('exercise_id', candidate.exercise_id)
       .neq('id', candidate.id)
-    // Mark this one approved
     await supabase.from('exercise_video_candidates')
       .update({ status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: user?.id })
       .eq('id', candidate.id)
-    // Write to exercise_library
     await supabase.from('exercise_library')
       .update({ video_url: candidate.url, video_source: 'youtube', video_approved_at: new Date().toISOString(), video_approved_by: user?.id })
       .eq('id', candidate.exercise_id)
-    await load()
+    await loadExercises()
     setActing(null)
   }
 
@@ -153,7 +193,7 @@ export default function VideoCurationTab() {
       .update({ video_url: `https://www.youtube.com/watch?v=${match[1]}`, video_source: 'custom', video_approved_at: new Date().toISOString(), video_approved_by: user?.id })
       .eq('id', exerciseId)
     setPasteUrls(prev => { const n = { ...prev }; delete n[exerciseId]; return n })
-    await load()
+    await loadExercises()
     setActing(null)
   }
 
@@ -168,7 +208,7 @@ export default function VideoCurationTab() {
     setRunning(false)
   }
 
-  // Stats
+  // ── Derived stats ──────────────────────────────────────────────────────────
   const total    = exercises.length
   const approved = exercises.filter(e => e.video_url).length
   const pending  = exercises.filter(e => !e.video_url && e.candidates.some(c => c.status === 'proposed')).length
@@ -182,14 +222,78 @@ export default function VideoCurationTab() {
     return true
   })
 
+  const hasChannels = channels.length > 0
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div>
       <div style={{ marginBottom: 20 }}>
         <h2 style={{ fontSize: 20, fontWeight: 800, color: C.text, marginBottom: 4 }}>Exercise Video Curation</h2>
-        <p style={{ fontSize: 13, color: C.textDim }}>AI-proposed YouTube videos per exercise. Review, approve, or paste your own.</p>
+        <p style={{ fontSize: 13, color: C.textDim }}>AI discovers certified fitness channels, proposes the best video per exercise. You review and approve.</p>
       </div>
 
-      {/* Stats strip */}
+      {/* ── Channel Discovery Panel ─────────────────────────────────────────── */}
+      <div style={{
+        padding: '16px 18px',
+        background: C.surface,
+        border: `1px solid ${hasChannels ? C.greenBorder : C.amberBorder}`,
+        borderRadius: 10,
+        marginBottom: 20,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: hasChannels ? 12 : 0 }}>
+          <div>
+            <p style={{ fontSize: 11, fontWeight: 700, color: hasChannels ? C.green : C.amber, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 3 }}>
+              {channelsLoading ? 'Loading channels…' : hasChannels ? `✓ ${channels.length} Approved Channels` : '⚠ No Channels Configured'}
+            </p>
+            {!hasChannels && !channelsLoading && (
+              <p style={{ fontSize: 12, color: C.textDim }}>
+                AI will search YouTube for certified fitness channels with 100K+ subscribers, score them for quality, and auto-populate the list.
+              </p>
+            )}
+          </div>
+          <button
+            onClick={discoverChannels}
+            disabled={discovering}
+            style={{
+              padding: '8px 18px', borderRadius: 8, border: 'none', cursor: discovering ? 'not-allowed' : 'pointer',
+              background: discovering ? C.surface2 : hasChannels ? 'transparent' : C.amber,
+              color: discovering ? C.textDim : hasChannels ? C.textMid : '#000',
+              border: hasChannels ? `1px solid ${C.border}` : 'none',
+              fontSize: 13, fontWeight: 700, fontFamily: 'inherit', whiteSpace: 'nowrap',
+            }}>
+            {discovering ? '⏳ Discovering…' : hasChannels ? '↺ Re-discover Channels' : '🔍 Auto-Discover Channels'}
+          </button>
+        </div>
+
+        {/* Channel chips */}
+        {hasChannels && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {channels.map(ch => (
+              <div key={ch.channel_id} style={{
+                padding: '4px 10px', borderRadius: 20,
+                background: C.greenDim, border: `1px solid ${C.greenBorder}`,
+                fontSize: 11, color: C.green, fontWeight: 600,
+              }}>
+                {ch.channel_name}
+                {ch.audience_focus && (
+                  <span style={{ color: C.textDim, fontWeight: 400, marginLeft: 4 }}>· {ch.audience_focus.split(',')[0].trim()}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Discovery log */}
+        {discoverLog.length > 0 && (
+          <div style={{ marginTop: 12, padding: '10px 12px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 7, maxHeight: 180, overflowY: 'auto' }}>
+            {discoverLog.map((l, i) => (
+              <p key={i} style={{ fontSize: 11, color: i === 0 ? C.green : C.textMid, fontFamily: 'monospace', lineHeight: 1.7 }}>{l}</p>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Stats strip ────────────────────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 20 }}>
         {[
           { label: 'Total Exercises', value: total,    color: C.text },
@@ -204,26 +308,32 @@ export default function VideoCurationTab() {
         ))}
       </div>
 
-      {/* Pipeline controls */}
+      {/* ── Pipeline controls ───────────────────────────────────────────────── */}
       <div style={{ padding: '16px 18px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 20 }}>
         <p style={{ fontSize: 11, fontWeight: 700, color: C.textDim, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>Run Pipeline</p>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 13, color: C.textMid }}>Batch size:</span>
-            <select value={batchSize} onChange={e => setBatchSize(Number(e.target.value))}
-              style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 13 }}>
-              {[5, 10, 25, 50].map(n => <option key={n} value={n}>{n} exercises</option>)}
-            </select>
+
+        {!hasChannels && !channelsLoading ? (
+          <p style={{ fontSize: 12, color: C.amber }}>⚠ Auto-Discover Channels first — the pipeline needs approved channels to search.</p>
+        ) : (
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 13, color: C.textMid }}>Batch size:</span>
+              <select value={batchSize} onChange={e => setBatchSize(Number(e.target.value))}
+                style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 13 }}>
+                {[5, 10, 25, 50].map(n => <option key={n} value={n}>{n} exercises</option>)}
+              </select>
+            </div>
+            <button onClick={runPipeline} disabled={running || !hasChannels}
+              style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: running || !hasChannels ? C.surface2 : C.accent, color: running || !hasChannels ? C.textDim : '#fff', fontSize: 13, fontWeight: 700, cursor: running || !hasChannels ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+              {running ? '⏳ Running…' : '▶ Run Curation'}
+            </button>
+            <button onClick={bulkApproveHighScore} disabled={running || !hasChannels}
+              style={{ padding: '8px 18px', borderRadius: 8, border: `1px solid ${C.greenBorder}`, background: C.greenDim, color: C.green, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              ✓ Approve All ≥ 0.85
+            </button>
           </div>
-          <button onClick={runPipeline} disabled={running}
-            style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: running ? C.surface2 : C.accent, color: running ? C.textDim : '#fff', fontSize: 13, fontWeight: 700, cursor: running ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
-            {running ? '⏳ Running…' : '▶ Run Curation'}
-          </button>
-          <button onClick={bulkApproveHighScore} disabled={running}
-            style={{ padding: '8px 18px', borderRadius: 8, border: `1px solid ${C.greenBorder}`, background: C.greenDim, color: C.green, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-            ✓ Approve All ≥ 0.85
-          </button>
-        </div>
+        )}
+
         {runLog.length > 0 && (
           <div style={{ marginTop: 12, padding: '10px 12px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 7, maxHeight: 160, overflowY: 'auto' }}>
             {runLog.map((l, i) => <p key={i} style={{ fontSize: 11, color: C.textMid, fontFamily: 'monospace', lineHeight: 1.7 }}>{l}</p>)}
@@ -231,7 +341,7 @@ export default function VideoCurationTab() {
         )}
       </div>
 
-      {/* Filters */}
+      {/* ── Filters ─────────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search exercises…"
           style={{ flex: 1, minWidth: 180, padding: '8px 12px', borderRadius: 7, border: `1px solid ${C.border}`, background: C.surface2, color: C.text, fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
@@ -243,7 +353,7 @@ export default function VideoCurationTab() {
         ))}
       </div>
 
-      {/* Exercise list */}
+      {/* ── Exercise list ────────────────────────────────────────────────────── */}
       {loading ? (
         <p style={{ fontSize: 13, color: C.textDim, textAlign: 'center', padding: '40px 0' }}>Loading exercises…</p>
       ) : filtered.length === 0 ? (
@@ -267,7 +377,7 @@ export default function VideoCurationTab() {
                       </span>
                     )}
                     {!ex.video_url && proposed.length > 0 && (
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: C.amberDim, color: C.amber, border: '1px solid rgba(245,158,11,0.3)' }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: C.amberDim, color: C.amber, border: `1px solid ${C.amberBorder}` }}>
                         {proposed.length} PROPOSED
                       </span>
                     )}
@@ -280,8 +390,8 @@ export default function VideoCurationTab() {
                       </a>
                     )}
                     {!ex.video_url && proposed.length === 0 && (
-                      <button onClick={() => runSingle(ex.id)} disabled={isActing}
-                        style={{ padding: '5px 12px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'transparent', color: C.textDim, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      <button onClick={() => runSingle(ex.id)} disabled={isActing || !hasChannels}
+                        style={{ padding: '5px 12px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'transparent', color: C.textDim, fontSize: 11, cursor: isActing || !hasChannels ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
                         {isActing ? '…' : '+ Get Suggestions'}
                       </button>
                     )}
@@ -299,7 +409,6 @@ export default function VideoCurationTab() {
                   <div style={{ padding: '14px 16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
                     {proposed.map(c => (
                       <div key={c.id} style={{ background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 9, overflow: 'hidden' }}>
-                        {/* Thumbnail */}
                         <a href={c.url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', position: 'relative' }}>
                           {c.thumbnail_url
                             ? <img src={c.thumbnail_url} alt={c.title} style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block' }} />
@@ -313,9 +422,7 @@ export default function VideoCurationTab() {
                             <span style={{ fontSize: 32, color: '#fff' }}>▶</span>
                           </div>
                         </a>
-
                         <div style={{ padding: '10px 12px' }}>
-                          {/* Score */}
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                             <span style={{ fontSize: 11, fontWeight: 800, color: scoreColor(c.ai_relevance_score), fontFamily: 'monospace' }}>
                               {Math.round(c.ai_relevance_score * 100)}% match
@@ -324,17 +431,11 @@ export default function VideoCurationTab() {
                               {fmtViews(c.view_count)} views · {fmtDuration(c.duration_seconds)}
                             </span>
                           </div>
-
-                          {/* Title */}
                           <p style={{ fontSize: 12, fontWeight: 600, color: C.text, lineHeight: 1.4, marginBottom: 4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                             {c.title}
                           </p>
                           <p style={{ fontSize: 11, color: C.textDim, marginBottom: 8 }}>{c.channel_title}</p>
-
-                          {/* AI reasoning */}
                           <p style={{ fontSize: 11, color: C.textMid, lineHeight: 1.5, marginBottom: 10, fontStyle: 'italic' }}>"{c.ai_reasoning}"</p>
-
-                          {/* Approve button */}
                           <button onClick={() => approve(c)} disabled={!!acting}
                             style={{ width: '100%', padding: '8px', borderRadius: 7, border: 'none', background: acting ? C.surface : C.green, color: acting ? C.textDim : '#fff', fontSize: 12, fontWeight: 700, cursor: acting ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
                             {acting === c.id ? 'Approving…' : '✓ Approve This One'}
