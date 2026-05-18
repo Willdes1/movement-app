@@ -59,6 +59,41 @@ type ExerciseDetail = {
   breathing: string
   core: string
   tip: string
+  video_url: string | null
+  video_source: string | null
+}
+
+function extractYouTubeId(url: string): string | null {
+  return url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/)?.[1] ?? null
+}
+
+function VideoPlayer({ url, source, name }: { url: string | null; source: string | null; name: string }) {
+  if (url && (source === 'youtube' || source === 'custom')) {
+    const videoId = extractYouTubeId(url)
+    if (videoId) return (
+      <div style={{ marginBottom: 14, borderRadius: 10, overflow: 'hidden', background: '#000' }}>
+        <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0 }}>
+          <iframe
+            src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`}
+            title={name}
+            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+        <p style={{ fontSize: 9, color: 'var(--text-dim)', padding: '5px 10px', textAlign: 'right', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', background: 'var(--surface2)' }}>
+          Video · Coach Approved
+        </p>
+      </div>
+    )
+  }
+  // "hosted" source handled here in future (replace YouTube with <video> tag)
+  return (
+    <div style={{ marginBottom: 14, padding: '14px 16px', background: 'rgba(59,130,246,0.05)', border: '1px dashed rgba(59,130,246,0.2)', borderRadius: 10, textAlign: 'center' }}>
+      <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-mid)', marginBottom: 4 }}>🎬 Video Coming Soon</p>
+      <p style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>Your coach is reviewing the best demonstration for this exercise.</p>
+    </div>
+  )
 }
 
 type WorkoutLog = {
@@ -91,6 +126,8 @@ function fallbackDetail(m: string, _day: DayPlan): ExerciseDetail {
     breathing: null as unknown as string,
     core: null as unknown as string,
     tip: null as unknown as string,
+    video_url: null,
+    video_source: null,
   }
 }
 
@@ -194,7 +231,7 @@ function CalendarInner() {
     if (normalizedNames.length > 0) {
       const { data: libData } = await supabase
         .from('exercise_library')
-        .select('name_normalized, name_display, how, breathing, core, tip')
+        .select('name_normalized, name_display, how, breathing, core, tip, video_url, video_source')
         .in('name_normalized', normalizedNames)
       if (libData) {
         libData.forEach(e => { libMap[e.name_normalized] = e as ExerciseDetail })
@@ -217,7 +254,7 @@ function CalendarInner() {
     setExerciseFetching(true)
     try {
       // Check DB before calling AI — avoids charges on every tap
-      const { data: dbEntry } = await supabase.from('exercise_library').select('name_normalized, name_display, how, breathing, core, tip').eq('name_normalized', key).single()
+      const { data: dbEntry } = await supabase.from('exercise_library').select('name_normalized, name_display, how, breathing, core, tip, video_url, video_source').eq('name_normalized', key).single()
       if (dbEntry) {
         setExerciseLibrary(prev => ({ ...prev, [key]: dbEntry as ExerciseDetail }))
         setSelectedExercise(dbEntry as ExerciseDetail)
@@ -647,6 +684,8 @@ function CalendarInner() {
               </div>
             </div>
             <div style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch' as never, padding: '0 24px 40px', flexGrow: 1 }}>
+              {/* Video player — YouTube embed now, hosted video in future */}
+              <VideoPlayer url={selectedExercise.video_url ?? null} source={selectedExercise.video_source ?? null} name={selectedExercise.name_display} />
               {/* Last session (read-only) */}
               <div style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)', marginBottom: 14 }}>
                 <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--text-dim)', marginBottom: 6, textTransform: 'uppercase' }}>Last Session</p>

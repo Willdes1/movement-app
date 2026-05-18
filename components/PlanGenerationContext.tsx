@@ -140,6 +140,13 @@ export function PlanGenerationProvider({ children }: { children: React.ReactNode
           setProgress({ current: w, total: config.numWeeks, details: true })
           await saveExerciseDetails(weekNames, librarySet, w)
         }
+        // Queue exercises that have no video yet — admin reviews these in the Video Curation tab
+        const normalizedWeekNames = weekNames.map(normalizeExerciseName)
+        fetch('/api/queue-exercise-videos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ exerciseNames: normalizedWeekNames }),
+        }).catch(() => {})
       } catch { /* continue to next week */ }
     }
 

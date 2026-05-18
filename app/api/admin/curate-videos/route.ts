@@ -81,7 +81,7 @@ How to perform it: "${exerciseHow ?? 'No description available'}"
 Candidates:
 ${candidateList}
 
-Pick the best 3 (or fewer if less than 3 are relevant). For each, give a relevance score 0.0–1.0 and one sentence of reasoning.
+Pick the best 3. Always return exactly 3 (or all of them if fewer than 3 exist). Score each 0.0–1.0 and give one sentence of reasoning. Include lower-scoring options rather than returning fewer than 3.
 
 Return ONLY valid JSON array, no markdown:
 [{"index": 0, "score": 0.92, "reasoning": "..."}]`
@@ -184,7 +184,7 @@ async function processExercises(exercises: Exercise[], channels: Channel[]) {
         .sort((a, b) => b.score - a.score)
         .slice(0, 3)
         .map(s => ({ ...s, detail: details[s.index] }))
-        .filter(s => s.detail && s.score >= 0.4)
+        .filter(s => s.detail && s.score >= 0.2)
 
       if (top3.length === 0) {
         results.push({ exercise: ex.name_display, status: 'no_good_matches' })

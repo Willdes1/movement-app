@@ -51,6 +51,9 @@ export default function VideoCurationTab() {
   const [discovering, setDiscovering]     = useState(false)
   const [discoverLog, setDiscoverLog]     = useState<string[]>([])
 
+  // ── Priority queue (from client plan generation) ───────────────────────────
+  const [queuedIds, setQueuedIds]         = useState<Set<string>>(new Set())
+
   // ── Exercise / candidate state ─────────────────────────────────────────────
   const [exercises, setExercises]   = useState<Exercise[]>([])
   const [loading, setLoading]       = useState(true)
@@ -62,7 +65,7 @@ export default function VideoCurationTab() {
   const [pasteUrls, setPasteUrls]   = useState<Record<string, string>>({})
   const [acting, setActing]         = useState<string | null>(null)
 
-  useEffect(() => { loadChannels(); loadExercises() }, [])
+  useEffect(() => { loadChannels(); loadExercises() }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Channel helpers ────────────────────────────────────────────────────────
   async function loadChannels() {
@@ -103,6 +106,13 @@ export default function VideoCurationTab() {
       .from('exercise_library')
       .select('id, name_display, name_normalized, video_url, video_source')
       .order('name_display')
+
+    // Collect queued exercise IDs (from client plan generation)
+    const { data: queued } = await supabase
+      .from('exercise_video_candidates')
+      .select('exercise_id')
+      .eq('status', 'queued')
+    setQueuedIds(new Set((queued ?? []).map(r => r.exercise_id)))
 
     const { data: cands } = await supabase
       .from('exercise_video_candidates')
@@ -307,6 +317,33 @@ export default function VideoCurationTab() {
           </div>
         ))}
       </div>
+
+      {/* ── Priority Queue (from client plan generation) ───────────────────── */}
+      {queuedIds.size > 0 && (
+        <div style={{ padding: '14px 18px', background: C.surface, border: `1px solid rgba(239,68,68,0.3)`, borderRadius: 10, marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div>
+              <p style={{ fontSize: 11, fontWeight: 700, color: C.red, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}>
+                🔴 Priority — {queuedIds.size} {queuedIds.size === 1 ? 'Exercise' : 'Exercises'} From Client Plans
+              </p>
+              <p style={{ fontSize: 11, color: C.textDim }}>A client generated a plan with these exercises but no videos are assigned yet. Find videos first.</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {exercises.filter(e => queuedIds.has(e.id) && !e.video_url).map(ex => (
+              <div key={ex.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 7 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{ex.name_display}</span>
+                <button
+                  onClick={() => runSingle(ex.id)}
+                  disabled={acting === ex.id || !hasChannels}
+                  style={{ padding: '5px 14px', borderRadius: 6, border: 'none', background: acting === ex.id ? C.surface2 : C.red, color: acting === ex.id ? C.textDim : '#fff', fontSize: 11, fontWeight: 700, cursor: acting === ex.id || !hasChannels ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+                  {acting === ex.id ? '…' : '▶ Find Videos'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Pipeline controls ───────────────────────────────────────────────── */}
       <div style={{ padding: '16px 18px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 20 }}>
