@@ -174,6 +174,119 @@ const SUB_TABS: { id: SubTab; label: string }[] = [
   { id: 'ai', label: '✦ AI Generate' },
 ]
 
+// ─── READINESS DATA ──────────────────────────────────────────────────────────
+const READINESS_DATA = [
+  {
+    label: 'F&F Beta',
+    sublabel: 'Consumer App',
+    color: C.green,
+    colorDim: C.greenDim,
+    colorBorder: C.greenBorder,
+    items: [
+      { label: 'AI plan generator (bulk 1/2/3-month)', done: true },
+      { label: 'Phase-based training (Foundation → Maintenance)', done: true },
+      { label: 'Exercise library with AI cues', done: true },
+      { label: 'Calendar + session completion + Undo', done: true },
+      { label: 'Workout logging (sets / reps / weight + PRs)', done: true },
+      { label: 'For You feed + mindset agent', done: true },
+      { label: 'Anatomy Explorer', done: true },
+      { label: 'Multi-sport profile + injury + equipment', done: true },
+      { label: 'Training background profile (beginner → pro)', done: true },
+      { label: 'Auth gates + promo code system', done: true },
+      { label: 'F&F beta role + access control', done: true },
+      { label: 'Terms of Service + Privacy Policy', done: true },
+      { label: 'Bug reports system', done: true },
+      { label: 'RLS security hardening', done: true },
+      { label: 'Exercise videos curated (80%+ of library)', done: false },
+      { label: 'Mobile UX polish', done: false },
+      { label: 'New user onboarding flow', done: false },
+      { label: 'Push notifications', done: false },
+      { label: 'Final QA — no critical bugs', done: false },
+    ],
+  },
+  {
+    label: 'Coach Portal',
+    sublabel: 'Professional Platform',
+    color: C.accent,
+    colorDim: C.accentDim,
+    colorBorder: C.accentBorder,
+    items: [
+      { label: 'Programs library', done: true },
+      { label: 'Program detail (inline editing + status)', done: true },
+      { label: 'Assign-to-client (search + date picker)', done: true },
+      { label: 'Exercise swap modal (sets/reps preserved)', done: true },
+      { label: 'AI generate (periodized plans)', done: true },
+      { label: 'Template library (zero-cost reuse)', done: true },
+      { label: 'Client roster + assignment history', done: true },
+      { label: 'Client portal (clients see assigned plans)', done: false },
+      { label: 'Stripe billing for coach tiers', done: false },
+      { label: 'Coach onboarding flow', done: false },
+      { label: 'Coach affiliate / referral system', done: false },
+      { label: 'Coach analytics dashboard', done: false },
+      { label: 'In-app coach ↔ client messaging', done: false },
+      { label: 'PDF export of programs', done: false },
+    ],
+  },
+]
+
+function ReadinessPanel() {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+      {READINESS_DATA.map(portal => {
+        const done = portal.items.filter(i => i.done).length
+        const total = portal.items.length
+        const pct = Math.round((done / total) * 100)
+        const r = 42
+        const circ = 2 * Math.PI * r
+        const offset = circ * (1 - pct / 100)
+        return (
+          <div key={portal.label} style={{ background: `linear-gradient(135deg, ${portal.colorDim} 0%, ${C.surface} 60%)`, border: `1px solid ${portal.colorBorder}`, borderRadius: 12, padding: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 16 }}>
+              {/* Progress ring */}
+              <div style={{ position: 'relative', flexShrink: 0, width: 100, height: 100 }}>
+                <svg width={100} height={100} style={{ transform: 'rotate(-90deg)' }}>
+                  <circle cx={50} cy={50} r={r} fill="none" stroke={C.surface2} strokeWidth={8} />
+                  <circle
+                    cx={50} cy={50} r={r}
+                    fill="none"
+                    stroke={portal.color}
+                    strokeWidth={8}
+                    strokeLinecap="round"
+                    strokeDasharray={circ}
+                    strokeDashoffset={offset}
+                  />
+                </svg>
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ fontSize: 22, fontWeight: 900, color: portal.color, letterSpacing: '-0.03em' }}>{pct}%</span>
+                </div>
+              </div>
+              {/* Label block */}
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: portal.color, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 3 }}>Beta Readiness</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: C.text, marginBottom: 2 }}>{portal.label}</div>
+                <div style={{ fontSize: 12, color: C.textDim, marginBottom: 8 }}>{portal.sublabel}</div>
+                <div style={{ fontSize: 12, color: C.textMid }}>
+                  <span style={{ color: portal.color, fontWeight: 700 }}>{done}</span>
+                  <span> of {total} items complete</span>
+                </div>
+              </div>
+            </div>
+            {/* Checklist */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {portal.items.map((item, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                  <span style={{ fontSize: 11, flexShrink: 0, marginTop: 1, color: item.done ? portal.color : C.textDim }}>{item.done ? '✓' : '○'}</span>
+                  <span style={{ fontSize: 11, color: item.done ? C.textMid : C.textDim, lineHeight: 1.5 }}>{item.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ─── OVERVIEW SECTION ────────────────────────────────────────────────────────
 function OverviewSection() {
   const BUILT = [
@@ -252,6 +365,8 @@ function OverviewSection() {
 
   return (
     <div>
+      <ReadinessPanel />
+
       {/* Dev Build Stats */}
       <div style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.07) 0%, rgba(167,139,250,0.07) 100%)', border: `1px solid ${C.accentBorder}`, borderRadius: 12, padding: '20px 24px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
         <div>
