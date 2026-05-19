@@ -115,15 +115,54 @@ ARTICLE QUALITY STANDARDS:
 - "How This Applies to Us" must be specific to this platform — not generic fitness advice
 - The One-Liner must be a single quotable sentence the founder can drop into any conversation
 
-Return ONLY valid JSON — no markdown, no code blocks, no explanation. Return this exact shape:
+Return ONLY valid JSON — no markdown wrapper, no code blocks, no explanation before or after. Return this exact shape:
 {
   "headline": "The specific punchy headline",
   "read_time": "X min read",
   "summary": "2-3 sentence 30-second version",
-  "body": "Full article in markdown (use ## for sections, **bold** for key terms, real paragraphs)",
-  "our_angle": "How this specifically applies to our platform and strategy (2-4 sentences)",
-  "one_liner": "A single quotable sentence the founder can use in a conversation or pitch"
+  "body": "Full article in markdown. IMPORTANT: do NOT use double-quote characters inside this field. Use single quotes for any quoted text (e.g. 'hello' not \"hello\"). Use ** for bold and ## for headers.",
+  "our_angle": "How this specifically applies to our platform and strategy (2-4 sentences). No double-quotes inside.",
+  "one_liner": "A single quotable sentence. No double-quotes inside — use single quotes if quoting anything."
 }`
+
+function parseArticleJson(text: string): Record<string, string> {
+  // First attempt: direct parse
+  try { return JSON.parse(text) } catch { /* fall through */ }
+
+  // Second attempt: field-by-field extraction when Claude includes
+  // unescaped double-quotes inside string values
+  const fields: Record<string, string> = {}
+  const fieldOrder = ['headline', 'read_time', 'summary', 'body', 'our_angle', 'one_liner']
+
+  for (let i = 0; i < fieldOrder.length; i++) {
+    const field = fieldOrder[i]
+    const next  = fieldOrder[i + 1]
+    const startMarker = `"${field}":`
+    const startIdx = text.indexOf(startMarker)
+    if (startIdx === -1) continue
+
+    const openQuote = text.indexOf('"', startIdx + startMarker.length)
+    if (openQuote === -1) continue
+
+    // Find where this field ends: just before the next field key
+    let closeIdx: number
+    if (next) {
+      const nextMarker = `"${next}":`
+      const nextIdx = text.indexOf(nextMarker)
+      closeIdx = nextIdx !== -1 ? text.lastIndexOf('"', nextIdx - 1) : text.lastIndexOf('"')
+    } else {
+      closeIdx = text.lastIndexOf('"')
+    }
+
+    if (closeIdx <= openQuote) continue
+    let value = text.substring(openQuote + 1, closeIdx)
+    value = value.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+    fields[field] = value
+  }
+
+  if (Object.keys(fields).length >= 4) return fields
+  throw new Error('Could not parse article response — try generating again.')
+}
 
 export async function POST(request: Request) {
   try {
@@ -160,7 +199,7 @@ Make it specific, sharp, and genuinely educational. Use real industry terminolog
 
     const raw = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
     const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()
-    const article = JSON.parse(cleaned)
+    const article = parseArticleJson(cleaned)
 
     logTokens({ operation: 'ceo_brief', route: '/api/admin/ceo-brief', input_tokens: message.usage.input_tokens, output_tokens: message.usage.output_tokens, user_id: userId })
     return Response.json({
