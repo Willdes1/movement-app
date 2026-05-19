@@ -167,12 +167,22 @@ export async function POST(request: Request) {
 type Channel = { channel_id: string; channel_name: string; audience_focus: string; priority: number }
 type Exercise = { id: string; name_display: string; how: string | null; name_normalized: string }
 
+function buildSearchQuery(name: string): string {
+  return name
+    .replace(/\s*[—–-]\s*.+$/, '')         // strip "— Forward and Backward" suffixes
+    .replace(/\s*\([^)]*\)/g, '')            // strip "(Kneeling)", "(Partial Range)" etc
+    .replace(/\s+x?\d+\s*(rounds?|cycles?|reps?|sets?)/gi, '') // strip "4 Rounds", "x5 Rounds"
+    .replace(/[/\\]/g, ' ')                  // "90/90" → "90 90"
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 async function processExercises(exercises: Exercise[], channels: Channel[]) {
   const results = []
 
   for (const ex of exercises) {
     try {
-      const searchQuery = ex.name_display
+      const searchQuery = buildSearchQuery(ex.name_display)
 
       // Search top 2 channels per exercise to stay within daily quota
       const allVideoIds: string[] = []
