@@ -211,6 +211,7 @@ function OverviewSection() {
     'RLS security hardening — privilege escalation guards on profiles INSERT + UPDATE; impersonation table policies upgraded to is_admin_user() SECURITY DEFINER pattern',
     'Terms of Service + Privacy Policy — admin impersonation disclosure, health/AI disclaimer, user rights, TOS consent gate on signup (email + Google OAuth)',
     'MIE Phase 0 — training_level, workout_background, sport activities injected into plan generator prompt with per-level guidance; plan quality now scales with user experience',
+    'Exercise Video Curation system — AI auto-discovers fitness YouTube channels (channels.list), scores quality via Claude Haiku, stores approved list; curation pipeline searches 2 channels per exercise (search.list + videos.list), scores 3 candidates per exercise, admin reviews + approves 1; approved video embeds inline in client calendar via YouTube iframe; exercises from real client plans bubble to top of curation queue; 752-exercise library populating at ~50/day within free API quota',
   ]
   const COMING = [
     'Movement Intelligence Engine (MIE) Phase 1 — Domain Knowledge Store: pgvector + embedding pipeline + Tier 1 knowledge seeding (NSCA, NASM, PT clinical guidelines, sport biomechanics)',
