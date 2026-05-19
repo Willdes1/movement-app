@@ -121,23 +121,35 @@ export async function POST(request: Request) {
     if (exerciseId) {
       query = supabaseAdmin.from('exercise_library').select('id, name_display, how, name_normalized').eq('id', exerciseId)
     } else {
-      // Skip exercises that already have proposed candidates
-      const { data: existing } = await supabaseAdmin
+      // Get candidate statuses in one query
+      const { data: existingCands } = await supabaseAdmin
         .from('exercise_video_candidates')
-        .select('exercise_id')
-        .eq('status', 'proposed')
-      const skip = new Set((existing ?? []).map((r: { exercise_id: string }) => r.exercise_id))
+        .select('exercise_id, status')
+        .in('status', ['proposed', 'queued'])
 
-      query = supabaseAdmin
+      const skip    = new Set<string>()
+      const queued  = new Set<string>()
+      for (const r of (existingCands ?? [])) {
+        if (r.status === 'proposed') skip.add(r.exercise_id)
+        if (r.status === 'queued')   queued.add(r.exercise_id)
+      }
+
+      // Fetch all unprocessed exercises (no video, not already proposed)
+      const { data: all } = await supabaseAdmin
         .from('exercise_library')
         .select('id, name_display, how, name_normalized')
         .is('video_url', null)
         .order('name_display')
-        .limit(batchSize + skip.size)
 
-      const { data: all } = await query
-      const filtered = (all ?? []).filter((e: { id: string }) => !skip.has(e.id)).slice(0, batchSize)
+      const available = (all ?? []).filter((e: Exercise) => !skip.has(e.id))
 
+      // Prioritise exercises queued from real client plans, then alphabetical
+      const sorted = [
+        ...available.filter((e: Exercise) => queued.has(e.id)),
+        ...available.filter((e: Exercise) => !queued.has(e.id)),
+      ]
+
+      const filtered = sorted.slice(0, batchSize)
       const results = await processExercises(filtered, channels)
       return Response.json({ processed: results.length, results })
     }
@@ -162,12 +174,12 @@ async function processExercises(exercises: Exercise[], channels: Channel[]) {
     try {
       const searchQuery = ex.name_display
 
-      // Search across all active channels, collect video IDs
+      // Search top 2 channels per exercise to stay within daily quota
       const allVideoIds: string[] = []
-      for (const ch of channels.slice(0, 4)) { // limit to top 4 channels per exercise to save quota
+      for (const ch of channels.slice(0, 2)) {
         const ids = await searchChannel(ch.channel_id, searchQuery)
         allVideoIds.push(...ids)
-        if (allVideoIds.length >= 8) break
+        if (allVideoIds.length >= 6) break
       }
 
       const unique = [...new Set(allVideoIds)]
