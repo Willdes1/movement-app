@@ -113,7 +113,9 @@ export default function TodayPage() {
 
   useEffect(() => {
     if (!user || loading) return
-    if (isAdmin || role === 'admin') return  // admins never see the welcome modal
+    if (isAdmin || role === 'admin') return
+    // Don't show welcome modal while onboarding flow is still active
+    if (!localStorage.getItem(`onboarding_v1_${userId}`)) return
     const key = `movement_welcomed_${userId}`
     if (!localStorage.getItem(key)) {
       setShowWelcomeModal(true)
