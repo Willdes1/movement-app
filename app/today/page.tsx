@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { supabase } from '@/lib/supabase'
+import PushNotificationBanner from '@/components/PushNotificationBanner'
 
 type DailyBlock = { label: string; duration: string; exercises: string[]; tip?: string }
 type DailySession = { morning?: DailyBlock; warmup?: DailyBlock; workout?: DailyBlock; abs?: DailyBlock; cooldown?: DailyBlock; evening?: DailyBlock }
@@ -135,6 +136,7 @@ export default function TodayPage() {
 
   return (
     <div className="page-content">
+      <PushNotificationBanner />
 
       {/* Header */}
       <div style={{ padding: '24px 16px 16px' }}>

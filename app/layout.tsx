@@ -11,6 +11,7 @@ import { PlanGenerationProvider } from '@/components/PlanGenerationContext'
 import GenerationBanner from '@/components/GenerationBanner'
 import ReportBugButton from '@/components/ReportBugButton'
 import OnboardingModal from '@/components/OnboardingModal'
+import ServiceWorkerRegistrar from '@/components/ServiceWorkerRegistrar'
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -65,6 +66,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </div>
               <ReportBugButton />
               <OnboardingModal />
+              <ServiceWorkerRegistrar />
             </PlanGenerationProvider>
           </ThemeProvider>
         </AuthProvider>

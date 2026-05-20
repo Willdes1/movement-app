@@ -200,7 +200,7 @@ const READINESS_DATA = [
       { label: 'Exercise videos curated (80%+ of library)', done: false },
       { label: 'Mobile UX polish', done: true },
       { label: 'New user onboarding flow', done: true },
-      { label: 'Push notifications', done: false },
+      { label: 'Push notifications', done: true },
       { label: 'Final QA — no critical bugs', done: true },
     ],
   },
