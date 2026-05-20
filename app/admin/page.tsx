@@ -15,6 +15,7 @@ import KnowledgeBaseTab from '@/components/admin/KnowledgeBaseTab'
 import SpendTab from '@/components/admin/SpendTab'
 import VideoCurationTab from '@/components/admin/VideoCurationTab'
 import PushTab from '@/components/admin/PushTab'
+import StripeTab from '@/components/admin/StripeTab'
 
 // ─── PALETTE ─────────────────────────────────────────────────────────────────
 const C = {
@@ -37,7 +38,7 @@ const C = {
 }
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
-type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad' | 'health' | 'media' | 'impersonation' | 'retention' | 'notes' | 'billing' | 'ceo' | 'bugs' | 'kb' | 'spend' | 'video' | 'push'
+type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad' | 'health' | 'media' | 'impersonation' | 'retention' | 'notes' | 'billing' | 'ceo' | 'bugs' | 'kb' | 'spend' | 'video' | 'push' | 'stripe'
 type TodoRow = { id: string; content: string; category: string; status: string; priority: string; created_at: string; updated_at: string }
 type IdeaRow = { id: string; content: string; category: string; created_at: string }
 type PromoRow = { id: string; code: string; role: string; max_uses: number; uses: number; created_at: string }
@@ -1454,6 +1455,7 @@ const NAV_GROUPS = [
   {
     label: 'Revenue',
     items: [
+      { id: 'stripe'  as Tab, label: 'Stripe' },
       { id: 'billing' as Tab, label: 'Billing' },
       { id: 'spend'   as Tab, label: 'Spend Tracker' },
     ],
@@ -1796,7 +1798,8 @@ export default function AdminPage() {
           {tab === 'kb' && <KnowledgeBaseTab />}
           {tab === 'spend' && <SpendTab />}
           {tab === 'video' && <VideoCurationTab />}
-          {tab === 'push'  && <PushTab />}
+          {tab === 'push'   && <PushTab />}
+          {tab === 'stripe' && <StripeTab />}
           {tab === 'launchpad' && <LaunchpadTab />}
           {tab === 'ceo' && <CEOBriefingTab />}
           {tab === 'media' && <MediaLibraryTab />}

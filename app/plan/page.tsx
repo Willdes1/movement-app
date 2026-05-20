@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { usePlanGeneration } from '@/components/PlanGenerationContext'
+import { usePlan } from '@/lib/usePlan'
+import UpgradeModal from '@/components/UpgradeModal'
 
 type DailyBlock = { label: string; duration: string; exercises: string[]; tip?: string }
 type DailySession = { morning?: DailyBlock; warmup?: DailyBlock; workout?: DailyBlock; abs?: DailyBlock; cooldown?: DailyBlock; evening?: DailyBlock }
@@ -137,6 +139,8 @@ export default function PlanPage() {
   const userId = effectiveUserId ?? user?.id ?? ''
   const isFF = !isAdmin && role === 'ff'
   const router = useRouter()
+  const { isPro } = usePlan()
+  const [showUpgrade, setShowUpgrade] = useState(false)
   const todayIdx = (new Date().getDay() + 6) % 7
   const { isGenerating: ctxGenerating, progress: ctxProgress, startGeneration } = usePlanGeneration()
 
@@ -722,7 +726,7 @@ export default function PlanPage() {
             <p style={{ fontSize: 12, color: phaseColor, fontWeight: 700, letterSpacing: '0.04em' }}>{phaseLabel}</p>
           </div>
           <div className="ai-gen-wrap" style={{ marginTop: 4 }}>
-            <button className="ai-gen-btn" onClick={() => setShowAiModal(true)}>
+            <button className="ai-gen-btn" onClick={() => isPro ? setShowAiModal(true) : setShowUpgrade(true)}>
               <AIIcon size={22}/>
               AI Generate
             </button>
@@ -1094,6 +1098,8 @@ export default function PlanPage() {
           </div>
         </div>
       )}
+
+      {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} highlightPlan="pro" />}
     </>
   )
 }

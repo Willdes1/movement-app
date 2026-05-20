@@ -1,10 +1,12 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { loadProfile } from '@/lib/storage'
 import type { UserProfile } from '@/lib/types'
+import { usePlan } from '@/lib/usePlan'
+import UpgradeModal from '@/components/UpgradeModal'
 
 type Activity = { name: string; level: string }
 const LEVELS = ['beginner', 'intermediate', 'expert', 'elite', 'pro'] as const
@@ -21,6 +23,11 @@ export default function AccountPage() {
   const { user, isAdmin, role, signOut, loading, effectiveUserId } = useAuth()
   const userId = effectiveUserId ?? user?.id ?? ''
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const { plan } = usePlan()
+  const [showUpgrade, setShowUpgrade] = useState(false)
+  const [billingLoading, setBillingLoading] = useState(false)
+  const [billingMsg, setBillingMsg] = useState('')
   const [profile, setProfile] = useState<UserProfile>({})
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [avatarLoading, setAvatarLoading] = useState(false)
@@ -42,6 +49,28 @@ export default function AccountPage() {
   useEffect(() => {
     if (!loading && !user) router.replace('/auth')
   }, [user, loading, router])
+
+  useEffect(() => {
+    const status = searchParams.get('billing')
+    if (status === 'success') setBillingMsg('Subscription activated! Welcome aboard.')
+    else if (status === 'cancelled') setBillingMsg('')
+  }, [searchParams])
+
+  async function openBillingPortal() {
+    if (!user) return
+    setBillingLoading(true)
+    try {
+      const res = await fetch('/api/stripe/portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, returnUrl: window.location.href }),
+      })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+    } catch { /* silent */ } finally {
+      setBillingLoading(false)
+    }
+  }
 
   useEffect(() => {
     const p = loadProfile() as UserProfile | null
@@ -213,30 +242,61 @@ export default function AccountPage() {
 
       {/* Plan tier badge */}
       {(() => {
-        const tiers = {
+        const roleBadges: Record<string, { label: string; color: string; bg: string; border: string }> = {
           admin: { label: 'Admin',      color: 'var(--orange)', bg: 'rgba(255,150,50,0.1)', border: 'rgba(255,150,50,0.25)' },
           beta:  { label: 'Beta Access',color: 'var(--green)',  bg: 'rgba(78,201,122,0.1)', border: 'rgba(78,201,122,0.25)' },
           ff:    { label: 'F&F Beta',   color: '#00b4ff',       bg: 'rgba(0,180,255,0.1)',  border: 'rgba(0,180,255,0.25)' },
           coach: { label: 'Coach',      color: '#a78bfa',       bg: 'rgba(167,139,250,0.1)',border: 'rgba(167,139,250,0.25)' },
-          free:  { label: 'Free Plan',  color: 'var(--accent)', bg: 'var(--accent-bg)',     border: 'var(--accent-border)' },
         }
-        const tier = tiers[role] ?? tiers.free
+        const planBadges: Record<string, { label: string; color: string; bg: string; border: string }> = {
+          pro:     { label: 'Pro',     color: 'var(--accent)', bg: 'var(--accent-bg)',            border: 'var(--accent-border)' },
+          plus:    { label: 'Plus',    color: '#a78bfa',       bg: 'rgba(167,139,250,0.1)',        border: 'rgba(167,139,250,0.25)' },
+          supreme: { label: 'Supreme', color: '#f59e0b',       bg: 'rgba(245,158,11,0.08)',        border: 'rgba(245,158,11,0.25)' },
+          free:    { label: 'Free',    color: 'var(--text-dim)', bg: 'var(--surface2)',            border: 'var(--border)' },
+        }
+        const badge = roleBadges[role] ?? planBadges[plan] ?? planBadges.free
+        const isPaid = plan === 'pro' || plan === 'plus' || plan === 'supreme'
+        const isPrivileged = role === 'admin' || role === 'coach' || role === 'beta' || role === 'ff'
         return (
-          <div style={{ marginBottom: 20 }}>
-            <span style={{ padding: '5px 12px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: tier.bg, border: `1px solid ${tier.border}`, color: tier.color, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-              {tier.label}
-            </span>
-            {role === 'free' && (
+          <div style={{ marginBottom: billingMsg ? 12 : 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span style={{ padding: '5px 12px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: badge.bg, border: `1px solid ${badge.border}`, color: badge.color, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                {badge.label}
+              </span>
+              {!isPrivileged && isPaid && (
+                <button
+                  onClick={openBillingPortal}
+                  disabled={billingLoading}
+                  style={{ fontSize: 12, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 600 }}
+                >
+                  {billingLoading ? 'Loading…' : 'Manage billing →'}
+                </button>
+              )}
+              {!isPrivileged && !isPaid && (
+                <button
+                  onClick={() => setShowUpgrade(true)}
+                  style={{ fontSize: 12, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 700 }}
+                >
+                  Upgrade →
+                </button>
+              )}
+            </div>
+            {billingMsg && (
+              <p style={{ fontSize: 12, color: 'var(--green)', marginTop: 8, fontWeight: 600 }}>{billingMsg}</p>
+            )}
+            {!isPrivileged && !isPaid && (
               <p style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 8 }}>
-                Upgrade for full AI plan customization — <span style={{ color: 'var(--accent)', fontWeight: 700 }}>coming soon</span>
+                Upgrade to Pro for unlimited AI plans, videos, and more — starting at $12/mo
               </p>
             )}
           </div>
         )
       })()}
 
+      {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
+
       {/* Promo code redemption — free users only */}
-      {role === 'free' && (
+      {role === 'free' && plan === 'free' && (
         <div style={{ marginBottom: 20, padding: '16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14 }}>
           <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Have a promo code?</p>
           <div style={{ display: 'flex', gap: 8 }}>
