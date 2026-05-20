@@ -5,10 +5,12 @@ import type Stripe from 'stripe'
 
 export const runtime = 'nodejs'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 export async function POST(req: NextRequest) {
   const body = await req.text()
@@ -21,6 +23,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
   }
 
+  const supabaseAdmin = getAdmin()
   const sub = event.data.object as Stripe.Subscription
 
   switch (event.type) {
@@ -37,7 +40,6 @@ export async function POST(req: NextRequest) {
           .update({ plan: active ? plan : 'free' })
           .eq('id', userId)
       } else {
-        // Fall back to lookup by stripe_customer_id
         await supabaseAdmin
           .from('profiles')
           .update({ plan: active ? plan : 'free' })

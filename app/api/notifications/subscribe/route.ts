@@ -1,9 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 export async function POST(request: Request) {
   try {
@@ -11,6 +13,8 @@ export async function POST(request: Request) {
     if (!userId || !subscription?.endpoint) {
       return Response.json({ error: 'Missing userId or subscription' }, { status: 400 })
     }
+
+    const supabaseAdmin = getAdmin()
 
     if (unsubscribe) {
       await supabaseAdmin
