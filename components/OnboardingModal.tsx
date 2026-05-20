@@ -353,7 +353,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '10px 14px', borderRadius: 10,
   border: '1px solid var(--border)', background: 'var(--surface2, #1a1f27)',
-  color: 'var(--text)', fontSize: 14, outline: 'none',
+  color: 'var(--text)', fontSize: 16, outline: 'none',
   fontFamily: 'inherit', boxSizing: 'border-box',
 }
 
@@ -451,7 +451,7 @@ export default function OnboardingModal() {
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 9000,
+      position: 'fixed', inset: 0, zIndex: 10001,
       background: 'rgba(0,0,0,0.88)',
       backdropFilter: 'blur(6px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',

@@ -89,6 +89,23 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+  /* Prevent iOS from auto-scaling fonts on orientation change */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Prevent double-tap zoom on all interactive elements */
+button, a, [role="button"] {
+  touch-action: manipulation;
+}
+
+/* Minimum tap target size for accessibility (44×44px) */
+button { min-height: 44px; }
+
+/* Ensure text never overflows on small screens or with long international names */
+h1, h2, h3, h4, p, span, div {
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 /* smooth theme transitions */
@@ -160,12 +177,19 @@ input, textarea, select { transition: border-color 0.2s; }
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   z-index: 10000;
   display: flex; align-items: flex-start; justify-content: center;
-  padding: 20px; overflow-y: auto;
+  padding: 20px;
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+  overflow-y: auto;
 }
 .modal-box {
   background: var(--surface); border: 1px solid var(--border2);
   border-radius: 20px; max-width: 520px; width: 100%;
   margin: auto; padding: 24px; position: relative;
+}
+
+/* Bottom-sheet style modals (align-items: flex-end) need safe area on last child */
+.modal-sheet-footer {
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
 }
 
 /* ── RECOVERY MODE BANNER ── */

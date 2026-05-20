@@ -755,5 +755,5 @@ function Chip({ label, active, onClick, block = false }: { label: string; active
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '11px 14px', borderRadius: 10,
   border: '1px solid var(--border)', background: 'var(--surface2)',
-  color: 'var(--text)', fontSize: 14, outline: 'none', boxSizing: 'border-box',
+  color: 'var(--text)', fontSize: 16, outline: 'none', boxSizing: 'border-box',
 }

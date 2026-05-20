@@ -199,7 +199,7 @@ const READINESS_DATA = [
       { label: 'RLS security hardening', done: true },
       { label: 'Exercise videos curated (80%+ of library)', done: false },
       { label: 'Mobile UX polish', done: false },
-      { label: 'New user onboarding flow', done: false },
+      { label: 'New user onboarding flow', done: true },
       { label: 'Push notifications', done: false },
       { label: 'Final QA — no critical bugs', done: false },
     ],
