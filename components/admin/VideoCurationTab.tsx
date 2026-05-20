@@ -143,8 +143,8 @@ export default function VideoCurationTab() {
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
-      const lines = (data.results ?? []).map((r: { exercise: string; status: string; candidates?: number }) =>
-        `${r.status === 'proposed' ? '✓' : r.status === 'no_results' ? '○' : '⚠'} ${r.exercise}${r.candidates ? ` — ${r.candidates} candidates` : ` — ${r.status}`}`
+      const lines = (data.results ?? []).map((r: { exercise: string; status: string; candidates?: number; error?: string }) =>
+        `${r.status === 'proposed' ? '✓' : r.status === 'no_results' ? '○' : '⚠'} ${r.exercise}${r.candidates ? ` — ${r.candidates} candidates` : ` — ${r.status}${r.error ?? ''}`}`
       )
       setRunLog([`Done — ${data.processed} exercises processed`, ...lines])
       await loadExercises()

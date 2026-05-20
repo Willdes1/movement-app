@@ -14,11 +14,30 @@ const supabaseAdmin = createClient(
 const YT_KEY = process.env.YOUTUBE_API_KEY!
 
 // ─── YouTube helpers ──────────────────────────────────────────────────────────
-async function searchChannel(channelId: string, query: string): Promise<string[]> {
-  const url = `https://www.googleapis.com/youtube/v3/search?part=id&channelId=${channelId}&q=${encodeURIComponent(query)}&type=video&videoEmbeddable=true&maxResults=3&key=${YT_KEY}`
+async function searchChannel(channelId: string, query: string): Promise<{ ids: string[]; error?: string }> {
+  // No videoEmbeddable filter here — getVideoDetails already gates on embeddability.
+  // Including it at search time silently drops valid candidates.
+  const url = `https://www.googleapis.com/youtube/v3/search?part=id&channelId=${channelId}&q=${encodeURIComponent(query)}&type=video&maxResults=3&key=${YT_KEY}`
   const res = await fetch(url)
   const data = await res.json()
-  return (data.items ?? []).map((i: { id: { videoId: string } }) => i.id.videoId).filter(Boolean)
+  if (data.error) {
+    const reason = data.error.errors?.[0]?.reason ?? data.error.message ?? 'unknown'
+    return { ids: [], error: `YT API error (${data.error.code}): ${reason}` }
+  }
+  const ids = (data.items ?? []).map((i: { id: { videoId: string } }) => i.id.videoId).filter(Boolean)
+  return { ids }
+}
+
+async function searchGeneral(query: string): Promise<{ ids: string[]; error?: string }> {
+  const url = `https://www.googleapis.com/youtube/v3/search?part=id&q=${encodeURIComponent(query + ' exercise tutorial')}&type=video&maxResults=5&key=${YT_KEY}`
+  const res = await fetch(url)
+  const data = await res.json()
+  if (data.error) {
+    const reason = data.error.errors?.[0]?.reason ?? data.error.message ?? 'unknown'
+    return { ids: [], error: `YT API error (${data.error.code}): ${reason}` }
+  }
+  const ids = (data.items ?? []).map((i: { id: { videoId: string } }) => i.id.videoId).filter(Boolean)
+  return { ids }
 }
 
 async function getVideoDetails(videoIds: string[]): Promise<VideoDetail[]> {
@@ -169,7 +188,7 @@ type Exercise = { id: string; name_display: string; how: string | null; name_nor
 
 function buildSearchQuery(name: string): string {
   return name
-    .replace(/\s*[—–-]\s*.+$/, '')         // strip "— Forward and Backward" suffixes
+    .replace(/\s*[—–]\s*.+$/, '')           // strip em/en-dash suffixes ONLY — NOT regular hyphens
     .replace(/\s*\([^)]*\)/g, '')            // strip "(Kneeling)", "(Partial Range)" etc
     .replace(/\s+x?\d+\s*(rounds?|cycles?|reps?|sets?)/gi, '') // strip "4 Rounds", "x5 Rounds"
     .replace(/[/\\]/g, ' ')                  // "90/90" → "90 90"
@@ -183,20 +202,30 @@ async function processExercises(exercises: Exercise[], channels: Channel[]) {
   for (const ex of exercises) {
     try {
       const searchQuery = buildSearchQuery(ex.name_display)
+      const apiErrors: string[] = []
 
-      // Search top 2 channels per exercise to stay within daily quota
+      // Search top 2 approved channels
       const allVideoIds: string[] = []
       for (const ch of channels.slice(0, 2)) {
-        const ids = await searchChannel(ch.channel_id, searchQuery)
+        const { ids, error } = await searchChannel(ch.channel_id, searchQuery)
+        if (error) apiErrors.push(error)
         allVideoIds.push(...ids)
         if (allVideoIds.length >= 6) break
+      }
+
+      // Fallback: open YouTube search when approved channels have nothing
+      if (allVideoIds.length === 0) {
+        const { ids: fallbackIds, error } = await searchGeneral(searchQuery)
+        if (error) apiErrors.push(error)
+        allVideoIds.push(...fallbackIds)
       }
 
       const unique = [...new Set(allVideoIds)]
       const details = await getVideoDetails(unique.slice(0, 8))
 
       if (details.length === 0) {
-        results.push({ exercise: ex.name_display, status: 'no_results' })
+        const errSuffix = apiErrors.length ? ` [${apiErrors[0]}]` : ''
+        results.push({ exercise: ex.name_display, status: 'no_results', error: errSuffix || undefined })
         continue
       }
 
