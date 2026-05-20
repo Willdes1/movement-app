@@ -67,16 +67,19 @@ export default function ForYouPage() {
   const loadData = useCallback(async () => {
     if (!user) return
     setLoading(true)
-    const [{ data: profileData }, { data: feedData }] = await Promise.all([
-      supabase.from('profiles').select('*').eq('id', userId).single(),
-      supabase.from('for_you_feed').select('cards, generated_at').eq('user_id', userId).single(),
-    ])
-    if (profileData) setProfile(profileData)
-    if (feedData) {
-      setCards(feedData.cards as FeedCard[])
-      setGeneratedAt(feedData.generated_at)
+    try {
+      const [{ data: profileData }, { data: feedData }] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', userId).single(),
+        supabase.from('for_you_feed').select('cards, generated_at').eq('user_id', userId).single(),
+      ])
+      if (profileData) setProfile(profileData)
+      if (feedData) {
+        setCards(feedData.cards as FeedCard[])
+        setGeneratedAt(feedData.generated_at)
+      }
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }, [user])
 
   useEffect(() => {

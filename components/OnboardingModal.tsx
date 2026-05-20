@@ -401,12 +401,10 @@ export default function OnboardingModal() {
     }))
   }
 
-  async function saveAndNext() {
-    if (!user) return
-    setSaving(true)
+  function buildUpsertPayload() {
     const sportVal = form.sport === 'Other' ? form.customSport : form.sport
-    await supabase.from('profiles').upsert({
-      id: user.id,
+    return {
+      id: user!.id,
       name: form.name || null,
       age: form.age || null,
       gender: form.gender || null,
@@ -420,8 +418,17 @@ export default function OnboardingModal() {
       restriction_areas: form.restrictionAreas.length ? form.restrictionAreas : null,
       restriction_notes: form.restrictionNotes || null,
       updated_at: new Date().toISOString(),
-    }, { onConflict: 'id' })
-    setSaving(false)
+    }
+  }
+
+  async function saveAndNext() {
+    if (!user) return
+    setSaving(true)
+    try {
+      await supabase.from('profiles').upsert(buildUpsertPayload(), { onConflict: 'id' })
+    } catch { /* silent — data saved again on next step */ } finally {
+      setSaving(false)
+    }
 
     if (step < TOTAL) {
       setStep(s => s + 1)
@@ -438,11 +445,12 @@ export default function OnboardingModal() {
     router.push('/plan')
   }
 
-  function skip() {
+  async function skip() {
     if (!user) return
     localStorage.setItem(ONBOARDING_KEY(user.id), '1')
     localStorage.setItem(WELCOME_KEY(user.id), '1')
     setShow(false)
+    try { await supabase.from('profiles').upsert(buildUpsertPayload(), { onConflict: 'id' }) } catch { /* silent */ }
   }
 
   if (!show) return null

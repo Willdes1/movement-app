@@ -57,7 +57,7 @@ export default function LogPage() {
   const loadLogs = useCallback(async () => {
     if (!user) return
     setLoading(true)
-
+    try {
     const [{ data: logs }, { data: library }] = await Promise.all([
       supabase
         .from('workout_logs')
@@ -68,7 +68,7 @@ export default function LogPage() {
       supabase.from('exercise_library').select('name_normalized, name_display'),
     ])
 
-    if (!logs?.length) { setLoading(false); return }
+    if (!logs?.length) { return }
 
     const nameMap = new Map(library?.map(l => [l.name_normalized, l.name_display]) ?? [])
 
@@ -89,7 +89,9 @@ export default function LogPage() {
       logs: dayLogs,
     })))
     setTotal(logs.length)
-    setLoading(false)
+    } finally {
+      setLoading(false)
+    }
   }, [user, userId])
 
   useEffect(() => { if (user) loadLogs() }, [user, loadLogs])

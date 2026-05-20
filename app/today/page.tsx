@@ -80,32 +80,33 @@ export default function TodayPage() {
   const loadData = useCallback(async () => {
     if (!user) return
     setLoading(true)
+    try {
+      const [{ data: profile }, { data: prog }] = await Promise.all([
+        supabase.from('profiles').select('name, sport, goal').eq('id', userId).single(),
+        supabase.from('training_programs').select('id, start_date').eq('user_id', userId).single(),
+      ])
 
-    const [{ data: profile }, { data: prog }] = await Promise.all([
-      supabase.from('profiles').select('name, sport, goal').eq('id', userId).single(),
-      supabase.from('training_programs').select('id, start_date').eq('user_id', userId).single(),
-    ])
+      if (profile?.name) setFirstName(profile.name.split(' ')[0])
+      setProfileReady(!!(profile?.sport || profile?.goal))
 
-    if (profile?.name) setFirstName(profile.name.split(' ')[0])
-    setProfileReady(!!(profile?.sport || profile?.goal))
+      if (!prog) { setHasProgram(false); return }
 
-    if (!prog) { setHasProgram(false); setLoading(false); return }
+      setHasProgram(true)
+      const week = getCurrentWeek(prog.start_date)
+      setCurrentWeek(week)
 
-    setHasProgram(true)
-    const week = getCurrentWeek(prog.start_date)
-    setCurrentWeek(week)
+      const { data: weekPlan } = await supabase
+        .from('weekly_plans').select('plan')
+        .eq('program_id', prog.id).eq('week_number', week).single()
 
-    const { data: weekPlan } = await supabase
-      .from('weekly_plans').select('plan')
-      .eq('program_id', prog.id).eq('week_number', week).single()
-
-    if (weekPlan?.plan) {
-      setWeekGenerated(true)
-      const todayIdx = (new Date().getDay() + 6) % 7
-      setTodayPlan((weekPlan.plan as DayPlan[])[todayIdx] ?? null)
+      if (weekPlan?.plan) {
+        setWeekGenerated(true)
+        const todayIdx = (new Date().getDay() + 6) % 7
+        setTodayPlan((weekPlan.plan as DayPlan[])[todayIdx] ?? null)
+      }
+    } finally {
+      setLoading(false)
     }
-
-    setLoading(false)
   }, [user])
 
   useEffect(() => { if (user) loadData() }, [user, loadData])

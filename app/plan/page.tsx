@@ -276,27 +276,30 @@ export default function PlanPage() {
   const initProgram = useCallback(async () => {
     if (!user) return
     setDataLoading(true)
-    const [{ data: existing }, { data: prof }] = await Promise.all([
-      supabase.from('training_programs').select('*').eq('user_id', userId).single(),
-      supabase.from('profiles').select('sport, goal').eq('id', userId).single(),
-    ])
-    setProfileReady(!!(prof?.sport || prof?.goal))
-    if (!existing) { setDataLoading(false); return }
-    const prog: Program = { id: existing.id, startDate: existing.start_date, totalWeeks: existing.total_weeks, status: existing.status, rebuildCount: (existing as Record<string, unknown>).rebuild_count as number ?? 0 }
-    setProgram(prog)
-    const week = getCurrentWeek(prog.startDate)
-    setCurrentWeek(week)
-    setViewingWeek(1)
-    if (week >= TOTAL_WEEKS) setProgramComplete(true)
-    const [{ data: plans }, { data: compData }] = await Promise.all([
-      supabase.from('weekly_plans').select('week_number, plan').eq('program_id', prog.id),
-      supabase.from('day_completions').select('week_number, day_index').eq('program_id', prog.id).eq('user_id', userId),
-    ])
-    const planMap: Record<number, DayPlan[]> = {}
-    plans?.forEach(p => { planMap[p.week_number] = p.plan as DayPlan[] })
-    setWeekPlans(planMap)
-    if (compData) setCompletions(new Set(compData.map(r => `${r.week_number}-${r.day_index}`)))
-    setDataLoading(false)
+    try {
+      const [{ data: existing }, { data: prof }] = await Promise.all([
+        supabase.from('training_programs').select('*').eq('user_id', userId).single(),
+        supabase.from('profiles').select('sport, goal').eq('id', userId).single(),
+      ])
+      setProfileReady(!!(prof?.sport || prof?.goal))
+      if (!existing) return
+      const prog: Program = { id: existing.id, startDate: existing.start_date, totalWeeks: existing.total_weeks, status: existing.status, rebuildCount: (existing as Record<string, unknown>).rebuild_count as number ?? 0 }
+      setProgram(prog)
+      const week = getCurrentWeek(prog.startDate)
+      setCurrentWeek(week)
+      setViewingWeek(1)
+      if (week >= TOTAL_WEEKS) setProgramComplete(true)
+      const [{ data: plans }, { data: compData }] = await Promise.all([
+        supabase.from('weekly_plans').select('week_number, plan').eq('program_id', prog.id),
+        supabase.from('day_completions').select('week_number, day_index').eq('program_id', prog.id).eq('user_id', userId),
+      ])
+      const planMap: Record<number, DayPlan[]> = {}
+      plans?.forEach(p => { planMap[p.week_number] = p.plan as DayPlan[] })
+      setWeekPlans(planMap)
+      if (compData) setCompletions(new Set(compData.map(r => `${r.week_number}-${r.day_index}`)))
+    } finally {
+      setDataLoading(false)
+    }
   }, [user, generateWeek])
 
   useEffect(() => { if (user) initProgram() }, [user, initProgram])

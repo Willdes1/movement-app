@@ -32,7 +32,7 @@ export default function AuthCallbackPage() {
       } catch { /* silent — promo already applied or session storage unavailable */ }
 
       router.replace('/today')
-    })
+    }).catch(() => router.replace('/auth?error=oauth'))
   }, [router])
 
   return (

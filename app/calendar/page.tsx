@@ -193,53 +193,55 @@ function CalendarInner() {
   const loadData = useCallback(async () => {
     if (!user) return
     setLoading(true)
-    const { data: prog } = await supabase
-      .from('training_programs')
-      .select('id, start_date')
-      .eq('user_id', userId)
-      .single()
+    try {
+      const { data: prog } = await supabase
+        .from('training_programs')
+        .select('id, start_date')
+        .eq('user_id', userId)
+        .single()
 
-    if (!prog) { setLoading(false); return }
+      if (!prog) return
 
-    const program: Program = { id: prog.id, startDate: prog.start_date }
-    setProgram(program)
-    setViewMonth(new Date(prog.start_date))
+      const program: Program = { id: prog.id, startDate: prog.start_date }
+      setProgram(program)
+      setViewMonth(new Date(prog.start_date))
 
-    const [{ data: plans }, { data: compData }] = await Promise.all([
-      supabase.from('weekly_plans').select('week_number, plan').eq('program_id', prog.id),
-      supabase.from('day_completions').select('week_number, day_index').eq('program_id', prog.id).eq('user_id', userId),
-    ])
+      const [{ data: plans }, { data: compData }] = await Promise.all([
+        supabase.from('weekly_plans').select('week_number, plan').eq('program_id', prog.id),
+        supabase.from('day_completions').select('week_number, day_index').eq('program_id', prog.id).eq('user_id', userId),
+      ])
 
-    if (compData) setCompletions(new Set(compData.map(r => `${r.week_number}-${r.day_index}`)))
+      if (compData) setCompletions(new Set(compData.map(r => `${r.week_number}-${r.day_index}`)))
 
-    const map: Record<number, DayPlan[]> = {}
-    plans?.forEach(p => { map[p.week_number] = p.plan as DayPlan[] })
-    setWeekPlans(map)
+      const map: Record<number, DayPlan[]> = {}
+      plans?.forEach(p => { map[p.week_number] = p.plan as DayPlan[] })
+      setWeekPlans(map)
 
-    // Load whatever is already in the library (fast path)
-    const allDays = Object.values(map).flat()
-    const displayNames = [...new Set(
-      allDays
-        .filter(d => d.type !== 'rest')
-        .flatMap(d => d.movements)
-        .map(m => parseExerciseName(m))
-        .filter(Boolean)
-    )]
-    const normalizedNames = displayNames.map(normalizeExerciseName)
+      // Load whatever is already in the library (fast path)
+      const allDays = Object.values(map).flat()
+      const displayNames = [...new Set(
+        allDays
+          .filter(d => d.type !== 'rest')
+          .flatMap(d => d.movements)
+          .map(m => parseExerciseName(m))
+          .filter(Boolean)
+      )]
+      const normalizedNames = displayNames.map(normalizeExerciseName)
 
-    let libMap: Record<string, ExerciseDetail> = {}
-    if (normalizedNames.length > 0) {
-      const { data: libData } = await supabase
-        .from('exercise_library')
-        .select('name_normalized, name_display, how, breathing, core, tip, video_url, video_source')
-        .in('name_normalized', normalizedNames)
-      if (libData) {
-        libData.forEach(e => { libMap[e.name_normalized] = e as ExerciseDetail })
-        setExerciseLibrary(libMap)
+      if (normalizedNames.length > 0) {
+        const { data: libData } = await supabase
+          .from('exercise_library')
+          .select('name_normalized, name_display, how, breathing, core, tip, video_url, video_source')
+          .in('name_normalized', normalizedNames)
+        if (libData) {
+          const libMap: Record<string, ExerciseDetail> = {}
+          libData.forEach(e => { libMap[e.name_normalized] = e as ExerciseDetail })
+          setExerciseLibrary(libMap)
+        }
       }
+    } finally {
+      setLoading(false)
     }
-
-    setLoading(false)
   }, [user])
 
   // On-demand fetch for a single exercise if not yet in library
