@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
@@ -20,6 +20,14 @@ const LEVEL_COLOR: Record<string, { color: string; bg: string; border: string }>
 }
 
 export default function AccountPage() {
+  return (
+    <Suspense>
+      <AccountPageInner />
+    </Suspense>
+  )
+}
+
+function AccountPageInner() {
   const { user, isAdmin, role, signOut, loading, effectiveUserId } = useAuth()
   const userId = effectiveUserId ?? user?.id ?? ''
   const router = useRouter()
