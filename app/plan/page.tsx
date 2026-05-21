@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { usePlanGeneration } from '@/components/PlanGenerationContext'
 import { usePlan } from '@/lib/usePlan'
 import UpgradeModal from '@/components/UpgradeModal'
+import { updateStreak } from '@/lib/useStreak'
 
 type DailyBlock = { label: string; duration: string; exercises: string[]; tip?: string }
 type DailySession = { morning?: DailyBlock; warmup?: DailyBlock; workout?: DailyBlock; abs?: DailyBlock; cooldown?: DailyBlock; evening?: DailyBlock }
@@ -351,6 +352,7 @@ export default function PlanPage() {
     const msg = COMPLETION_MESSAGES[Math.floor(Math.random() * COMPLETION_MESSAGES.length)]
     setCompletionMsg(msg)
     setTimeout(() => setCompletionMsg(null), 4000)
+    updateStreak(userId).catch(() => {})
   }
 
   async function handleCompleteDay(weekNum: number, dayIdx: number) {
@@ -381,6 +383,7 @@ export default function PlanPage() {
       setCompletions(prev => new Set([...prev, ...inserts.map(r => `${r.week_number}-${r.day_index}`)]))
     }
     setShowCompleteModal(false); setPendingComplete(null); setCompleting(false)
+    updateStreak(userId).catch(() => {})
   }
 
   async function restructureAndComplete() {

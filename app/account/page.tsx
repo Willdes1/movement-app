@@ -7,6 +7,8 @@ import { loadProfile } from '@/lib/storage'
 import type { UserProfile } from '@/lib/types'
 import { usePlan } from '@/lib/usePlan'
 import UpgradeModal from '@/components/UpgradeModal'
+import { useStreak } from '@/lib/useStreak'
+import StreakBadge from '@/components/StreakBadge'
 
 type Activity = { name: string; level: string }
 const LEVELS = ['beginner', 'intermediate', 'expert', 'elite', 'pro'] as const
@@ -33,6 +35,7 @@ function AccountPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { plan } = usePlan()
+  const { currentStreak, longestStreak } = useStreak()
   const [showUpgrade, setShowUpgrade] = useState(false)
   const [billingLoading, setBillingLoading] = useState(false)
   const [billingMsg, setBillingMsg] = useState('')
@@ -247,6 +250,13 @@ function AccountPageInner() {
           <p style={{ fontSize: 13, color: 'var(--text-dim)' }}>{user.email}</p>
         </div>
       </div>
+
+      {/* Streak */}
+      {currentStreak > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <StreakBadge streak={currentStreak} longestStreak={longestStreak} size="md" showRecord />
+        </div>
+      )}
 
       {/* Plan tier badge */}
       {(() => {

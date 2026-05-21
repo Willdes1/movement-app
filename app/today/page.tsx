@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { supabase } from '@/lib/supabase'
 import PushNotificationBanner from '@/components/PushNotificationBanner'
+import { useStreak } from '@/lib/useStreak'
 
 type DailyBlock = { label: string; duration: string; exercises: string[]; tip?: string }
 type DailySession = { morning?: DailyBlock; warmup?: DailyBlock; workout?: DailyBlock; abs?: DailyBlock; cooldown?: DailyBlock; evening?: DailyBlock }
@@ -60,6 +61,7 @@ function getGreeting() {
 
 export default function TodayPage() {
   const { user, loading: authLoading, effectiveUserId, role, isAdmin } = useAuth()
+  const { currentStreak, longestStreak } = useStreak()
   const isFF = !isAdmin && role === 'ff'
   const userId = effectiveUserId ?? user?.id ?? ''
   const { activeRecovery } = useTheme()
@@ -170,6 +172,12 @@ export default function TodayPage() {
           <div style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 700, marginTop: 3, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
             {isRecovering ? 'Recovery' : 'No Injury'}
           </div>
+        </div>
+        <div style={{ flex: 1, background: currentStreak > 0 ? 'rgba(245,158,11,0.08)' : 'var(--surface)', border: `1px solid ${currentStreak > 0 ? 'rgba(245,158,11,0.25)' : 'var(--border)'}`, borderRadius: 14, padding: '12px 10px', textAlign: 'center' }}>
+          <div style={{ fontSize: 20, fontWeight: 900, color: currentStreak > 0 ? '#f59e0b' : 'var(--text-dim)' }}>
+            {currentStreak > 0 ? `${currentStreak}🔥` : '—'}
+          </div>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 700, marginTop: 3, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Streak</div>
         </div>
       </div>
 
