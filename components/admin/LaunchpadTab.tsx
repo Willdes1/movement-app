@@ -179,9 +179,11 @@ const READINESS_DATA = [
   {
     label: 'F&F Beta',
     sublabel: 'Consumer App',
+    meterLabel: 'Beta Readiness',
     color: C.green,
     colorDim: C.greenDim,
     colorBorder: C.greenBorder,
+    fullWidth: false,
     items: [
       { label: 'AI plan generator (bulk 1/2/3-month)', done: true },
       { label: 'Phase-based training (Foundation → Maintenance)', done: true },
@@ -207,9 +209,11 @@ const READINESS_DATA = [
   {
     label: 'Coach Portal',
     sublabel: 'Professional Platform',
+    meterLabel: 'Beta Readiness',
     color: C.accent,
     colorDim: C.accentDim,
     colorBorder: C.accentBorder,
+    fullWidth: false,
     items: [
       { label: 'Programs library', done: true },
       { label: 'Program detail (inline editing + status)', done: true },
@@ -227,6 +231,49 @@ const READINESS_DATA = [
       { label: 'PDF export of programs', done: false },
     ],
   },
+  {
+    label: 'App Store Launch',
+    sublabel: 'Apple • Google Play • Public',
+    meterLabel: 'Launch Readiness',
+    color: C.amber,
+    colorDim: C.amberDim,
+    colorBorder: C.amberBorder,
+    fullWidth: true,
+    items: [
+      // Legal & Business
+      { label: 'App name finalized + trademark search done', done: false },
+      { label: 'Domain secured for final brand name', done: false },
+      { label: 'LLC / business entity registered', done: false },
+      { label: 'Apple Developer Program enrolled ($99/yr — requires LLC)', done: false },
+      { label: 'Google Play Developer account created ($25 one-time)', done: false },
+      // App Identity & Store Assets
+      { label: 'App icon 1024×1024 created (App Store requirement)', done: false },
+      { label: 'App Store screenshots — iPhone 6.7" + 6.1" + iPad 12.9"', done: false },
+      { label: 'Google Play screenshots — phone + 7" tablet', done: false },
+      { label: 'App Store title, subtitle, description + keywords written', done: false },
+      { label: 'Age rating questionnaire completed (likely 4+)', done: false },
+      // Technical Compliance (CRITICAL)
+      { label: 'Sign in with Apple implemented (required if Google OAuth offered)', done: false },
+      { label: 'Apple IAP / RevenueCat for iOS subscriptions (Stripe alone = rejection)', done: false },
+      { label: 'Google Play Billing / RevenueCat for Android subscriptions', done: false },
+      { label: 'App wrapped with Capacitor (PWA → native iOS + Android)', done: false },
+      { label: 'Bundle ID registered (e.g. com.brandname.app)', done: false },
+      { label: 'Universal Links (iOS) + App Links (Android) configured', done: false },
+      { label: 'Push notifications — APNs certificate configured for iOS', done: false },
+      // Content & Legal
+      { label: 'Privacy Policy at public URL (/legal/privacy)', done: true },
+      { label: 'Terms of Service at public URL (/legal/terms)', done: true },
+      { label: 'App Store privacy nutrition labels declared', done: false },
+      { label: 'Google Play data safety section completed', done: false },
+      { label: '"Restore Purchases" button added (required for subscription apps)', done: false },
+      // Beta Testing
+      { label: 'TestFlight internal testing (≥10 testers)', done: false },
+      { label: 'TestFlight external beta (up to 10k testers, 90 days)', done: false },
+      { label: 'Firebase App Distribution beta (Android)', done: false },
+      { label: 'Crash rate < 1% across all core flows on real devices', done: false },
+      { label: 'App passes review on real iPhone (not simulator)', done: false },
+    ],
+  },
 ]
 
 function ReadinessPanel() {
@@ -240,7 +287,7 @@ function ReadinessPanel() {
         const circ = 2 * Math.PI * r
         const offset = circ * (1 - pct / 100)
         return (
-          <div key={portal.label} style={{ background: `linear-gradient(135deg, ${portal.colorDim} 0%, ${C.surface} 60%)`, border: `1px solid ${portal.colorBorder}`, borderRadius: 12, padding: 20 }}>
+          <div key={portal.label} style={{ background: `linear-gradient(135deg, ${portal.colorDim} 0%, ${C.surface} 60%)`, border: `1px solid ${portal.colorBorder}`, borderRadius: 12, padding: 20, gridColumn: portal.fullWidth ? '1 / -1' : undefined }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 16 }}>
               {/* Progress ring */}
               <div style={{ position: 'relative', flexShrink: 0, width: 100, height: 100 }}>
@@ -262,7 +309,7 @@ function ReadinessPanel() {
               </div>
               {/* Label block */}
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: portal.color, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 3 }}>Beta Readiness</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: portal.color, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 3 }}>{portal.meterLabel}</div>
                 <div style={{ fontSize: 18, fontWeight: 800, color: C.text, marginBottom: 2 }}>{portal.label}</div>
                 <div style={{ fontSize: 12, color: C.textDim, marginBottom: 8 }}>{portal.sublabel}</div>
                 <div style={{ fontSize: 12, color: C.textMid }}>
@@ -272,9 +319,9 @@ function ReadinessPanel() {
               </div>
             </div>
             {/* Checklist */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: portal.fullWidth ? '1fr 1fr' : '1fr', gap: '2px 24px' }}>
               {portal.items.map((item, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '3px 0' }}>
                   <span style={{ fontSize: 11, flexShrink: 0, marginTop: 1, color: item.done ? portal.color : C.textDim }}>{item.done ? '✓' : '○'}</span>
                   <span style={{ fontSize: 11, color: item.done ? C.textMid : C.textDim, lineHeight: 1.5 }}>{item.label}</span>
                 </div>
