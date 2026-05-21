@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase'
 const navItems = [
   { href: '/today',     label: 'Home',       emoji: '🏠' },
   { href: '/for-you',  label: 'For You',    emoji: '⚡' },
+  { href: '/nutrition', label: 'Nutrition',  emoji: '🥗' },
   { href: '/calendar', label: 'Calendar',   emoji: '📅' },
   { href: '/log',      label: 'History',    emoji: '📋' },
   { href: '/recovery', label: 'Recovery',   emoji: '🩹' },
