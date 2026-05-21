@@ -17,6 +17,14 @@ function GoogleIcon() {
   )
 }
 
+function AppleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style={{ flexShrink: 0 }} fill="currentColor">
+      <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+    </svg>
+  )
+}
+
 export default function AuthPage() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
@@ -37,11 +45,11 @@ export default function AuthPage() {
   const [password, setPassword] = useState('')
   const [promoCode, setPromoCode] = useState('')
   const [tosAccepted, setTosAccepted] = useState(false)
-  const [error, setError] = useState(oauthError ? 'Google sign-in failed or was cancelled. Please try again.' : '')
+  const [error, setError] = useState(oauthError ? 'Sign-in failed or was cancelled. Please try again.' : '')
   const [loading, setLoading] = useState(false)
   const [confirmSent, setConfirmSent] = useState(false)
 
-  async function handleGoogleAuth() {
+  async function handleOAuth(provider: 'google' | 'apple') {
     setError('')
     if (mode === 'signup' && !tosAccepted) {
       setError('Please accept the Terms of Service and Privacy Policy to continue.')
@@ -72,7 +80,7 @@ export default function AuthPage() {
     }
 
     await supabase.auth.signInWithOAuth({
-      provider: 'google',
+      provider,
       options: { redirectTo: `${window.location.origin}/auth/callback` },
     })
     // Page navigates away — no setLoading(false) needed
@@ -183,31 +191,56 @@ export default function AuthPage() {
         </p>
       </div>
 
-      {/* Google OAuth */}
-      <button
-        onClick={handleGoogleAuth}
-        disabled={loading}
-        style={{
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 10,
-          padding: '13px 16px',
-          borderRadius: 10,
-          border: '1px solid var(--border)',
-          background: 'var(--surface2)',
-          color: 'var(--text)',
-          fontWeight: 600,
-          fontSize: 14,
-          cursor: loading ? 'not-allowed' : 'pointer',
-          marginBottom: 20,
-          opacity: loading ? 0.6 : 1,
-        }}
-      >
-        <GoogleIcon />
-        Continue with Google
-      </button>
+      {/* OAuth buttons */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+        <button
+          onClick={() => handleOAuth('google')}
+          disabled={loading}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 10,
+            padding: '13px 16px',
+            borderRadius: 10,
+            border: '1px solid var(--border)',
+            background: 'var(--surface2)',
+            color: 'var(--text)',
+            fontWeight: 600,
+            fontSize: 14,
+            cursor: loading ? 'not-allowed' : 'pointer',
+            opacity: loading ? 0.6 : 1,
+          }}
+        >
+          <GoogleIcon />
+          Continue with Google
+        </button>
+
+        <button
+          onClick={() => handleOAuth('apple')}
+          disabled={loading}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 10,
+            padding: '13px 16px',
+            borderRadius: 10,
+            border: '1px solid var(--border)',
+            background: '#000',
+            color: '#fff',
+            fontWeight: 600,
+            fontSize: 14,
+            cursor: loading ? 'not-allowed' : 'pointer',
+            opacity: loading ? 0.6 : 1,
+          }}
+        >
+          <AppleIcon />
+          Continue with Apple
+        </button>
+      </div>
 
       {/* Divider */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
