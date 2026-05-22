@@ -253,7 +253,7 @@ const READINESS_DATA = [
       { label: 'App Store title, subtitle, description + keywords written', done: false },
       { label: 'Age rating questionnaire completed (likely 4+)', done: false },
       // Technical Compliance (CRITICAL)
-      { label: 'Sign in with Apple implemented (required if Google OAuth offered)', done: false },
+      { label: 'Sign in with Apple implemented (required if Google OAuth offered)', done: true },
       { label: 'Apple IAP / RevenueCat for iOS subscriptions (Stripe alone = rejection)', done: false },
       { label: 'Google Play Billing / RevenueCat for Android subscriptions', done: false },
       { label: 'App wrapped with Capacitor (PWA → native iOS + Android)', done: false },
