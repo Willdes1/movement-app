@@ -1507,6 +1507,15 @@ export default function AdminPage() {
   const router = useRouter()
 
   const [tab, setTab] = useState<Tab>('overview')
+
+  // Persist active tab in URL hash so refresh lands on the same tab
+  useEffect(() => {
+    const hash = window.location.hash.slice(1) as Tab
+    const valid: Tab[] = ['overview','users','activity','todos','ideas','promos','marketing','partners','launchpad','health','media','impersonation','retention','notes','billing','ceo','bugs','kb','spend','video','push','stripe']
+    if (valid.includes(hash)) setTab(hash)
+  }, [])
+  useEffect(() => { window.location.hash = tab }, [tab])
+
   const [isMobile, setIsMobile] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
