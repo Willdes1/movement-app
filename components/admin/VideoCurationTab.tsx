@@ -227,6 +227,8 @@ export default function VideoCurationTab() {
   const filtered = exercises.filter(e => {
     const matchSearch = !search || e.name_display.toLowerCase().includes(search.toLowerCase())
     if (!matchSearch) return false
+    // When searching by name, bypass the tab filter so any exercise is findable
+    if (search.trim()) return true
     if (filter === 'approved') return !!e.video_url
     if (filter === 'pending')  return !e.video_url && e.candidates.some(c => c.status === 'proposed')
     return true
@@ -378,15 +380,20 @@ export default function VideoCurationTab() {
       </div>
 
       {/* ── Filters ─────────────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search exercises…"
-          style={{ flex: 1, minWidth: 180, padding: '8px 12px', borderRadius: 7, border: `1px solid ${C.border}`, background: C.surface2, color: C.text, fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+      <div style={{ padding: '12px 16px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 14 }}>
+        <p style={{ fontSize: 11, fontWeight: 700, color: C.textDim, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
+          Quick Search — find any exercise and run curation on it directly
+        </p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder='Search any exercise… e.g. "Chest Press", "Squat"'
+          style={{ flex: 1, minWidth: 200, padding: '9px 12px', borderRadius: 7, border: `1px solid ${search ? C.accentBorder : C.border}`, background: C.bg, color: C.text, fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
         {(['pending', 'approved', 'all'] as const).map(f => (
           <button key={f} onClick={() => setFilter(f)}
             style={{ padding: '8px 14px', borderRadius: 7, border: `1px solid ${filter === f ? C.accentBorder : C.border}`, background: filter === f ? C.accentDim : 'transparent', color: filter === f ? C.accent : C.textDim, fontSize: 12, fontWeight: filter === f ? 700 : 400, cursor: 'pointer', textTransform: 'capitalize', fontFamily: 'inherit' }}>
             {f === 'pending' ? `Pending (${pending})` : f === 'approved' ? `Approved (${approved})` : `All (${total})`}
           </button>
         ))}
+        </div>
       </div>
 
       {/* ── Exercise list ────────────────────────────────────────────────────── */}

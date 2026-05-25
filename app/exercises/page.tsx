@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/contexts/AuthContext'
 
 type ExerciseRow = {
   name_normalized: string
@@ -61,6 +62,7 @@ function CueRow({ label, value }: { label: string; value: string | null }) {
 type Filter = 'all' | 'video' | 'no-video'
 
 export default function ExercisesPage() {
+  const { isAdmin } = useAuth()
   const [all, setAll]           = useState<ExerciseRow[]>([])
   const [loading, setLoading]   = useState(true)
   const [query, setQuery]       = useState('')
@@ -179,10 +181,12 @@ export default function ExercisesPage() {
       {/* Filter pills */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
         {([
-          { id: 'all',      label: 'All' },
-          { id: 'video',    label: '🎬 Has Video' },
-          { id: 'no-video', label: 'No Video Yet' },
-        ] as { id: Filter; label: string }[]).map(f => (
+          { id: 'all',      label: 'All',          adminOnly: false },
+          { id: 'video',    label: '🎬 Has Video', adminOnly: false },
+          { id: 'no-video', label: 'No Video Yet', adminOnly: true  },
+        ] as { id: Filter; label: string; adminOnly: boolean }[])
+        .filter(f => !f.adminOnly || isAdmin)
+        .map(f => (
           <button
             key={f.id}
             onClick={() => setFilter(f.id)}
@@ -269,11 +273,12 @@ export default function ExercisesPage() {
                       <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {ex.name_display}
                       </span>
-                      {hasVideo ? (
+                      {hasVideo && (
                         <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: 'rgba(34,197,94,0.1)', color: 'var(--green)', border: '1px solid rgba(34,197,94,0.25)' }}>
                           VIDEO
                         </span>
-                      ) : (
+                      )}
+                      {!hasVideo && isAdmin && (
                         <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 10, background: 'var(--surface2)', color: 'var(--text-dim)', border: '1px solid var(--border)' }}>
                           SOON
                         </span>
