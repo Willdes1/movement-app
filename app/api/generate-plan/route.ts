@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { logTokens } from '@/lib/log-tokens'
+import { retrieveKnowledge, formatKnowledgeContext } from '@/lib/knowledge-retrieval'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -90,7 +91,37 @@ Additional rules:
 - Each week should feel progressively different from previous weeks — vary exercises, not just intensity
 - Return nothing except the raw JSON array`
 
-function buildPrompt(profile: Record<string, unknown>, weekNumber: number, phaseLabel: string, intensity: string, instructions = ''): string {
+const PT_REHAB_SYSTEM_PROMPT = `You are an elite physical therapist and sports rehabilitation specialist with 15+ years of clinical experience. You are reviewing a drafted training plan to ensure athlete safety given their listed injury restrictions.
+
+Your job: identify any exercises that are contraindicated for the athlete's specific restrictions and replace them with safe, effective alternatives that target the same muscle groups and maintain the same training intent.
+
+RULES:
+1. Review EVERY exercise in every block (morning, warmup, workout, abs, cooldown, evening)
+2. Replace contraindicated exercises with safe alternatives — keep the same rep/set scheme format
+3. Maintain the training structure, progressive intent, and session flow
+4. Update the coaching cue if the primary movement changed
+5. If NO changes are needed, return the plan completely unchanged
+6. Return ONLY the valid 7-day JSON array in the exact same format — no explanation, no markdown`
+
+function buildRehabPrompt(
+  profile: Record<string, unknown>,
+  draftPlan: unknown[],
+  rehabKnowledge: string
+): string {
+  const lines: string[] = []
+  lines.push('ATHLETE INJURY RESTRICTIONS:')
+  if (profile.restriction_areas) lines.push(`Areas: ${JSON.stringify(profile.restriction_areas)}`)
+  if (profile.restriction_notes) lines.push(`Notes: ${profile.restriction_notes}`)
+  if (rehabKnowledge) {
+    lines.push('\n' + rehabKnowledge)
+  }
+  lines.push('\nDRAFTED TRAINING PLAN TO REVIEW:')
+  lines.push(JSON.stringify(draftPlan))
+  lines.push('\nReturn the safe, modified 7-day plan as a raw JSON array:')
+  return lines.join('\n')
+}
+
+function buildPrompt(profile: Record<string, unknown>, weekNumber: number, phaseLabel: string, intensity: string, instructions = '', knowledgeContext = ''): string {
   const lines: string[] = [
     `PROGRAM CONTEXT: Week ${weekNumber} of 13 — ${phaseLabel}`,
     `INTENSITY GUIDANCE: ${intensity}`,
@@ -110,9 +141,6 @@ function buildPrompt(profile: Record<string, unknown>, weekNumber: number, phase
   if (profile.wants_morning) lines.push(`Prefers morning workouts: yes`)
   if (profile.wants_evening) lines.push(`Prefers evening workouts: yes`)
   if (profile.mobility_time) lines.push(`Mobility time: ${profile.mobility_time}`)
-  if (profile.has_restrictions) {
-    if (profile.restriction_areas) lines.push(`Injury/restriction areas: ${JSON.stringify(profile.restriction_areas)}`)
-  }
   if (profile.sport_schedule) lines.push(`Sport schedule: ${JSON.stringify(profile.sport_schedule)}`)
   if (profile.workout_location) lines.push(`Workout location: ${profile.workout_location}`)
   if (profile.home_equipment && Array.isArray(profile.home_equipment) && (profile.home_equipment as string[]).length > 0) {
@@ -153,6 +181,16 @@ function buildPrompt(profile: Record<string, unknown>, weekNumber: number, phase
     lines.push('Apply these instructions precisely — they override general defaults.')
   }
 
+  // Inject restriction notes (previously missing from prompt)
+  if (profile.has_restrictions) {
+    if (profile.restriction_areas) lines.push(`Injury/restriction areas: ${JSON.stringify(profile.restriction_areas)}`)
+    if (profile.restriction_notes) lines.push(`Restriction notes from athlete: ${profile.restriction_notes}`)
+  }
+
+  if (knowledgeContext) {
+    lines.push('\n' + knowledgeContext)
+  }
+
   lines.push(`\nGenerate the 7-day plan for Week ${weekNumber} now.`)
   return lines.join('\n')
 }
@@ -164,30 +202,90 @@ export async function POST(request: Request) {
 
     if (!profile) return Response.json({ error: 'Profile is required' }, { status: 400 })
 
-    const prompt = buildPrompt(profile, weekNumber, phaseLabel, intensity, instructions)
+    // ── MIE Phase 1: Retrieve relevant domain knowledge ──────────────────────
+    let knowledgeContext = ''
+    let rehabKnowledge = ''
+    try {
+      const queryParts = [
+        profile.sport ?? '',
+        profile.goal ?? '',
+        phaseLabel,
+        profile.training_level ?? '',
+      ].filter(Boolean).join(' ')
 
-    const message = await client.messages.create({
+      const [generalItems, rehabItems] = await Promise.all([
+        retrieveKnowledge(queryParts, 10, 0.45),
+        profile.has_restrictions && profile.restriction_areas
+          ? retrieveKnowledge(
+              `${JSON.stringify(profile.restriction_areas)} rehabilitation injury protocol`,
+              6,
+              0.4
+            )
+          : Promise.resolve([]),
+      ])
+      knowledgeContext = formatKnowledgeContext(generalItems)
+      rehabKnowledge = formatKnowledgeContext(rehabItems as Awaited<ReturnType<typeof retrieveKnowledge>>)
+    } catch (ragErr) {
+      console.warn('RAG retrieval failed, proceeding without knowledge context:', ragErr)
+    }
+
+    const prompt = buildPrompt(profile, weekNumber, phaseLabel, intensity, instructions, knowledgeContext)
+
+    // ── MIE Phase 2 — Agent 1: S&C Agent drafts the plan ────────────────────
+    const scMessage = await client.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 8192,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: prompt }],
     })
 
-    const raw = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
-    const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()
-    const plan = JSON.parse(cleaned)
+    const scRaw = scMessage.content[0].type === 'text' ? scMessage.content[0].text.trim() : ''
+    const scCleaned = scRaw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()
+    let plan = JSON.parse(scCleaned)
 
     if (!Array.isArray(plan) || plan.length !== 7) {
       throw new Error(`Expected 7-day array, got ${Array.isArray(plan) ? plan.length : typeof plan}`)
     }
-
     const missingDs = plan.findIndex((d: Record<string, unknown>) => !d.daily_session)
     if (missingDs !== -1) {
       throw new Error(`Day at index ${missingDs} is missing daily_session`)
     }
 
-    logTokens({ operation: 'generate_plan', route: '/api/generate-plan', input_tokens: message.usage.input_tokens, output_tokens: message.usage.output_tokens, user_id: profile?.id ?? null })
-    return Response.json({ plan, usage: { input_tokens: message.usage.input_tokens, output_tokens: message.usage.output_tokens } })
+    let totalInput = scMessage.usage.input_tokens
+    let totalOutput = scMessage.usage.output_tokens
+
+    // ── MIE Phase 2 — Agent 2: PT/Rehab Agent reviews for safety ────────────
+    // Only runs when athlete has documented injury restrictions
+    if (profile.has_restrictions && Array.isArray(profile.restriction_areas) && profile.restriction_areas.length > 0) {
+      try {
+        const rehabPrompt = buildRehabPrompt(profile, plan, rehabKnowledge)
+        const ptMessage = await client.messages.create({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 8192,
+          system: PT_REHAB_SYSTEM_PROMPT,
+          messages: [{ role: 'user', content: rehabPrompt }],
+        })
+        const ptRaw = ptMessage.content[0].type === 'text' ? ptMessage.content[0].text.trim() : ''
+        const ptCleaned = ptRaw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()
+        const reviewedPlan = JSON.parse(ptCleaned)
+        if (Array.isArray(reviewedPlan) && reviewedPlan.length === 7) {
+          plan = reviewedPlan
+          totalInput += ptMessage.usage.input_tokens
+          totalOutput += ptMessage.usage.output_tokens
+        }
+      } catch (ptErr) {
+        console.warn('PT/Rehab agent failed, using S&C draft:', ptErr)
+      }
+    }
+
+    logTokens({
+      operation: 'generate_plan',
+      route: '/api/generate-plan',
+      input_tokens: totalInput,
+      output_tokens: totalOutput,
+      user_id: profile?.id ?? null,
+    })
+    return Response.json({ plan, usage: { input_tokens: totalInput, output_tokens: totalOutput } })
   } catch (err) {
     console.error('Plan generation error:', err)
     return Response.json({ error: 'Failed to generate plan' }, { status: 500 })
