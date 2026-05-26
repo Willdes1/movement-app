@@ -218,11 +218,33 @@ input, textarea, select { transition: border-color 0.2s; }
 
 .page-content { max-width: 480px; margin: 0 auto; }
 
+/* Mobile hamburger — visible on mobile, hidden on desktop */
+.mobile-hamburger {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: fixed;
+  top: 14px;
+  left: 16px;
+  z-index: 50;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(22, 27, 34, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  padding: 0 9px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
 @media (min-width: 768px) {
   .app-sidebar { display: flex; }
   .app-main { margin-left: 230px; padding-bottom: 0; }
   .mobile-nav-wrapper { display: none; }
   .page-content { max-width: 860px; }
+  .mobile-hamburger { display: none; }
 }
 
 /* ── COACH PORTAL RESPONSIVE ── */

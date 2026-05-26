@@ -15,20 +15,10 @@ const tabs = [
     ),
   },
   {
-    href: '/for-you',
-    label: 'For You',
-    icon: (active: boolean) => (
-      <svg width="20" height="20" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fillOpacity={active ? 0.2 : 0}/>
-      </svg>
-    ),
-  },
-  {
     href: '/nutrition',
     label: 'Nutrition',
-    center: true,
     icon: (active: boolean) => (
-      <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+      <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
         <path d="M3 11h18c0 5.5-4.5 9-9 9s-9-3.5-9-9z" fill={active ? 'currentColor' : 'none'} fillOpacity={active ? 0.2 : 0}/>
         <path d="M8 3v5M12 2v5M16 3v5" strokeLinecap="round"/>
       </svg>
@@ -70,14 +60,14 @@ export default function BottomNav() {
       position: 'fixed',
       bottom: 0, left: 0, right: 0,
       height: 'auto',
-      minHeight: '80px',
+      minHeight: '64px',
       background: 'rgba(19,19,24,0.97)',
       backdropFilter: 'blur(20px)',
       WebkitBackdropFilter: 'blur(20px)',
       borderTop: '1px solid var(--border)',
       display: 'flex',
       alignItems: 'flex-start',
-      paddingTop: '8px',
+      paddingTop: '10px',
       paddingBottom: 'env(safe-area-inset-bottom)',
       zIndex: 100,
     }}>
@@ -92,51 +82,6 @@ export default function BottomNav() {
 
       {tabs.map(tab => {
         const active = pathname.startsWith(tab.href) || (tab.href === '/account' && pathname.startsWith('/profile'))
-
-        if (tab.center) {
-          return (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              style={{
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '3px',
-                padding: '0 0 4px',
-                color: active ? 'var(--accent)' : 'var(--text-dim)',
-                textDecoration: 'none',
-                fontSize: '8px',
-                fontWeight: 800,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
-                position: 'relative',
-                marginTop: -10,
-              }}
-            >
-              <div style={{
-                width: 48, height: 48,
-                borderRadius: 16,
-                background: active
-                  ? 'linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%)'
-                  : 'var(--surface2)',
-                border: `1px solid ${active ? 'var(--accent)' : 'var(--border2)'}`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: active ? '#fff' : 'var(--text-dim)',
-                boxShadow: active ? '0 4px 16px var(--accent-shadow)' : 'none',
-              }}>
-                {tab.icon(active)}
-              </div>
-              <span style={{ color: active ? 'var(--accent)' : 'var(--text-dim)' }}>
-                {tab.label}
-              </span>
-            </Link>
-          )
-        }
-
         return (
           <Link
             key={tab.href}

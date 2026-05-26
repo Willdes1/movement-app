@@ -3,6 +3,7 @@ import { DM_Sans, Space_Mono } from 'next/font/google'
 import './globals.css'
 import BottomNav from '@/components/ui/BottomNav'
 import Sidebar from '@/components/ui/Sidebar'
+import MobileMenu from '@/components/ui/MobileMenu'
 import RecoveryBanner from '@/components/ui/RecoveryBanner'
 import ImpersonationBanner from '@/components/ui/ImpersonationBanner'
 import { AuthProvider } from '@/contexts/AuthContext'
@@ -55,6 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <PlanGenerationProvider>
               <div className="grain" />
               <Sidebar />
+              <MobileMenu />
               <main className="app-main">
                 <ImpersonationBanner />
                 <RecoveryBanner />
