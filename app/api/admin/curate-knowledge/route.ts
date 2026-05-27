@@ -34,17 +34,19 @@ Return ONLY a raw JSON array (no markdown, no explanation). If no items need fla
 Format: [{"id": "uuid", "flag_reason": "...", "suggested_content": "..."}]`
 
 type FlagResult = { id: string; flag_reason: string; suggested_content: string }
+type KnowledgeRow = { id: string; category: string; title: string; content: string }
 
 export async function POST() {
   try {
     const supabase = getSupabaseAdmin()
 
     // Fetch the 60 items least recently reviewed (never-reviewed items first)
-    const { data: items, error } = await supabase
+    const { data: rawItems, error } = await supabase
       .from('knowledge_items')
       .select('id, category, title, content')
       .order('last_reviewed_at', { ascending: true, nullsFirst: true })
       .limit(60)
+    const items = rawItems as KnowledgeRow[] | null
 
     if (error) return Response.json({ error: error.message }, { status: 500 })
     if (!items || items.length === 0) return Response.json({ message: 'No items to review', flagged: 0 })
