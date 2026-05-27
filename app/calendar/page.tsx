@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback, Suspense } from 'react'
+import { useTTS } from '@/hooks/useTTS'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -182,6 +183,7 @@ function CalendarInner() {
   const [exerciseLibrary, setExerciseLibrary] = useState<Record<string, ExerciseDetail>>({})
   const [selectedExercise, setSelectedExercise] = useState<ExerciseDetail | null>(null)
   const [exerciseFetching, setExerciseFetching] = useState(false)
+  const { speak, stop, speaking, gender, toggleGender } = useTTS()
   const [lastLog, setLastLog] = useState<WorkoutLog | null>(null)
   const [completions, setCompletions] = useState<Set<string>>(new Set())
   const [completing, setCompleting] = useState(false)
@@ -667,9 +669,10 @@ function CalendarInner() {
       )}
 
       {/* Exercise detail modal */}
+      <style>{`@keyframes tts-pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }`}</style>
       {selectedExercise && (
         <div
-          onClick={() => { setSelectedExercise(null) }}
+          onClick={() => { stop(); setSelectedExercise(null) }}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000 }}
         >
           <div
@@ -682,7 +685,40 @@ function CalendarInner() {
                   <p style={{ fontWeight: 800, fontSize: 17, lineHeight: 1.3 }}>{selectedExercise.name_display}</p>
                   {exerciseFetching && <p style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4, fontWeight: 600 }}>Generating coaching details…</p>}
                 </div>
-                <button onClick={() => setSelectedExercise(null)} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--text-dim)', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}>×</button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                  {/* Voice gender toggle */}
+                  <button
+                    onClick={toggleGender}
+                    title={`Voice: ${gender}. Tap to switch.`}
+                    style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 8px', fontSize: 11, color: 'var(--text-dim)', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}
+                  >
+                    {gender === 'male' ? '♂' : '♀'}
+                  </button>
+                  {/* TTS speak/stop button */}
+                  <button
+                    onClick={() => {
+                      if (speaking) { stop(); return }
+                      const ex = selectedExercise
+                      const parts = [ex.name_display]
+                      if (ex.how) parts.push(ex.how)
+                      if (ex.breathing) parts.push('Breathing: ' + ex.breathing)
+                      if (ex.core) parts.push('Core engagement: ' + ex.core)
+                      if (ex.tip) parts.push('Coaching tip: ' + ex.tip)
+                      speak(parts.join('. '))
+                    }}
+                    title={speaking ? 'Stop' : 'Read aloud'}
+                    style={{
+                      background: speaking ? 'var(--accent)' : 'var(--surface2)',
+                      border: `1px solid ${speaking ? 'var(--accent)' : 'var(--border)'}`,
+                      borderRadius: 8, padding: '5px 10px', fontSize: 16,
+                      cursor: 'pointer', lineHeight: 1,
+                      animation: speaking ? 'tts-pulse 1.2s ease-in-out infinite' : 'none',
+                    }}
+                  >
+                    {speaking ? '🔊' : '🔈'}
+                  </button>
+                  <button onClick={() => { stop(); setSelectedExercise(null) }} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--text-dim)', cursor: 'pointer', lineHeight: 1 }}>×</button>
+                </div>
               </div>
             </div>
             <div style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch' as never, padding: '0 24px 40px', flexGrow: 1 }}>
