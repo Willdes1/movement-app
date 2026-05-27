@@ -372,19 +372,20 @@ function OverviewSection() {
     'Terms of Service + Privacy Policy — admin impersonation disclosure, health/AI disclaimer, user rights, TOS consent gate on signup (email + Google OAuth)',
     'MIE Phase 0 — training_level, workout_background, sport activities injected into plan generator prompt with per-level guidance; plan quality now scales with user experience',
     'Exercise Video Curation system — AI auto-discovers fitness YouTube channels (channels.list), scores quality via Claude Haiku, stores approved list; curation pipeline searches 2 channels per exercise (search.list + videos.list), scores 3 candidates per exercise, admin reviews + approves 1; approved video embeds inline in client calendar via YouTube iframe; exercises from real client plans bubble to top of curation queue; 752-exercise library populating at ~50/day within free API quota',
+    'MIE Phase 1 — Domain Knowledge Store: pgvector + OpenAI embeddings + 784 items seeded (15 training principles, 10 sport protocols, 7 rehab protocols, 752 exercises); RAG retrieval wired into plan generation; ivfflat index (lists=30)',
+    'MIE Phase 2 — Agent Council v1: S&C Agent drafts full 7-day plan using retrieved knowledge; PT/Rehab Agent runs safety review pass for restricted athletes with veto logic; token usage tracked across both agents',
+    'MIE Phase 3 — Full Agent Council: Sports Specialist Agent (sport-specific warmups + coaching cues), Mobility Agent (morning/cooldown/evening blocks), Mindset Agent (Mushin/Kaizen/Shokunin/Zanshin/Fudoshin layer on coaching + warmup tips), Recovery Agent (evidence-based rest day programming); all 4 agents sequential, non-fatal fallback',
+    'MIE Phase 4 — Knowledge Curator Agent: weekly Vercel cron reviews 60 items/pass (least-recently-reviewed first); Claude flags outdated/inaccurate items with suggested replacements; admin accepts (re-embeds + increments version) or dismisses; full review UI in admin MIE tab',
+    'Push notifications — VAPID keys configured, service worker live, PushNotificationBanner on Today page, admin send UI; web push delivery to subscribed devices',
   ]
   const COMING = [
-    'Movement Intelligence Engine (MIE) Phase 1 — Domain Knowledge Store: pgvector + embedding pipeline + Tier 1 knowledge seeding (NSCA, NASM, PT clinical guidelines, sport biomechanics)',
-    'MIE Phase 2 — Agent Council v1: Orchestrator + Strength & Conditioning + PT/Rehab (veto power) + Critic/Verification agents wired into plan generation',
-    'MIE Phase 3 — Full council: Mobility + Sports Specialist (all sports) + Recovery + Mindset agents; extends to recovery-plan and return-to-sport APIs',
-    'MIE Phase 4 — Knowledge Curator Agent: monitors research sources, flags updates for admin review, keeps Domain Knowledge Store current',
     'Injury → training handoff: AI-modified safe training plan that runs alongside recovery',
-    'Nutrition AI: 3-month meal plan synced to training phases + macro targets (eventual dedicated MIE sub-engine)',
+    'Nutrition AI: 3-month meal plan synced to training phases + macro targets',
     'Stripe billing: Free → Pro → Plus → Supreme consumer tiers',
     'Coach portal affiliate system — referral tracking, revenue-sharing per referral, coach analytics dashboard',
     'Wearable integration: Oura Ring, Apple Watch, Samsung Health — feeds MIE Recovery Agent',
     'Native iOS + Android via Capacitor wrapper',
-    'Push notifications, streak system, accountability nudges',
+    'Streak system + accountability nudges',
   ]
   const MARKETS = [
     { label: 'Global Fitness App Market', val: '$96B by 2032', pct: 88, color: C.accent },
@@ -401,8 +402,8 @@ function OverviewSection() {
   ]
   const ROADMAP = [
     { phase: 'Phase 1', label: 'Core Consumer App', status: 'done', items: 'AI plan generator (bulk 1/2/3-month) · Phase-based training with rest times · 6-block daily sessions · Exercise library · SI Joint + custom injury recovery · Return-to-sport agent · Calendar + undo completion · Workout logging · For You feed · Anatomy Explorer · Auth · Admin portal · CI/CD · Training background profile · TOS/Privacy + RLS security hardening' },
-    { phase: 'Phase 2', label: 'Movement Intelligence Engine (MIE)', status: 'active', items: 'Multi-Agent Agentic RAG Pipeline — Domain Knowledge Store (pgvector + curated expert knowledge from NSCA, NASM, PT guidelines, sport biomechanics) · Orchestrator Agent · Strength & Conditioning Agent · PT/Rehab Agent (veto power) · Sports Specialist Agent (all sports taxonomy) · Mobility, Recovery, Mindset agents · Critic/Verification Agent · Knowledge Curator Agent (async research monitor) · Token efficiency via RAG retrieval instead of scratch generation' },
-    { phase: 'Phase 3', label: 'Monetization + Professional Portal', status: 'active', items: '✓ Coach portal: programs library, assign-to-client, AI generate, exercise swap modal, template library, clients roster · ✓ Admin Portal V2: retention dashboard, notes system, billing overview · Stripe billing (Free → Pro → Plus → Supreme) · Coach affiliate system · Injury→training AI handoff · Nutrition AI (3-month meal plan, eventual dedicated MIE sub-engine) · Push notifications · Native iOS/Android · Wearable integration (Oura, Apple Watch → feeds MIE Recovery Agent)' },
+    { phase: 'Phase 2', label: 'Movement Intelligence Engine (MIE)', status: 'done', items: '✓ Domain Knowledge Store — pgvector + 784 items (training principles, sport protocols, rehab protocols, exercises) + RAG retrieval · ✓ S&C Agent + PT/Rehab Agent (veto logic) · ✓ Sports Specialist + Mobility + Mindset + Recovery agents (full council) · ✓ Knowledge Curator Agent — weekly cron, auto-flags outdated content, version tracking' },
+    { phase: 'Phase 3', label: 'Monetization + Professional Portal', status: 'active', items: '✓ Coach portal: programs library, assign-to-client, AI generate, exercise swap modal, template library, clients roster · ✓ Admin Portal V2: retention dashboard, notes system, billing overview · ✓ Push notifications: VAPID + service worker + admin send UI · Stripe billing (Free → Pro → Plus → Supreme) · Coach affiliate system · Injury→training AI handoff · Nutrition AI (3-month meal plan) · Native iOS/Android · Wearable integration' },
     { phase: 'Phase 4', label: 'Marketplace + Scale', status: 'upcoming', items: 'Hire local trainers in-app · Marketplace listings · Built-in marketing automation · Revenue-sharing · Platform data as B2B sales intelligence · Client portal' },
     { phase: 'Phase 5', label: 'Enterprise + Partnerships', status: 'upcoming', items: 'White-label options · Insurance partnerships · University athletics licensing · International expansion · Strategic acquisition potential' },
     { phase: 'Deferred', label: 'Exercise Video Curation', status: 'upcoming', items: 'YouTube Data API + AI candidate scoring + admin review UI · Trigger: stable platform checkpoint before content spend' },
@@ -512,7 +513,7 @@ function OverviewSection() {
               </tr>
               <tr style={{ background: `rgba(59,130,246,0.08)` }}>
                 <td style={{ padding: '10px 12px', fontWeight: 800, color: C.accent, borderBottom: `1px solid ${C.border}` }}>Move. (Us)</td>
-                {['Full AI', '4-Phase', 'Planned', 'Unique IP', 'In Build', 'Planned'].map(v => (
+                {['Full AI', '4-Phase', 'Built', 'Unique IP', 'Planned', 'Planned'].map(v => (
                   <td key={v} style={{ padding: '10px 12px', color: C.green, fontWeight: 700, borderBottom: `1px solid ${C.border}` }}>✓ {v}</td>
                 ))}
               </tr>
