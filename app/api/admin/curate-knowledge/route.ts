@@ -38,7 +38,8 @@ type KnowledgeRow = { id: string; category: string; title: string; content: stri
 
 export async function POST() {
   try {
-    const supabase = getSupabaseAdmin()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const supabase = getSupabaseAdmin() as any
 
     // Fetch the 60 items least recently reviewed (never-reviewed items first)
     const { data: rawItems, error } = await supabase

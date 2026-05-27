@@ -19,7 +19,8 @@ export async function PATCH(request: Request) {
     const { id, action, custom_content } = await request.json()
     if (!id || !action) return Response.json({ error: 'id and action required' }, { status: 400 })
 
-    const supabase = getSupabaseAdmin()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const supabase = getSupabaseAdmin() as any
     const now = new Date().toISOString()
 
     if (action === 'dismiss') {
