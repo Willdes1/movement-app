@@ -1,72 +1,71 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 export type TTSGender = 'male' | 'female'
 
-function pickVoice(gender: TTSGender): SpeechSynthesisVoice | undefined {
-  const voices = window.speechSynthesis.getVoices()
-  const en = voices.filter(v => v.lang.startsWith('en'))
-  if (en.length === 0) return undefined
-
-  const maleHints = ['male', 'alex', 'fred', 'daniel', 'david', 'james', 'tom', 'gordon', 'mark', 'lee', 'google us english male']
-  const femaleHints = ['female', 'samantha', 'victoria', 'kate', 'tessa', 'fiona', 'moira', 'karen', 'zira', 'google us english']
-
-  const hints = gender === 'male' ? maleHints : femaleHints
-  const match = en.find(v => hints.some(h => v.name.toLowerCase().includes(h)))
-  if (match) return match
-
-  // Fallback: first voice = male, second (or last) = female
-  return gender === 'male' ? en[0] : (en[1] ?? en[en.length - 1])
-}
+// Session cache: text → blob URL (avoids repeat API calls within a session)
+const audioCache = new Map<string, string>()
 
 export function useTTS() {
   const [speaking, setSpeaking] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [gender, setGender] = useState<TTSGender>(() => {
     if (typeof window === 'undefined') return 'male'
     return (localStorage.getItem('tts_gender') as TTSGender) ?? 'male'
   })
-
-  const speak = useCallback((text: string) => {
-    if (!('speechSynthesis' in window)) return
-    window.speechSynthesis.cancel()
-
-    const utterance = new SpeechSynthesisUtterance(text)
-    utterance.lang = 'en-US'
-    utterance.rate = 0.88
-    utterance.pitch = gender === 'male' ? 0.85 : 1.1
-
-    const go = () => {
-      const voice = pickVoice(gender)
-      if (voice) utterance.voice = voice
-      utterance.onstart = () => setSpeaking(true)
-      utterance.onend = () => setSpeaking(false)
-      utterance.onerror = () => setSpeaking(false)
-      window.speechSynthesis.speak(utterance)
-    }
-
-    const voices = window.speechSynthesis.getVoices()
-    if (voices.length > 0) {
-      go()
-    } else {
-      window.speechSynthesis.addEventListener('voiceschanged', go, { once: true })
-    }
-  }, [gender])
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const stop = useCallback(() => {
-    window.speechSynthesis.cancel()
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.currentTime = 0
+    }
     setSpeaking(false)
+    setLoading(false)
   }, [])
+
+  const speak = useCallback(async (text: string) => {
+    stop()
+    setLoading(true)
+
+    const voice = gender === 'male' ? 'onyx' : 'nova'
+    const cacheKey = `${voice}:${text}`
+
+    try {
+      let blobUrl = audioCache.get(cacheKey)
+
+      if (!blobUrl) {
+        const res = await fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, voice }),
+        })
+        if (!res.ok) throw new Error('TTS API failed')
+        const blob = await res.blob()
+        blobUrl = URL.createObjectURL(blob)
+        audioCache.set(cacheKey, blobUrl)
+      }
+
+      const audio = new Audio(blobUrl)
+      audioRef.current = audio
+      audio.onplay = () => { setLoading(false); setSpeaking(true) }
+      audio.onended = () => setSpeaking(false)
+      audio.onerror = () => { setSpeaking(false); setLoading(false) }
+      await audio.play()
+    } catch {
+      setLoading(false)
+      setSpeaking(false)
+    }
+  }, [gender, stop])
 
   const toggleGender = useCallback(() => {
     const next: TTSGender = gender === 'male' ? 'female' : 'male'
     setGender(next)
     localStorage.setItem('tts_gender', next)
-    window.speechSynthesis.cancel()
-    setSpeaking(false)
-  }, [gender])
+    stop()
+  }, [gender, stop])
 
-  // Clean up on unmount
-  useEffect(() => () => { window.speechSynthesis.cancel() }, [])
+  useEffect(() => () => { stop() }, [stop])
 
-  return { speak, stop, speaking, gender, toggleGender }
+  return { speak, stop, speaking, loading, gender, toggleGender }
 }

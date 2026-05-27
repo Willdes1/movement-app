@@ -183,7 +183,7 @@ function CalendarInner() {
   const [exerciseLibrary, setExerciseLibrary] = useState<Record<string, ExerciseDetail>>({})
   const [selectedExercise, setSelectedExercise] = useState<ExerciseDetail | null>(null)
   const [exerciseFetching, setExerciseFetching] = useState(false)
-  const { speak, stop, speaking, gender, toggleGender } = useTTS()
+  const { speak, stop, speaking, loading: ttsLoading, gender, toggleGender } = useTTS()
   const [lastLog, setLastLog] = useState<WorkoutLog | null>(null)
   const [completions, setCompletions] = useState<Set<string>>(new Set())
   const [completing, setCompleting] = useState(false)
@@ -697,7 +697,7 @@ function CalendarInner() {
                   {/* TTS speak/stop button */}
                   <button
                     onClick={() => {
-                      if (speaking) { stop(); return }
+                      if (speaking || ttsLoading) { stop(); return }
                       const ex = selectedExercise
                       const parts = [ex.name_display]
                       if (ex.how) parts.push(ex.how)
@@ -706,16 +706,17 @@ function CalendarInner() {
                       if (ex.tip) parts.push('Coaching tip: ' + ex.tip)
                       speak(parts.join('. '))
                     }}
-                    title={speaking ? 'Stop' : 'Read aloud'}
+                    title={speaking ? 'Stop' : ttsLoading ? 'Loading…' : 'Read aloud'}
                     style={{
                       background: speaking ? 'var(--accent)' : 'var(--surface2)',
                       border: `1px solid ${speaking ? 'var(--accent)' : 'var(--border)'}`,
                       borderRadius: 8, padding: '5px 10px', fontSize: 16,
-                      cursor: 'pointer', lineHeight: 1,
+                      cursor: ttsLoading ? 'wait' : 'pointer', lineHeight: 1,
                       animation: speaking ? 'tts-pulse 1.2s ease-in-out infinite' : 'none',
+                      opacity: ttsLoading ? 0.6 : 1,
                     }}
                   >
-                    {speaking ? '🔊' : '🔈'}
+                    {ttsLoading ? '⏳' : speaking ? '🔊' : '🔈'}
                   </button>
                   <button onClick={() => { stop(); setSelectedExercise(null) }} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--text-dim)', cursor: 'pointer', lineHeight: 1 }}>×</button>
                 </div>
