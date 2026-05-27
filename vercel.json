@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/admin/curate-knowledge",
+      "schedule": "0 9 * * 1"
+    }
+  ]
+}
