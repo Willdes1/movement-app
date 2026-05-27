@@ -81,7 +81,15 @@ export default function MIETab() {
             { icon: '→', label: '', sub: '', color: 'var(--text-dim)' },
             { icon: '💪', label: 'S&C Agent', sub: 'Drafts the plan', color: 'var(--accent)' },
             { icon: '→', label: '', sub: '', color: 'var(--text-dim)' },
-            { icon: '🩹', label: 'PT/Rehab Agent', sub: 'Safety review (injured users)', color: 'var(--green)' },
+            { icon: '🩹', label: 'PT/Rehab Agent', sub: 'Safety (injured only)', color: 'var(--blue)' },
+            { icon: '→', label: '', sub: '', color: 'var(--text-dim)' },
+            { icon: '🏆', label: 'Sports Specialist', sub: 'Sport-specific depth', color: 'var(--orange)' },
+            { icon: '→', label: '', sub: '', color: 'var(--text-dim)' },
+            { icon: '🧘', label: 'Mobility Agent', sub: 'Movement quality', color: 'var(--purple)' },
+            { icon: '→', label: '', sub: '', color: 'var(--text-dim)' },
+            { icon: '🧠', label: 'Mindset Agent', sub: 'Warrior philosophy', color: 'var(--accent)' },
+            { icon: '→', label: '', sub: '', color: 'var(--text-dim)' },
+            { icon: '🔋', label: 'Recovery Agent', sub: 'Rest day science', color: 'var(--green)' },
             { icon: '→', label: '', sub: '', color: 'var(--text-dim)' },
             { icon: '✅', label: 'Final Plan', sub: 'Returned to athlete', color: 'var(--yellow)' },
           ].map((step, i) =>
@@ -204,7 +212,7 @@ export default function MIETab() {
         {[
           { phase: 'Phase 1', title: 'Domain Knowledge Store', status: 'LIVE', color: 'var(--green)', desc: 'pgvector + embeddings + retrieval wired into plan generation' },
           { phase: 'Phase 2', title: 'Agent Council v1', status: 'LIVE', color: 'var(--green)', desc: 'S&C Agent + PT/Rehab Agent with veto logic for restricted athletes' },
-          { phase: 'Phase 3', title: 'Full Agent Council', status: 'NEXT', color: 'var(--yellow)', desc: 'Mobility Agent + Sports Specialist Agent + Recovery Agent + Mindset Agent' },
+          { phase: 'Phase 3', title: 'Full Agent Council', status: 'LIVE', color: 'var(--green)', desc: 'Sports Specialist Agent + Mobility Agent + Mindset Agent + Recovery Agent' },
           { phase: 'Phase 4', title: 'Knowledge Curator Agent', status: 'PLANNED', color: 'var(--text-dim)', desc: 'Background job monitors research sources, flags updates for admin review, versions knowledge' },
         ].map((p, i) => (
           <div key={i} style={{ display: 'flex', gap: 14, padding: '12px 0', borderBottom: i < 3 ? '1px solid var(--border)' : 'none' }}>

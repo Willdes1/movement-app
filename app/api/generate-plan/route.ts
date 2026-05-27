@@ -91,6 +91,31 @@ Additional rules:
 - Each week should feel progressively different from previous weeks — vary exercises, not just intensity
 - Return nothing except the raw JSON array`
 
+// ── Agent runner helper ───────────────────────────────────────────────────────
+async function runAgent(
+  systemPrompt: string,
+  userPrompt: string,
+  label: string
+): Promise<{ plan: unknown[] | null; inputTokens: number; outputTokens: number }> {
+  try {
+    const msg = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 8192,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+    })
+    const raw = msg.content[0].type === 'text' ? msg.content[0].text.trim() : ''
+    const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()
+    const parsed = JSON.parse(cleaned)
+    if (!Array.isArray(parsed) || parsed.length !== 7) throw new Error('Invalid array length')
+    return { plan: parsed, inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens }
+  } catch (err) {
+    console.warn(`${label} agent failed, using previous plan:`, err)
+    return { plan: null, inputTokens: 0, outputTokens: 0 }
+  }
+}
+
+// ── Phase 2: PT/Rehab ─────────────────────────────────────────────────────────
 const PT_REHAB_SYSTEM_PROMPT = `You are an elite physical therapist and sports rehabilitation specialist with 15+ years of clinical experience. You are reviewing a drafted training plan to ensure athlete safety given their listed injury restrictions.
 
 Your job: identify any exercises that are contraindicated for the athlete's specific restrictions and replace them with safe, effective alternatives that target the same muscle groups and maintain the same training intent.
@@ -102,6 +127,59 @@ RULES:
 4. Update the coaching cue if the primary movement changed
 5. If NO changes are needed, return the plan completely unchanged
 6. Return ONLY the valid 7-day JSON array in the exact same format — no explanation, no markdown`
+
+// ── Phase 3: Sports Specialist ────────────────────────────────────────────────
+const SPORTS_SPECIALIST_SYSTEM_PROMPT = `You are an elite sports performance specialist with deep expertise in the physical and technical demands of specific sports. You are enhancing a training plan's sport-specific elements.
+
+YOUR SCOPE — modify ONLY these two fields:
+1. daily_session.warmup for each training day — make it genuinely sport-specific with real sport movements, drills, terminology, and culture from the athlete's sport. Use actual sport-specific exercises (e.g. for skateboarding: "Ride regular stance 3 min easy", "50-50 grinds 5 reps"; for basketball: "Full-court dribble 3 min", "Defensive slides 3×10 yards"). The tip should use sport culture language.
+2. coaching field for each training day — end with one sport-specific technical point relevant to today's primary movement pattern
+
+DO NOT CHANGE: any workout exercises, sets/reps, rest times, movements array, morning/abs/cooldown/evening blocks, rest days, or any field outside daily_session.warmup and coaching.
+
+Return ONLY the complete valid 7-day JSON array — no explanation, no markdown, no code blocks.`
+
+// ── Phase 3: Mobility Agent ───────────────────────────────────────────────────
+const MOBILITY_SYSTEM_PROMPT = `You are a world-class movement specialist and corrective exercise expert specializing in mobility, flexibility, and joint health for athletes.
+
+YOUR SCOPE — modify ONLY these three blocks:
+1. daily_session.morning for ALL 7 days — tailor exercises to the athlete's sport and address sport-specific tightness patterns (e.g. hip flexors for cyclists, ankle dorsiflexion for skateboarders, thoracic rotation for golfers). Each exercise should be specific and named, not generic.
+2. daily_session.cooldown for training days — target the exact primary muscles worked that day. If today was lower body, cooldown is lower body. If upper pull, cooldown is lats/biceps/rear delt.
+3. daily_session.evening for ALL 7 days — optimize for parasympathetic activation and next-day preparation. Include legs-up-wall, supine twists, diaphragmatic breathing, progressive muscle relaxation as appropriate.
+
+DO NOT CHANGE: warmup, workout, abs blocks, coaching cues, movements array, duration/label fields unless updating exercise content, or rest day structure.
+
+Return ONLY the complete valid 7-day JSON array — no explanation, no markdown, no code blocks.`
+
+// ── Phase 3: Mindset Agent ────────────────────────────────────────────────────
+const MINDSET_SYSTEM_PROMPT = `You are a sports psychologist and elite performance mindset coach specializing in Japanese warrior philosophy applied to modern athletic performance.
+
+The five principles you apply:
+- Mushin (無心): action without overthinking — automatic execution, no fear-freeze, full commitment
+- Kaizen (改善): small daily improvements compounding — 1% better every session beats intensity spikes
+- Shokunin (職人): master the process not the result — fall in love with the rep, the drill, the detail
+- Zanshin (残心): relaxed sustained awareness — fully present before, during, and after every action
+- Fudoshin (不動心): immovable mind under pressure — emotionally steady after mistakes or failure
+
+YOUR SCOPE — modify ONLY these two fields on TRAINING DAYS (not rest days):
+1. coaching — append one sentence applying the most relevant principle directly to today's session and movement pattern. Be specific, not generic. E.g. "Mushin — when the bar gets heavy, stop thinking and trust the pattern your body has built."
+2. daily_session.warmup.tip — replace with a sport-specific mental preparation cue using one of the five principles applied to the athlete's sport culture
+
+DO NOT CHANGE: any exercises, sets/reps, block structure, rest day content, or any field outside coaching and daily_session.warmup.tip.
+
+Return ONLY the complete valid 7-day JSON array — no explanation, no markdown, no code blocks.`
+
+// ── Phase 3: Recovery Agent ───────────────────────────────────────────────────
+const RECOVERY_SYSTEM_PROMPT = `You are a recovery science and periodization specialist with deep expertise in optimizing athlete recovery, deload protocols, and rest day programming.
+
+YOUR SCOPE — modify ONLY rest day content:
+1. daily_session on rest days (morning, abs, evening blocks) — replace generic content with evidence-based recovery modalities: contrast breathing sequences, progressive muscle relaxation, parasympathetic activation, gentle sport-specific mobility flows. Each exercise should be specific and named.
+2. coaching on rest days — replace with specific actionable recovery guidance tied to the previous day's training load and tomorrow's demands
+3. focus on rest days — update to reflect the specific recovery priority (e.g. "CNS recovery + hip mobility" rather than "Active recovery")
+
+DO NOT CHANGE: any training day content, warmup/workout/abs/cooldown blocks on training days, coaching on training days, or the training day structure.
+
+Return ONLY the complete valid 7-day JSON array — no explanation, no markdown, no code blocks.`
 
 function buildRehabPrompt(
   profile: Record<string, unknown>,
@@ -277,6 +355,47 @@ export async function POST(request: Request) {
         console.warn('PT/Rehab agent failed, using S&C draft:', ptErr)
       }
     }
+
+    // ── MIE Phase 3 — Full Agent Council ─────────────────────────────────────
+    const athleteContext = [
+      `Sport: ${profile.sport ?? 'General fitness'}`,
+      `Goal: ${profile.goal ?? 'General fitness'}`,
+      `Week: ${weekNumber} — ${phaseLabel}`,
+      profile.age ? `Age: ${profile.age}` : '',
+      profile.training_level ? `Experience: ${profile.training_level}` : '',
+    ].filter(Boolean).join('\n')
+
+    // Agent 3: Sports Specialist — enhances warmup blocks + coaching cues
+    const sportsResult = await runAgent(
+      SPORTS_SPECIALIST_SYSTEM_PROMPT,
+      `ATHLETE:\n${athleteContext}\n\nSPORT KNOWLEDGE:\n${knowledgeContext}\n\nCURRENT PLAN:\n${JSON.stringify(plan)}\n\nEnhance warmup blocks and coaching cues for sport-specificity. Return the complete modified 7-day JSON array:`,
+      'SportsSpecialist'
+    )
+    if (sportsResult.plan) { plan = sportsResult.plan; totalInput += sportsResult.inputTokens; totalOutput += sportsResult.outputTokens }
+
+    // Agent 4: Mobility Agent — enhances morning/cooldown/evening blocks
+    const mobilityResult = await runAgent(
+      MOBILITY_SYSTEM_PROMPT,
+      `ATHLETE:\n${athleteContext}\n${profile.restriction_areas ? `Restrictions: ${JSON.stringify(profile.restriction_areas)}` : ''}\n\nCURRENT PLAN:\n${JSON.stringify(plan)}\n\nEnhance morning, cooldown, and evening mobility blocks. Return the complete modified 7-day JSON array:`,
+      'Mobility'
+    )
+    if (mobilityResult.plan) { plan = mobilityResult.plan; totalInput += mobilityResult.inputTokens; totalOutput += mobilityResult.outputTokens }
+
+    // Agent 5: Mindset Agent — adds mindset layer to coaching cues + warmup tips
+    const mindsetResult = await runAgent(
+      MINDSET_SYSTEM_PROMPT,
+      `ATHLETE:\n${athleteContext}\n\nCURRENT PLAN:\n${JSON.stringify(plan)}\n\nAdd the mindset layer to training day coaching cues and warmup tips. Return the complete modified 7-day JSON array:`,
+      'Mindset'
+    )
+    if (mindsetResult.plan) { plan = mindsetResult.plan; totalInput += mindsetResult.inputTokens; totalOutput += mindsetResult.outputTokens }
+
+    // Agent 6: Recovery Agent — optimizes rest day programming
+    const recoveryResult = await runAgent(
+      RECOVERY_SYSTEM_PROMPT,
+      `ATHLETE:\n${athleteContext}\n\nCURRENT PLAN:\n${JSON.stringify(plan)}\n\nOptimize the rest day programming with evidence-based recovery content. Return the complete modified 7-day JSON array:`,
+      'Recovery'
+    )
+    if (recoveryResult.plan) { plan = recoveryResult.plan; totalInput += recoveryResult.inputTokens; totalOutput += recoveryResult.outputTokens }
 
     logTokens({
       operation: 'generate_plan',
