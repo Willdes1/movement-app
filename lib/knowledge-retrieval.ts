@@ -1,11 +1,17 @@
-import { openai } from './openai'
-import { createClient } from '@supabase/supabase-js'
+import { getOpenAI } from './openai'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-// Use service role for server-side knowledge retrieval (bypasses RLS)
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+let _supabaseAdmin: SupabaseClient | null = null
+
+function getSupabaseAdmin(): SupabaseClient {
+  if (!_supabaseAdmin) {
+    _supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabaseAdmin
+}
 
 export type KnowledgeItem = {
   id: string
@@ -17,15 +23,15 @@ export type KnowledgeItem = {
 }
 
 export async function embedText(text: string): Promise<number[]> {
-  const response = await openai.embeddings.create({
+  const response = await getOpenAI().embeddings.create({
     model: 'text-embedding-3-small',
-    input: text.slice(0, 8000), // model limit safety
+    input: text.slice(0, 8000),
   })
   return response.data[0].embedding
 }
 
 export async function embedBatch(texts: string[]): Promise<number[][]> {
-  const response = await openai.embeddings.create({
+  const response = await getOpenAI().embeddings.create({
     model: 'text-embedding-3-small',
     input: texts.map(t => t.slice(0, 8000)),
   })
@@ -39,7 +45,7 @@ export async function retrieveKnowledge(
 ): Promise<KnowledgeItem[]> {
   try {
     const embedding = await embedText(query)
-    const { data, error } = await supabaseAdmin.rpc('match_knowledge', {
+    const { data, error } = await getSupabaseAdmin().rpc('match_knowledge', {
       query_embedding: embedding,
       match_threshold: matchThreshold,
       match_count: matchCount,

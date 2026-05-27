@@ -1,11 +1,17 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { embedBatch } from '@/lib/knowledge-retrieval'
 import { logTokens } from '@/lib/log-tokens'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+let _admin: SupabaseClient | null = null
+function getSupabaseAdmin(): SupabaseClient {
+  if (!_admin) {
+    _admin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _admin
+}
 
 // ─── Seed content ──────────────────────────────────────────────────────────────
 
@@ -193,7 +199,7 @@ export async function POST(request: Request) {
     ]
 
     // Also pull exercises from exercise_library
-    const { data: exercises } = await supabaseAdmin
+    const { data: exercises } = await getSupabaseAdmin()
       .from('exercise_library')
       .select('name_normalized, name_display, how, breathing, core, tip')
       .not('how', 'is', null)
@@ -208,7 +214,7 @@ export async function POST(request: Request) {
     const allItems = [...staticItems, ...exerciseItems]
 
     // Check which titles already exist to skip re-embedding
-    const { data: existing } = await supabaseAdmin
+    const { data: existing } = await getSupabaseAdmin()
       .from('knowledge_items')
       .select('title')
     const existingTitles = new Set((existing ?? []).map(e => e.title))
@@ -233,7 +239,7 @@ export async function POST(request: Request) {
         embedding: embeddings[idx],
       }))
 
-      const { error } = await supabaseAdmin
+      const { error } = await getSupabaseAdmin()
         .from('knowledge_items')
         .upsert(rows, { onConflict: 'title' })
 
