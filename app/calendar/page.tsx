@@ -62,6 +62,8 @@ type ExerciseDetail = {
   tip: string
   video_url: string | null
   video_source: string | null
+  tts_url_male: string | null
+  tts_url_female: string | null
 }
 
 function extractYouTubeId(url: string): string | null {
@@ -233,7 +235,7 @@ function CalendarInner() {
       if (normalizedNames.length > 0) {
         const { data: libData } = await supabase
           .from('exercise_library')
-          .select('name_normalized, name_display, how, breathing, core, tip, video_url, video_source')
+          .select('name_normalized, name_display, how, breathing, core, tip, video_url, video_source, tts_url_male, tts_url_female')
           .in('name_normalized', normalizedNames)
         if (libData) {
           const libMap: Record<string, ExerciseDetail> = {}
@@ -258,7 +260,7 @@ function CalendarInner() {
     setExerciseFetching(true)
     try {
       // Check DB before calling AI — avoids charges on every tap
-      const { data: dbEntry } = await supabase.from('exercise_library').select('name_normalized, name_display, how, breathing, core, tip, video_url, video_source').eq('name_normalized', key).single()
+      const { data: dbEntry } = await supabase.from('exercise_library').select('name_normalized, name_display, how, breathing, core, tip, video_url, video_source, tts_url_male, tts_url_female').eq('name_normalized', key).single()
       if (dbEntry) {
         setExerciseLibrary(prev => ({ ...prev, [key]: dbEntry as ExerciseDetail }))
         setSelectedExercise(dbEntry as ExerciseDetail)
@@ -699,12 +701,16 @@ function CalendarInner() {
                     onClick={() => {
                       if (speaking || ttsLoading) { stop(); return }
                       const ex = selectedExercise
+                      const preUrl = gender === 'male' ? ex.tts_url_male : ex.tts_url_female
                       const parts = [ex.name_display]
                       if (ex.how) parts.push(ex.how)
                       if (ex.breathing) parts.push('Breathing: ' + ex.breathing)
                       if (ex.core) parts.push('Core engagement: ' + ex.core)
                       if (ex.tip) parts.push('Coaching tip: ' + ex.tip)
-                      speak(parts.join('. '))
+                      speak(parts.join('. '), {
+                        preGeneratedUrl: preUrl ?? undefined,
+                        nameNormalized: preUrl ? undefined : ex.name_normalized,
+                      })
                     }}
                     title={speaking ? 'Stop' : ttsLoading ? 'Loading…' : 'Read aloud'}
                     style={{

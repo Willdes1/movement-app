@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 
 export type TTSGender = 'male' | 'female'
 
-// Session cache: text → blob URL (avoids repeat API calls within a session)
+// Session cache: cacheKey → blob URL
 const audioCache = new Map<string, string>()
 
 export function useTTS() {
@@ -24,12 +24,31 @@ export function useTTS() {
     setLoading(false)
   }, [])
 
-  const speak = useCallback(async (text: string) => {
+  const playUrl = useCallback(async (url: string) => {
+    const audio = new Audio(url)
+    audioRef.current = audio
+    audio.onplay = () => { setLoading(false); setSpeaking(true) }
+    audio.onended = () => setSpeaking(false)
+    audio.onerror = () => { setSpeaking(false); setLoading(false) }
+    await audio.play()
+  }, [])
+
+  // speak: uses pre-generated CDN URL if provided, otherwise calls API (and auto-saves if nameNormalized given)
+  const speak = useCallback(async (
+    text: string,
+    opts?: { nameNormalized?: string; preGeneratedUrl?: string }
+  ) => {
     stop()
     setLoading(true)
 
+    // Fast path: pre-generated CDN URL
+    if (opts?.preGeneratedUrl) {
+      await playUrl(opts.preGeneratedUrl)
+      return
+    }
+
     const voice = gender === 'male' ? 'onyx' : 'nova'
-    const cacheKey = `${voice}:${text}`
+    const cacheKey = `${voice}:${text.slice(0, 80)}`
 
     try {
       let blobUrl = audioCache.get(cacheKey)
@@ -38,25 +57,20 @@ export function useTTS() {
         const res = await fetch('/api/tts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, voice }),
+          body: JSON.stringify({ text, voice, name_normalized: opts?.nameNormalized }),
         })
-        if (!res.ok) throw new Error('TTS API failed')
+        if (!res.ok) throw new Error('TTS failed')
         const blob = await res.blob()
         blobUrl = URL.createObjectURL(blob)
         audioCache.set(cacheKey, blobUrl)
       }
 
-      const audio = new Audio(blobUrl)
-      audioRef.current = audio
-      audio.onplay = () => { setLoading(false); setSpeaking(true) }
-      audio.onended = () => setSpeaking(false)
-      audio.onerror = () => { setSpeaking(false); setLoading(false) }
-      await audio.play()
+      await playUrl(blobUrl)
     } catch {
       setLoading(false)
       setSpeaking(false)
     }
-  }, [gender, stop])
+  }, [gender, stop, playUrl])
 
   const toggleGender = useCallback(() => {
     const next: TTSGender = gender === 'male' ? 'female' : 'male'
