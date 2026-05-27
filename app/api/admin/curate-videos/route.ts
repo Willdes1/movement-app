@@ -80,12 +80,16 @@ type YTVideo = {
 }
 
 // ─── Claude scoring ───────────────────────────────────────────────────────────
-async function scoreCandidates(exerciseName: string, exerciseHow: string, candidates: VideoDetail[]) {
+async function scoreCandidates(exerciseName: string, exerciseHow: string, candidates: VideoDetail[], strict = false) {
   if (candidates.length === 0) return []
 
   const candidateList = candidates.map((c, i) =>
     `[${i}] "${c.title}" by ${c.channelTitle} (${Math.round(c.viewCount / 1000)}K views, ${Math.round(c.duration / 60)} min)`
   ).join('\n')
+
+  const strictNote = strict
+    ? `\nBe strict about technique specificity. If the exercise has a specific movement pattern (e.g., directional descriptors, specific technique names), only videos clearly demonstrating that exact technique should score above 0.7. Generic or close-but-not-exact exercises should score below 0.5. It is acceptable to return fewer than 3 results if the candidates are poor matches.`
+    : ''
 
   const msg = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
@@ -100,7 +104,7 @@ How to perform it: "${exerciseHow ?? 'No description available'}"
 Candidates:
 ${candidateList}
 
-Pick the best 3. Always return exactly 3 (or all of them if fewer than 3 exist). Score each 0.0–1.0 and give one sentence of reasoning. Include lower-scoring options rather than returning fewer than 3.
+Pick the best 3. Always return exactly 3 (or all of them if fewer than 3 exist). Score each 0.0–1.0 and give one sentence of reasoning. Include lower-scoring options rather than returning fewer than 3.${strictNote}
 
 Return ONLY valid JSON array, no markdown:
 [{"index": 0, "score": 0.92, "reasoning": "..."}]`
@@ -119,7 +123,7 @@ Return ONLY valid JSON array, no markdown:
 // ─── Main handler ─────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   try {
-    const { exerciseId, batchSize = 10 } = await request.json().catch(() => ({}))
+    const { exerciseId, batchSize = 10, regenerate = false } = await request.json().catch(() => ({}))
 
     // Load approved channels
     const { data: channels } = await supabaseAdmin
@@ -169,12 +173,12 @@ export async function POST(request: Request) {
       ]
 
       const filtered = sorted.slice(0, batchSize)
-      const results = await processExercises(filtered, channels)
+      const results = await processExercises(filtered, channels, regenerate)
       return Response.json({ processed: results.length, results })
     }
 
     const { data: exercises } = await query
-    const results = await processExercises(exercises ?? [], channels)
+    const results = await processExercises(exercises ?? [], channels, regenerate)
     return Response.json({ processed: results.length, results })
 
   } catch (err) {
@@ -196,32 +200,82 @@ function buildSearchQuery(name: string): string {
     .trim()
 }
 
-async function processExercises(exercises: Exercise[], channels: Channel[]) {
+// Returns 2–4 query variations for regeneration: broader terms get more diverse YouTube results
+function buildAlternativeQueries(name: string): string[] {
+  const primary = buildSearchQuery(name)
+  const queries: string[] = [primary]
+
+  // Strip directional/side qualifiers e.g. "Toe-Side to Heel-Side", "Lateral to Medial"
+  const noDirectional = primary
+    .replace(/\b\w+-Side(\s+to\s+\w+-Side)?\b/gi, '')
+    .replace(/\b(clockwise|counterclockwise|lateral|medial|bilateral|unilateral|alternating|contralateral)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (noDirectional && noDirectional !== primary) queries.push(noDirectional)
+
+  // Core 2-word movement name (e.g., "Ankle Circles" from "Ankle Circles Toe-Side to Heel-Side")
+  const words = primary.split(' ')
+  if (words.length > 3) queries.push(words.slice(0, 2).join(' ') + ' exercise tutorial')
+  else if (words.length === 3) queries.push(words.slice(0, 2).join(' '))
+
+  // "How to" prefix for tutorial-focused results
+  const base = noDirectional || primary
+  queries.push('how to ' + base.toLowerCase().split(' ').slice(0, 4).join(' '))
+
+  return [...new Set(queries)].filter(q => q.length >= 5)
+}
+
+async function processExercises(exercises: Exercise[], channels: Channel[], regenerate = false) {
   const results = []
 
   for (const ex of exercises) {
     try {
-      const searchQuery = buildSearchQuery(ex.name_display)
       const apiErrors: string[] = []
-
-      // Search top 2 approved channels
       const allVideoIds: string[] = []
-      for (const ch of channels.slice(0, 2)) {
-        const { ids, error } = await searchChannel(ch.channel_id, searchQuery)
-        if (error) apiErrors.push(error)
-        allVideoIds.push(...ids)
-        if (allVideoIds.length >= 6) break
-      }
 
-      // Fallback: open YouTube search when approved channels have nothing
-      if (allVideoIds.length === 0) {
-        const { ids: fallbackIds, error } = await searchGeneral(searchQuery)
-        if (error) apiErrors.push(error)
-        allVideoIds.push(...fallbackIds)
+      if (regenerate) {
+        // Regenerate: try multiple query variations across ALL approved channels
+        const queries = buildAlternativeQueries(ex.name_display)
+        const channelPool = channels  // all channels, not just top 2
+
+        for (const q of queries) {
+          for (const ch of channelPool) {
+            const { ids, error } = await searchChannel(ch.channel_id, q)
+            if (error) apiErrors.push(error)
+            allVideoIds.push(...ids)
+          }
+          if (allVideoIds.length >= 9) break
+        }
+
+        // Broader fallback: try each query variant against general YouTube
+        if (allVideoIds.length < 3) {
+          for (const q of queries) {
+            const { ids, error } = await searchGeneral(q)
+            if (error) apiErrors.push(error)
+            allVideoIds.push(...ids)
+            if (allVideoIds.length >= 8) break
+          }
+        }
+      } else {
+        // Normal path: single query, top 2 channels
+        const searchQuery = buildSearchQuery(ex.name_display)
+
+        for (const ch of channels.slice(0, 2)) {
+          const { ids, error } = await searchChannel(ch.channel_id, searchQuery)
+          if (error) apiErrors.push(error)
+          allVideoIds.push(...ids)
+          if (allVideoIds.length >= 6) break
+        }
+
+        if (allVideoIds.length === 0) {
+          const { ids: fallbackIds, error } = await searchGeneral(searchQuery)
+          if (error) apiErrors.push(error)
+          allVideoIds.push(...fallbackIds)
+        }
       }
 
       const unique = [...new Set(allVideoIds)]
-      const details = await getVideoDetails(unique.slice(0, 8))
+      const details = await getVideoDetails(unique.slice(0, 12))
 
       if (details.length === 0) {
         const errSuffix = apiErrors.length ? ` [${apiErrors[0]}]` : ''
@@ -229,13 +283,14 @@ async function processExercises(exercises: Exercise[], channels: Channel[]) {
         continue
       }
 
-      // Score with Claude
-      const scored = await scoreCandidates(ex.name_display, ex.how ?? '', details)
+      // Score with Claude (strict mode on regenerate to avoid low-quality approvals)
+      const scored = await scoreCandidates(ex.name_display, ex.how ?? '', details, regenerate)
+      const minScore = regenerate ? 0.35 : 0.2
       const top3 = scored
         .sort((a, b) => b.score - a.score)
         .slice(0, 3)
         .map(s => ({ ...s, detail: details[s.index] }))
-        .filter(s => s.detail && s.score >= 0.2)
+        .filter(s => s.detail && s.score >= minScore)
 
       if (top3.length === 0) {
         results.push({ exercise: ex.name_display, status: 'no_good_matches' })

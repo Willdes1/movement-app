@@ -154,13 +154,13 @@ export default function VideoCurationTab() {
     setRunning(false)
   }
 
-  async function runSingle(exerciseId: string) {
+  async function runSingle(exerciseId: string, regenerate = false) {
     setActing(exerciseId)
     try {
       await fetch('/api/admin/curate-videos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ exerciseId }),
+        body: JSON.stringify({ exerciseId, regenerate }),
       })
       await loadExercises()
     } catch { /* ignore */ }
@@ -189,7 +189,7 @@ export default function VideoCurationTab() {
       .update({ status: 'rejected', reviewed_at: new Date().toISOString(), reviewed_by: user?.id })
       .eq('exercise_id', exerciseId)
       .eq('status', 'proposed')
-    await runSingle(exerciseId)
+    await runSingle(exerciseId, true)  // regenerate=true: uses varied queries so results differ
     setActing(null)
   }
 
