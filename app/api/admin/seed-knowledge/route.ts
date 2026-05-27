@@ -180,14 +180,7 @@ type SeedItem = {
 
 // ─── Route ─────────────────────────────────────────────────────────────────────
 
-export async function POST(request: Request) {
-  // Admin auth check
-  const authHeader = request.headers.get('authorization') ?? ''
-  if (authHeader !== `Bearer ${process.env.ADMIN_SEED_SECRET}` &&
-      process.env.NODE_ENV !== 'development') {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
+export async function POST() {
   const results = { seeded: 0, skipped: 0, errors: [] as string[] }
 
   try {

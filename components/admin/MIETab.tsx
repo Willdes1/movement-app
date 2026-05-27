@@ -43,10 +43,7 @@ export default function MIETab() {
     setSeeding(true)
     setSeedResult(null)
     try {
-      const res = await fetch('/api/admin/seed-knowledge', {
-        method: 'POST',
-        headers: { authorization: `Bearer ${process.env.NEXT_PUBLIC_ADMIN_SEED_SECRET ?? 'dev'}` },
-      })
+      const res = await fetch('/api/admin/seed-knowledge', { method: 'POST' })
       const data = await res.json()
       setSeedResult(data.message ?? data.error ?? 'Done')
       await loadStats()
