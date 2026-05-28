@@ -145,7 +145,7 @@ function AccountPageInner() {
       .eq('status', 'active')
       .maybeSingle()
     if (data) {
-      const coachName = (data.profiles as { name: string } | null)?.name
+      const coachName = (data.profiles as unknown as { name: string }[] | null)?.[0]?.name
       setCurrentCoach(coachName ?? 'Connected')
     }
     setCoachChecked(true)
