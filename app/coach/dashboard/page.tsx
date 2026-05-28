@@ -1,59 +1,291 @@
 'use client'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+
+interface Stats { activeClients: number; totalPrograms: number; activeAssignments: number }
+
+interface RecentRow {
+  id: string
+  client_name: string
+  program_name: string
+  start_date: string
+  status: string
+  client_id: string
+}
+
+const STATUS_DOT: Record<string, string> = {
+  active: '#22c55e', completed: '#3b82f6', paused: '#f59e0b', cancelled: '#6b7280',
+}
 
 export default function CoachDashboardPage() {
   const { user } = useAuth()
+  const router = useRouter()
+  const [stats, setStats]             = useState<Stats>({ activeClients: 0, totalPrograms: 0, activeAssignments: 0 })
+  const [recent, setRecent]           = useState<RecentRow[]>([])
+  const [inviteCode, setInviteCode]   = useState<string | null>(null)
+  const [loading, setLoading]         = useState(true)
+  const [genLoading, setGenLoading]   = useState(false)
+  const [copied, setCopied]           = useState(false)
+
+  useEffect(() => { if (user) load() }, [user])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function load() {
+    setLoading(true)
+
+    const [clientsRes, programsRes, assignRes, codesRes] = await Promise.all([
+      supabase.from('coach_clients').select('id', { count: 'exact', head: true }).eq('coach_id', user!.id).eq('status', 'active'),
+      supabase.from('coach_programs').select('id', { count: 'exact', head: true }).eq('coach_id', user!.id),
+      supabase.from('coach_program_assignments').select('id', { count: 'exact', head: true }).eq('coach_id', user!.id).eq('status', 'active'),
+      supabase.from('coach_invite_codes').select('code').eq('coach_id', user!.id).eq('active', true).order('created_at', { ascending: false }).limit(1),
+    ])
+
+    setStats({
+      activeClients:    clientsRes.count  ?? 0,
+      totalPrograms:    programsRes.count ?? 0,
+      activeAssignments: assignRes.count  ?? 0,
+    })
+
+    const codes = (codesRes.data ?? []) as { code: string }[]
+    if (codes.length) setInviteCode(codes[0].code)
+
+    // Recent assignments with client names
+    const { data: assignData } = await supabase
+      .from('coach_program_assignments')
+      .select('id, client_id, status, start_date, coach_programs(name)')
+      .eq('coach_id', user!.id)
+      .order('created_at', { ascending: false })
+      .limit(8)
+
+    if (assignData?.length) {
+      const ids = [...new Set((assignData as any[]).map(a => a.client_id))]
+      const { data: profiles } = await supabase.from('profiles').select('id, name').in('id', ids)
+      const nameMap = new Map((profiles ?? []).map((p: any) => [p.id, p.name ?? 'Unknown']))
+      setRecent((assignData as any[]).map(a => ({
+        id: a.id,
+        client_id: a.client_id,
+        client_name: nameMap.get(a.client_id) ?? 'Unknown',
+        program_name: (a.coach_programs as { name: string }[])?.[0]?.name ?? 'Program',
+        start_date: a.start_date,
+        status: a.status,
+      })))
+    }
+
+    setLoading(false)
+  }
+
+  async function generateCode() {
+    setGenLoading(true)
+    // Deactivate existing codes
+    await supabase.from('coach_invite_codes').update({ active: false }).eq('coach_id', user!.id)
+    const code = (Math.random().toString(36).substring(2, 6) + Math.random().toString(36).substring(2, 6)).toUpperCase()
+    const { error } = await supabase.from('coach_invite_codes').insert({ coach_id: user!.id, code, active: true })
+    if (!error) setInviteCode(code)
+    setGenLoading(false)
+  }
+
+  async function copyCode() {
+    if (!inviteCode) return
+    await navigator.clipboard.writeText(inviteCode)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  function fmtDate(iso: string) {
+    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
+  function initials(name: string) {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+  }
 
   return (
     <div style={{ padding: '40px 40px 80px', maxWidth: 1100 }}>
-      <div style={{ marginBottom: 40 }}>
+      {/* Header */}
+      <div style={{ marginBottom: 32 }}>
         <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>
           Coach Portal
         </div>
-        <h1 style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.03em', marginBottom: 6 }}>Dashboard</h1>
-        <p style={{ fontSize: 14, color: 'var(--text-dim)' }}>Welcome back. Your clients and programs will appear here.</p>
+        <h1 style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.03em', margin: 0 }}>Dashboard</h1>
       </div>
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-        gap: 16,
-        marginBottom: 40,
-      }}>
+      {/* Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14, marginBottom: 26 }}>
         {[
-          { label: 'Active Clients',     value: '—', icon: '👥' },
-          { label: 'Active Programs',    value: '—', icon: '📋' },
-          { label: 'Pending Check-ins',  value: '—', icon: '📬' },
-          { label: 'Affiliate Earnings', value: '$0', icon: '💰' },
+          { label: 'Active Clients',     value: stats.activeClients,     icon: '👥', href: '/coach/clients' },
+          { label: 'Total Programs',     value: stats.totalPrograms,     icon: '📋', href: '/coach/programs' },
+          { label: 'Active Assignments', value: stats.activeAssignments, icon: '⚡', href: null },
         ].map(card => (
           <div
             key={card.label}
+            onClick={card.href ? () => router.push(card.href!) : undefined}
             style={{
-              background: 'var(--surface2)',
-              border: '1px solid var(--border)',
-              borderRadius: 14,
-              padding: '20px 24px',
+              background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 14,
+              padding: '20px 22px', cursor: card.href ? 'pointer' : 'default',
             }}
           >
             <div style={{ fontSize: 22, marginBottom: 8 }}>{card.icon}</div>
-            <div style={{ fontSize: 26, fontWeight: 900, letterSpacing: '-0.03em', marginBottom: 2 }}>{card.value}</div>
+            <div style={{ fontSize: 30, fontWeight: 900, letterSpacing: '-0.03em', marginBottom: 2 }}>
+              {loading ? '…' : card.value}
+            </div>
             <div style={{ fontSize: 12, color: 'var(--text-dim)', fontWeight: 600 }}>{card.label}</div>
           </div>
         ))}
       </div>
 
-      <div style={{
-        background: 'var(--surface2)',
-        border: '1px solid var(--border)',
-        borderRadius: 14,
-        padding: '24px',
-        color: 'var(--text-dim)',
-        fontSize: 13,
-        lineHeight: 1.7,
-      }}>
-        <strong style={{ color: 'var(--text)', display: 'block', marginBottom: 8 }}>🚧 Under Construction</strong>
-        Coach portal is in active development. Next up: client management, program builder, and AI generation pipeline.
+      {/* Invite Code + Quick Actions */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 26 }}>
+        {/* Invite code */}
+        <div style={{ background: 'var(--surface2)', border: '1px solid var(--accent-border, rgba(59,130,246,0.3))', borderRadius: 14, padding: '22px' }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>
+            Client Invite Code
+          </div>
+          <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16, lineHeight: 1.6 }}>
+            Share this code with clients. They enter it in their Account page to join your roster instantly.
+          </p>
+
+          {inviteCode ? (
+            <>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
+                <div style={{
+                  flex: 1, background: 'var(--surface)', border: '1px solid var(--border)',
+                  borderRadius: 10, padding: '12px 16px', fontFamily: 'monospace',
+                  fontSize: 24, fontWeight: 900, letterSpacing: '0.15em', color: 'var(--accent)', textAlign: 'center',
+                }}>
+                  {inviteCode}
+                </div>
+                <button
+                  onClick={copyCode}
+                  style={{
+                    padding: '12px 18px', borderRadius: 10, border: 'none',
+                    background: copied ? '#22c55e' : 'var(--accent)', color: '#fff',
+                    fontWeight: 700, fontSize: 13, cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit',
+                  }}
+                >
+                  {copied ? '✓' : 'Copy'}
+                </button>
+              </div>
+              <button
+                onClick={generateCode}
+                disabled={genLoading}
+                style={{ fontSize: 11, color: 'var(--text-dim)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+              >
+                {genLoading ? 'Regenerating…' : '↺ Regenerate code'}
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={generateCode}
+              disabled={genLoading}
+              style={{
+                width: '100%', padding: '12px', borderRadius: 10, border: 'none',
+                background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 14,
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              {genLoading ? 'Generating…' : '+ Generate Invite Code'}
+            </button>
+          )}
+        </div>
+
+        {/* Quick actions */}
+        <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 14, padding: '22px' }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 14 }}>
+            Quick Actions
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[
+              { label: '+ Build New Program', href: '/coach/builder', primary: true },
+              { label: '📋 All Programs',     href: '/coach/programs' },
+              { label: '👥 Clients',          href: '/coach/clients' },
+            ].map(item => (
+              <button
+                key={item.href}
+                onClick={() => router.push(item.href)}
+                style={{
+                  padding: '10px 14px', borderRadius: 9, textAlign: 'left', fontFamily: 'inherit',
+                  border: item.primary ? 'none' : '1px solid var(--border)',
+                  background: item.primary ? 'var(--accent)' : 'var(--surface)',
+                  color: item.primary ? '#fff' : 'var(--text)',
+                  fontWeight: 700, fontSize: 13, cursor: 'pointer',
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
+
+      {/* Recent assignments */}
+      {(loading || recent.length > 0) && (
+        <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 14, padding: '22px' }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 16 }}>
+            Recent Assignments
+          </div>
+          {loading ? (
+            <p style={{ fontSize: 13, color: 'var(--text-dim)' }}>Loading…</p>
+          ) : (
+            <div>
+              {recent.map((a, i) => (
+                <div
+                  key={a.id}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 14,
+                    padding: '10px 0',
+                    borderBottom: i < recent.length - 1 ? '1px solid var(--border)' : 'none',
+                  }}
+                >
+                  <div style={{
+                    width: 34, height: 34, borderRadius: '50%',
+                    background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
+                    color: 'var(--accent)', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', fontSize: 11, fontWeight: 800, flexShrink: 0,
+                  }}>
+                    {initials(a.client_name)}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <button
+                      onClick={() => router.push(`/coach/clients/${a.client_id}`)}
+                      style={{ fontSize: 13, fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--text)', textAlign: 'left' }}
+                    >
+                      {a.client_name}
+                    </button>
+                    <span style={{ fontSize: 12, color: 'var(--text-dim)', marginLeft: 8 }}>{a.program_name}</span>
+                  </div>
+                  <span style={{ fontSize: 11, color: 'var(--text-dim)', flexShrink: 0 }}>
+                    {fmtDate(a.start_date)}
+                  </span>
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em',
+                    color: STATUS_DOT[a.status] ?? '#6b7280', flexShrink: 0,
+                  }}>
+                    {a.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && recent.length === 0 && stats.activeClients === 0 && (
+        <div style={{ textAlign: 'center', padding: '48px 40px', border: '2px dashed var(--border)', borderRadius: 16 }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>🚀</div>
+          <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Ready to coach</div>
+          <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 24, maxWidth: 360, margin: '0 auto 24px' }}>
+            Generate your invite code above, share it with clients, then build your first program.
+          </div>
+          <button
+            onClick={() => router.push('/coach/builder')}
+            style={{ padding: '12px 28px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 12, fontWeight: 800, fontSize: 14, cursor: 'pointer' }}
+          >
+            Build First Program
+          </button>
+        </div>
+      )}
     </div>
   )
 }

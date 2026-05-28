@@ -48,6 +48,14 @@ function AccountPageInner() {
   const [promoError, setPromoError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Coach connection
+  const [coachCode, setCoachCode]       = useState('')
+  const [coachLoading, setCoachLoading] = useState(false)
+  const [coachMsg, setCoachMsg]         = useState('')
+  const [coachError, setCoachError]     = useState('')
+  const [currentCoach, setCurrentCoach] = useState<string | null>(null)
+  const [coachChecked, setCoachChecked] = useState(false)
+
   // Training background
   const [trainingLevel, setTrainingLevel] = useState('')
   const [workoutBackground, setWorkoutBackground] = useState('')
@@ -126,6 +134,44 @@ function AccountPageInner() {
   async function handleSignOut() {
     await signOut()
     router.push('/auth')
+  }
+
+  async function checkCurrentCoach() {
+    if (!user || coachChecked) return
+    const { data } = await supabase
+      .from('coach_clients')
+      .select('coach_id, profiles!coach_clients_coach_id_fkey(name)')
+      .eq('client_id', user.id)
+      .eq('status', 'active')
+      .maybeSingle()
+    if (data) {
+      const coachName = (data.profiles as { name: string } | null)?.name
+      setCurrentCoach(coachName ?? 'Connected')
+    }
+    setCoachChecked(true)
+  }
+
+  async function redeemCoachCode() {
+    if (!coachCode.trim() || !user) return
+    setCoachLoading(true)
+    setCoachError('')
+    setCoachMsg('')
+    try {
+      const res = await fetch('/api/coach/redeem-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: coachCode.trim().toUpperCase(), userId: user.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setCoachError(data.error ?? 'Invalid code'); return }
+      setCoachMsg(`Connected! You've joined ${data.coachName}'s roster.`)
+      setCurrentCoach(data.coachName)
+      setCoachCode('')
+    } catch {
+      setCoachError('Something went wrong. Try again.')
+    } finally {
+      setCoachLoading(false)
+    }
   }
 
   async function redeemCode() {
@@ -528,6 +574,44 @@ function AccountPageInner() {
           </button>
         </div>
       </div>
+
+      {/* Connect with a Coach */}
+      {role !== 'coach' && role !== 'admin' && (
+        <div
+          style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '16px', marginBottom: 20 }}
+          onFocus={checkCurrentCoach}
+          onClick={checkCurrentCoach}
+        >
+          <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Have a coach?</p>
+          {currentCoach ? (
+            <p style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600 }}>✓ Connected to {currentCoach}</p>
+          ) : (
+            <>
+              <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10, lineHeight: 1.5 }}>
+                Enter your coach&apos;s invite code to join their roster and receive assigned programs.
+              </p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  value={coachCode}
+                  onChange={e => setCoachCode(e.target.value.toUpperCase())}
+                  placeholder="ENTER COACH CODE"
+                  maxLength={10}
+                  style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontSize: 13, letterSpacing: '0.06em', fontFamily: 'inherit', outline: 'none' }}
+                />
+                <button
+                  onClick={redeemCoachCode}
+                  disabled={coachLoading || !coachCode.trim()}
+                  style={{ padding: '10px 18px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: coachLoading || !coachCode.trim() ? 'default' : 'pointer', opacity: coachLoading || !coachCode.trim() ? 0.5 : 1, fontFamily: 'inherit' }}
+                >
+                  {coachLoading ? '…' : 'Join'}
+                </button>
+              </div>
+              {coachMsg && <p style={{ fontSize: 12, color: 'var(--green)', marginTop: 8, fontWeight: 600 }}>{coachMsg}</p>}
+              {coachError && <p style={{ fontSize: 12, color: 'rgba(255,100,100,0.9)', marginTop: 8 }}>{coachError}</p>}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Actions */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
