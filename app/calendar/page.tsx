@@ -131,6 +131,8 @@ function fallbackDetail(m: string, _day: DayPlan): ExerciseDetail {
     tip: null as unknown as string,
     video_url: null,
     video_source: null,
+    tts_url_male: null,
+    tts_url_female: null,
   }
 }
 
