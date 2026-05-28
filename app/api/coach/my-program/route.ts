@@ -1,0 +1,70 @@
+import { createClient } from '@supabase/supabase-js'
+
+export const runtime = 'nodejs'
+
+function getServiceClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
+
+export async function GET(request: Request) {
+  try {
+    // Verify caller's identity via their JWT
+    const token = request.headers.get('Authorization')?.replace('Bearer ', '')
+    if (!token) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const anonClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { global: { headers: { Authorization: `Bearer ${token}` } } }
+    )
+    const { data: { user }, error: authErr } = await anonClient.auth.getUser()
+    if (authErr || !user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const supabase = getServiceClient()
+
+    // Get active assignment for this client
+    const { data: assignment } = await supabase
+      .from('coach_program_assignments')
+      .select('id, program_id, coach_id, start_date, status, created_at, coach_programs(id, name, weeks_total, notes, description)')
+      .eq('client_id', user.id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (!assignment) return Response.json({ assignment: null })
+
+    // Get coach name
+    const { data: coachProfile } = await supabase
+      .from('profiles')
+      .select('name')
+      .eq('id', assignment.coach_id)
+      .single()
+
+    // Get all weeks for this program
+    const { data: weeks } = await supabase
+      .from('coach_program_weeks')
+      .select('id, week_number, label, phase, days, coach_notes')
+      .eq('program_id', assignment.program_id)
+      .order('week_number', { ascending: true })
+
+    const program = (assignment.coach_programs as Record<string, unknown>[] | null)?.[0] ?? null
+
+    return Response.json({
+      assignment: {
+        id: assignment.id,
+        start_date: assignment.start_date,
+        status: assignment.status,
+      },
+      program,
+      weeks: weeks ?? [],
+      coachName: coachProfile?.name ?? 'Your Coach',
+    })
+  } catch (err) {
+    console.error('my-program error:', err)
+    return Response.json({ error: 'Failed to load program' }, { status: 500 })
+  }
+}

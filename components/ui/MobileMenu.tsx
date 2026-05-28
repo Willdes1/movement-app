@@ -6,10 +6,11 @@ import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 
 const MENU_ITEMS = [
-  { href: '/for-you',   label: 'For You',          desc: 'Daily feed & mindset',      emoji: '⚡' },
+  { href: '/for-you',   label: 'For You',          desc: 'Daily feed & mindset',       emoji: '⚡' },
   { href: '/exercises', label: 'Exercise Library',  desc: 'Search & explore movements', emoji: '📚' },
-  { href: '/log',       label: 'History',           desc: 'Your workout log',           emoji: '📋' },
+  { href: '/log',       label: 'History',           desc: 'Your workout log',            emoji: '📋' },
   { href: '/recovery',  label: 'Recovery',          desc: 'Active recovery tracking',   emoji: '🩹' },
+  { href: '/my-coach',  label: 'My Coach',          desc: 'Coach-assigned program',     emoji: '🏋️' },
 ]
 
 export default function MobileMenu() {
