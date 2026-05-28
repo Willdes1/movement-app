@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -826,31 +826,45 @@ const OP_LABEL: Record<string, string> = {
 }
 
 // ─── MEDIA LIBRARY TAB ────────────────────────────────────────────────────────
-type MediaRow = { exercise_normalized: string; name_display: string; youtube_url: string | null; image_url: string | null; notes: string | null }
+type MediaRow = { exercise_normalized: string; name_display: string; youtube_url: string | null; image_url: string | null; notes: string | null; tts_url_male: string | null; tts_url_female: string | null }
 type MediaEdits = { youtube_url: string; image_url: string; notes: string }
 
 function MediaLibraryTab() {
   const [rows, setRows] = useState<MediaRow[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<'all' | 'no_video' | 'no_image'>('all')
+  const [filter, setFilter] = useState<'all' | 'no_video' | 'no_image' | 'no_tts'>('all')
   const [editingRow, setEditingRow] = useState<string | null>(null)
   const [editValues, setEditValues] = useState<MediaEdits>({ youtube_url: '', image_url: '', notes: '' })
   const [saving, setSaving] = useState(false)
   const [flashSaved, setFlashSaved] = useState<string | null>(null)
+  const [playingId, setPlayingId] = useState<string | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  function playAudio(url: string, id: string) {
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
+    if (playingId === id) { setPlayingId(null); return }
+    const audio = new Audio(url)
+    audioRef.current = audio
+    setPlayingId(id)
+    audio.play()
+    audio.onended = () => setPlayingId(null)
+  }
 
   async function load() {
     const [{ data: lib }, { data: media }] = await Promise.all([
-      supabase.from('exercise_library').select('name_normalized, name_display').order('name_display'),
+      supabase.from('exercise_library').select('name_normalized, name_display, tts_url_male, tts_url_female').order('name_display'),
       supabase.from('exercise_media').select('exercise_normalized, youtube_url, image_url, notes'),
     ])
     const mediaMap = new Map(media?.map(m => [m.exercise_normalized, m]) ?? [])
-    setRows((lib ?? []).map(l => ({
+    setRows((lib ?? []).map((l: { name_normalized: string; name_display: string; tts_url_male: string | null; tts_url_female: string | null }) => ({
       exercise_normalized: l.name_normalized,
       name_display: l.name_display,
       youtube_url: mediaMap.get(l.name_normalized)?.youtube_url ?? null,
       image_url: mediaMap.get(l.name_normalized)?.image_url ?? null,
       notes: mediaMap.get(l.name_normalized)?.notes ?? null,
+      tts_url_male: l.tts_url_male,
+      tts_url_female: l.tts_url_female,
     })))
     setLoading(false)
   }
@@ -890,12 +904,13 @@ function MediaLibraryTab() {
   const filtered = rows.filter(r => {
     const q = search.toLowerCase()
     const matchSearch = !q || r.name_display.toLowerCase().includes(q) || r.exercise_normalized.includes(q)
-    const matchFilter = filter === 'all' || (filter === 'no_video' && !r.youtube_url) || (filter === 'no_image' && !r.image_url)
+    const matchFilter = filter === 'all' || (filter === 'no_video' && !r.youtube_url) || (filter === 'no_image' && !r.image_url) || (filter === 'no_tts' && !r.tts_url_male)
     return matchSearch && matchFilter
   })
 
   const hasVideo = rows.filter(r => r.youtube_url).length
   const hasImage = rows.filter(r => r.image_url).length
+  const hasTTS   = rows.filter(r => r.tts_url_male).length
   const inputSt: React.CSSProperties = { background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 6, color: C.text, fontSize: 12, padding: '5px 8px', width: '100%', fontFamily: 'inherit', boxSizing: 'border-box' }
   const filterBtn = (id: typeof filter, label: string) => (
     <button onClick={() => setFilter(id)} style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${filter === id ? C.accentBorder : C.border}`, background: filter === id ? C.accentDim : 'transparent', color: filter === id ? C.accent : C.textMid, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{label}</button>
@@ -908,7 +923,7 @@ function MediaLibraryTab() {
         <div>
           <p style={{ fontWeight: 700, fontSize: 15 }}>Media Library</p>
           <p style={{ fontSize: 12, color: C.textDim, marginTop: 2 }}>
-            {rows.length} exercises · <span style={{ color: C.green }}>{hasVideo} with video</span> · <span style={{ color: C.accent }}>{hasImage} with image</span>
+            {rows.length} exercises · <span style={{ color: C.green }}>{hasVideo} with video</span> · <span style={{ color: C.accent }}>{hasImage} with image</span> · <span style={{ color: '#a78bfa' }}>{hasTTS} with TTS</span>
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -923,6 +938,7 @@ function MediaLibraryTab() {
         {filterBtn('all', 'All')}
         {filterBtn('no_video', `Missing video (${rows.filter(r => !r.youtube_url).length})`)}
         {filterBtn('no_image', `Missing image (${rows.filter(r => !r.image_url).length})`)}
+        {filterBtn('no_tts', `Missing TTS (${rows.filter(r => !r.tts_url_male).length})`)}
       </div>
 
       {loading && <p style={{ fontSize: 12, color: C.textDim }}>Loading…</p>}
@@ -931,8 +947,8 @@ function MediaLibraryTab() {
       {!loading && (
         <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
           {/* Column headers */}
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 2fr 1.5fr 80px', gap: 0, background: C.surface2, padding: '8px 14px', borderBottom: `1px solid ${C.border}` }}>
-            {['EXERCISE', 'YOUTUBE URL', 'IMAGE URL', 'NOTES', ''].map((h, i) => (
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 2fr 1fr 80px', gap: 0, background: C.surface2, padding: '8px 14px', borderBottom: `1px solid ${C.border}` }}>
+            {['EXERCISE', 'YOUTUBE URL', 'IMAGE URL', 'TTS AUDIO', ''].map((h, i) => (
               <span key={i} style={{ fontSize: 10, fontWeight: 700, color: C.textDim, letterSpacing: '0.07em' }}>{h}</span>
             ))}
           </div>
@@ -944,7 +960,7 @@ function MediaLibraryTab() {
               return (
                 <div
                   key={row.exercise_normalized}
-                  style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 2fr 1.5fr 80px', gap: 0, padding: '10px 14px', borderBottom: `1px solid ${C.border}`, alignItems: 'center', background: isSavedFlash ? 'rgba(34,197,94,0.06)' : isEditing ? 'rgba(59,130,246,0.04)' : 'transparent', transition: 'background 0.3s' }}
+                  style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 2fr 1fr 80px', gap: 0, padding: '10px 14px', borderBottom: `1px solid ${C.border}`, alignItems: 'center', background: isSavedFlash ? 'rgba(34,197,94,0.06)' : isEditing ? 'rgba(59,130,246,0.04)' : 'transparent', transition: 'background 0.3s' }}
                 >
                   {/* Exercise name */}
                   <div>
@@ -972,14 +988,24 @@ function MediaLibraryTab() {
                     }
                   </div>
 
-                  {/* Notes */}
-                  <div style={{ paddingRight: 8 }}>
-                    {isEditing
-                      ? <input value={editValues.notes} onChange={e => setEditValues(v => ({ ...v, notes: e.target.value }))} placeholder="Optional notes…" style={inputSt} />
-                      : <span style={{ fontSize: 12, color: row.notes ? C.textMid : C.textDim }}>
-                          {row.notes ? (row.notes.length > 30 ? row.notes.slice(0, 30) + '…' : row.notes) : '—'}
-                        </span>
-                    }
+                  {/* TTS Audio */}
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {row.tts_url_male ? (
+                      <button
+                        onClick={() => playAudio(row.tts_url_male!, `male-${row.exercise_normalized}`)}
+                        style={{ padding: '3px 8px', borderRadius: 5, border: `1px solid ${playingId === `male-${row.exercise_normalized}` ? C.accentBorder : 'rgba(59,130,246,0.25)'}`, background: playingId === `male-${row.exercise_normalized}` ? C.accentDim : 'rgba(59,130,246,0.07)', color: C.accent, fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                      >
+                        {playingId === `male-${row.exercise_normalized}` ? '⏸' : '▶'} ♂
+                      </button>
+                    ) : <span style={{ fontSize: 10, color: C.textDim }}>♂ —</span>}
+                    {row.tts_url_female ? (
+                      <button
+                        onClick={() => playAudio(row.tts_url_female!, `female-${row.exercise_normalized}`)}
+                        style={{ padding: '3px 8px', borderRadius: 5, border: `1px solid ${playingId === `female-${row.exercise_normalized}` ? C.accentBorder : 'rgba(168,85,247,0.25)'}`, background: playingId === `female-${row.exercise_normalized}` ? 'rgba(168,85,247,0.12)' : 'rgba(168,85,247,0.07)', color: '#a78bfa', fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                      >
+                        {playingId === `female-${row.exercise_normalized}` ? '⏸' : '▶'} ♀
+                      </button>
+                    ) : <span style={{ fontSize: 10, color: C.textDim }}>♀ —</span>}
                   </div>
 
                   {/* Actions */}
