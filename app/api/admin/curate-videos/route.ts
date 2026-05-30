@@ -225,10 +225,7 @@ function buildAlternativeQueries(name: string): string[] {
   return [...new Set(queries)].filter(q => q.length >= 5)
 }
 
-async function processExercises(exercises: Exercise[], channels: Channel[], regenerate = false) {
-  const results = []
-
-  for (const ex of exercises) {
+async function processOne(ex: Exercise, channels: Channel[], regenerate: boolean) {
     try {
       const apiErrors: string[] = []
       const allVideoIds: string[] = []
@@ -279,8 +276,7 @@ async function processExercises(exercises: Exercise[], channels: Channel[], rege
 
       if (details.length === 0) {
         const errSuffix = apiErrors.length ? ` [${apiErrors[0]}]` : ''
-        results.push({ exercise: ex.name_display, status: 'no_results', error: errSuffix || undefined })
-        continue
+        return { exercise: ex.name_display, status: 'no_results', error: errSuffix || undefined }
       }
 
       // Score with Claude (strict mode on regenerate to avoid low-quality approvals)
@@ -293,8 +289,7 @@ async function processExercises(exercises: Exercise[], channels: Channel[], rege
         .filter(s => s.detail && s.score >= minScore)
 
       if (top3.length === 0) {
-        results.push({ exercise: ex.name_display, status: 'no_good_matches' })
-        continue
+        return { exercise: ex.name_display, status: 'no_good_matches' }
       }
 
       // Write candidates to DB
@@ -314,11 +309,20 @@ async function processExercises(exercises: Exercise[], channels: Channel[], rege
       }))
 
       await supabaseAdmin.from('exercise_video_candidates').insert(inserts)
-      results.push({ exercise: ex.name_display, status: 'proposed', candidates: top3.length })
+      return { exercise: ex.name_display, status: 'proposed', candidates: top3.length }
     } catch (err) {
-      results.push({ exercise: ex.name_display, status: 'error', error: err instanceof Error ? err.message : 'unknown' })
+      return { exercise: ex.name_display, status: 'error', error: err instanceof Error ? err.message : 'unknown' }
     }
-  }
+}
 
+// Process exercises 4 at a time in parallel to stay within function timeout
+async function processExercises(exercises: Exercise[], channels: Channel[], regenerate = false) {
+  const results = []
+  const CONCURRENCY = 4
+  for (let i = 0; i < exercises.length; i += CONCURRENCY) {
+    const chunk = exercises.slice(i, i + CONCURRENCY)
+    const chunkResults = await Promise.all(chunk.map(ex => processOne(ex, channels, regenerate)))
+    results.push(...chunkResults)
+  }
   return results
 }
