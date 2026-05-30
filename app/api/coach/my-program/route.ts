@@ -62,6 +62,7 @@ export async function GET(request: Request) {
       program,
       weeks: weeks ?? [],
       coachName: coachProfile?.name ?? 'Your Coach',
+      coachId:   assignment.coach_id,
     })
   } catch (err) {
     console.error('my-program error:', err)

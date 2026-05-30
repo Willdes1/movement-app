@@ -10,6 +10,7 @@ const coachNav = [
   { href: '/coach/clients',    label: 'Clients',   emoji: '👥' },
   { href: '/coach/builder',    label: 'Builder',   emoji: '🛠️' },
   { href: '/coach/analytics',  label: 'Analytics', emoji: '📈' },
+  { href: '/coach/messages',   label: 'Messages',  emoji: '💬' },
 ]
 
 export default function CoachLayout({ children }: { children: React.ReactNode }) {

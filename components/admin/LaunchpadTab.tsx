@@ -227,7 +227,7 @@ const READINESS_DATA = [
       { label: 'Coach onboarding flow', done: true },
       { label: 'Coach affiliate / referral system', done: false },
       { label: 'Coach analytics dashboard', done: true },
-      { label: 'In-app coach ↔ client messaging', done: false },
+      { label: 'In-app coach ↔ client messaging', done: true },
       { label: 'PDF export of programs', done: false },
     ],
   },

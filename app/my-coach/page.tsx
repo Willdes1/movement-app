@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -61,17 +61,45 @@ function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+interface ChatMsg {
+  id: string
+  sender_id: string
+  content: string
+  created_at: string
+}
+
+function msgTime(iso: string) {
+  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+function dateDivider(iso: string) {
+  const d = new Date(iso)
+  const today = new Date(); const yest = new Date(); yest.setDate(yest.getDate() - 1)
+  if (d.toDateString() === today.toDateString()) return 'Today'
+  if (d.toDateString() === yest.toDateString())  return 'Yesterday'
+  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+}
+
 export default function MyCoachPage() {
   const { user } = useAuth()
   const router   = useRouter()
 
+  const [tab, setTab]               = useState<'program' | 'messages'>('program')
   const [program, setProgram]       = useState<Program | null>(null)
   const [weeks, setWeeks]           = useState<Week[]>([])
   const [assignment, setAssignment] = useState<AssignmentData | null>(null)
   const [coachName, setCoachName]   = useState<string>('')
+  const [coachId, setCoachId]       = useState<string | null>(null)
   const [loading, setLoading]       = useState(true)
   const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(new Set())
   const [expandedDays, setExpandedDays]   = useState<Set<string>>(new Set())
+
+  // Messages state
+  const [chatMsgs, setChatMsgs]     = useState<ChatMsg[]>([])
+  const [chatInput, setChatInput]   = useState('')
+  const [chatSending, setChatSending] = useState(false)
+  const [chatLoading, setChatLoading] = useState(false)
+  const [unread, setUnread]         = useState(0)
+  const chatBottomRef               = useRef<HTMLDivElement>(null)
 
   useEffect(() => { if (user) load() }, [user])  // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -90,6 +118,7 @@ export default function MyCoachPage() {
       setProgram(data.program)
       setWeeks(data.weeks)
       setCoachName(data.coachName)
+      setCoachId(data.coachId ?? null)
 
       // Auto-expand current week
       const currWeek = currentProgramWeek(data.assignment.start_date, data.program?.weeks_total ?? 1)
@@ -100,6 +129,75 @@ export default function MyCoachPage() {
     }
 
     setLoading(false)
+  }
+
+  // Load messages when Messages tab is opened
+  useEffect(() => {
+    if (tab === 'messages' && coachId && user) loadChat()
+  }, [tab, coachId, user])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Real-time: receive coach messages
+  useEffect(() => {
+    if (!user || !coachId) return
+    const channel = supabase
+      .channel(`client_msgs_${user.id}`)
+      .on('postgres_changes', {
+        event:  'INSERT',
+        schema: 'public',
+        table:  'coach_messages',
+        filter: `client_id=eq.${user.id}`,
+      }, async (payload) => {
+        const msg = payload.new as any
+        if (tab === 'messages') {
+          setChatMsgs(prev => [...prev, { id: msg.id, sender_id: msg.sender_id, content: msg.content, created_at: msg.created_at }])
+          await supabase.from('coach_messages').update({ read_at: new Date().toISOString() }).eq('id', msg.id)
+        } else {
+          setUnread(prev => prev + 1)
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [user, coachId, tab])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatMsgs])
+
+  async function loadChat() {
+    if (!user || !coachId) return
+    setChatLoading(true)
+    const { data } = await supabase
+      .from('coach_messages')
+      .select('id, sender_id, content, created_at')
+      .eq('coach_id', coachId)
+      .eq('client_id', user.id)
+      .order('created_at', { ascending: true })
+    setChatMsgs(data ?? [])
+    setChatLoading(false)
+    setUnread(0)
+    // Mark as read
+    await supabase
+      .from('coach_messages')
+      .update({ read_at: new Date().toISOString() })
+      .eq('coach_id', coachId)
+      .eq('client_id', user.id)
+      .is('read_at', null)
+      .neq('sender_id', user.id)
+  }
+
+  async function sendChat() {
+    if (!chatInput.trim() || !user || !coachId || chatSending) return
+    const content = chatInput.trim()
+    setChatInput('')
+    setChatSending(true)
+    const { data, error } = await supabase
+      .from('coach_messages')
+      .insert({ coach_id: coachId, client_id: user.id, sender_id: user.id, content })
+      .select('id, sender_id, content, created_at')
+      .single()
+    if (!error && data) setChatMsgs(prev => [...prev, data])
+    setChatSending(false)
   }
 
   function toggleWeek(n: number) {
@@ -151,6 +249,133 @@ export default function MyCoachPage() {
 
   return (
     <div style={{ padding: '24px 20px 100px', maxWidth: 640, margin: '0 auto' }}>
+
+      {/* Tab switcher */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 24 }}>
+        {([['program', '📋 Program'], ['messages', '💬 Messages']] as const).map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => { setTab(id); if (id === 'messages') setUnread(0) }}
+            style={{
+              padding: '8px 16px', borderRadius: 10, fontFamily: 'inherit',
+              border: `1px solid ${tab === id ? 'var(--accent-border, rgba(59,130,246,0.3))' : 'var(--border)'}`,
+              background: tab === id ? 'rgba(59,130,246,0.1)' : 'transparent',
+              color: tab === id ? 'var(--accent)' : 'var(--text-dim)',
+              fontSize: 13, fontWeight: tab === id ? 700 : 500, cursor: 'pointer',
+              position: 'relative',
+            }}
+          >
+            {label}
+            {id === 'messages' && unread > 0 && (
+              <span style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: 'var(--accent)', color: '#fff', fontSize: 9, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--surface)' }}>
+                {unread}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* ── MESSAGES TAB ──────────────────────────────────────────────────────── */}
+      {tab === 'messages' && (
+        <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 200px)', minHeight: 400 }}>
+          {!coachId ? (
+            <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+              <div style={{ fontSize: 40, marginBottom: 16 }}>🏋️</div>
+              <p style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>No coach connected</p>
+              <p style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 24 }}>Enter your coach's invite code in Account settings to connect.</p>
+              <button onClick={() => router.push('/account')} style={{ padding: '12px 24px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                Go to Account
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Chat header */}
+              <div style={{ padding: '0 0 14px', borderBottom: '1px solid var(--border)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(59,130,246,0.15)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800 }}>
+                  {coachName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                </div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 800 }}>{coachName}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Your Coach</div>
+                </div>
+              </div>
+
+              {/* Messages */}
+              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, paddingBottom: 8 }}>
+                {chatLoading ? (
+                  <p style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: 13, marginTop: 40 }}>Loading…</p>
+                ) : chatMsgs.length === 0 ? (
+                  <div style={{ textAlign: 'center', marginTop: 60 }}>
+                    <div style={{ fontSize: 32, marginBottom: 12 }}>👋</div>
+                    <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Say hello to {coachName}</p>
+                    <p style={{ fontSize: 12, color: 'var(--text-dim)' }}>Send your coach a message below.</p>
+                  </div>
+                ) : (() => {
+                  // Group by date
+                  const groups: { date: string; msgs: ChatMsg[] }[] = []
+                  for (const msg of chatMsgs) {
+                    const ds = new Date(msg.created_at).toDateString()
+                    const last = groups[groups.length - 1]
+                    if (last && last.date === ds) last.msgs.push(msg)
+                    else groups.push({ date: ds, msgs: [msg] })
+                  }
+                  return groups.map(group => (
+                    <div key={group.date}>
+                      <div style={{ textAlign: 'center', margin: '14px 0 10px' }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-dim)', background: 'var(--surface)', padding: '3px 10px', borderRadius: 20, border: '1px solid var(--border)' }}>
+                          {dateDivider(group.msgs[0].created_at)}
+                        </span>
+                      </div>
+                      {group.msgs.map((msg, i) => {
+                        const isMe    = msg.sender_id === user?.id
+                        const showTime = i === group.msgs.length - 1 || group.msgs[i + 1].sender_id !== msg.sender_id
+                        return (
+                          <div key={msg.id} style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', marginBottom: showTime ? 8 : 2 }}>
+                            <div style={{ maxWidth: '75%' }}>
+                              <div style={{ padding: '10px 14px', borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px', background: isMe ? 'var(--accent)' : 'var(--surface2)', color: isMe ? '#fff' : 'var(--text)', fontSize: 14, lineHeight: 1.5, border: isMe ? 'none' : '1px solid var(--border)' }}>
+                                {msg.content}
+                              </div>
+                              {showTime && (
+                                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 3, textAlign: isMe ? 'right' : 'left', paddingInline: 4 }}>
+                                  {msgTime(msg.created_at)}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ))
+                })()}
+                <div ref={chatBottomRef} />
+              </div>
+
+              {/* Input */}
+              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', paddingTop: 12, borderTop: '1px solid var(--border)', marginTop: 4 }}>
+                <textarea
+                  value={chatInput}
+                  onChange={e => setChatInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat() } }}
+                  placeholder={`Message ${coachName}…`}
+                  rows={1}
+                  style={{ flex: 1, padding: '10px 14px', borderRadius: 20, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontSize: 14, fontFamily: 'inherit', resize: 'none', outline: 'none', lineHeight: 1.5 }}
+                  onInput={e => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 100) + 'px' }}
+                />
+                <button
+                  onClick={sendChat}
+                  disabled={!chatInput.trim() || chatSending}
+                  style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', flexShrink: 0, background: chatInput.trim() && !chatSending ? 'var(--accent)' : 'var(--surface2)', color: chatInput.trim() && !chatSending ? '#fff' : 'var(--text-dim)', fontSize: 16, cursor: chatInput.trim() && !chatSending ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  ↑
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── PROGRAM TAB ───────────────────────────────────────────────────────── */}
+      {tab === 'program' && <>
 
       {/* Coach + program header */}
       <div style={{ marginBottom: 24 }}>
@@ -342,6 +567,8 @@ export default function MyCoachPage() {
           )
         })}
       </div>
+
+      </>}
     </div>
   )
 }
