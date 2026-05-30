@@ -196,11 +196,15 @@ export default function VideoCurationTab() {
   async function pasteCustom(exerciseId: string) {
     const raw = pasteUrls[exerciseId]?.trim()
     if (!raw) return
-    const match = raw.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/)
+    const match = raw.match(/(?:v=|youtu\.be\/|shorts\/)([A-Za-z0-9_-]{11})/)
     if (!match) { alert('Please paste a valid YouTube URL'); return }
+    const isShort = raw.includes('/shorts/')
+    const savedUrl = isShort
+      ? `https://www.youtube.com/shorts/${match[1]}`
+      : `https://www.youtube.com/watch?v=${match[1]}`
     setActing(exerciseId)
     await supabase.from('exercise_library')
-      .update({ video_url: `https://www.youtube.com/watch?v=${match[1]}`, video_source: 'custom', video_approved_at: new Date().toISOString(), video_approved_by: user?.id })
+      .update({ video_url: savedUrl, video_source: 'custom', video_approved_at: new Date().toISOString(), video_approved_by: user?.id })
       .eq('id', exerciseId)
     setPasteUrls(prev => { const n = { ...prev }; delete n[exerciseId]; return n })
     await loadExercises()

@@ -18,28 +18,46 @@ type ExerciseDetail = ExerciseRow & {
 }
 
 function extractYouTubeId(url: string): string | null {
-  return url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/)?.[1] ?? null
+  return url.match(/(?:v=|youtu\.be\/|shorts\/)([A-Za-z0-9_-]{11})/)?.[1] ?? null
 }
 
 function VideoPlayer({ url, source, name }: { url: string | null; source: string | null; name: string }) {
+  const [muted, setMuted] = useState(true)
   if (url && (source === 'youtube' || source === 'custom')) {
     const videoId = extractYouTubeId(url)
-    if (videoId) return (
-      <div style={{ marginBottom: 14, borderRadius: 10, overflow: 'hidden', background: '#000' }}>
-        <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0 }}>
-          <iframe
-            src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`}
-            title={name}
-            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
+    const short = url.includes('/shorts/')
+    if (videoId) {
+      const embedSrc = short
+        ? `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&autoplay=1&loop=1&playlist=${videoId}&mute=${muted ? 1 : 0}&controls=1`
+        : `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`
+      return (
+        <div style={{ marginBottom: 14, borderRadius: 10, overflow: 'hidden', background: '#000', position: 'sticky', top: 0, zIndex: 10 }}>
+          <div style={{ position: 'relative', paddingBottom: short ? '177.78%' : '56.25%', height: 0 }}>
+            <iframe
+              key={`${videoId}-${muted}`}
+              src={embedSrc}
+              title={name}
+              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 10px', background: 'var(--surface2)' }}>
+            <p style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>
+              Video · Coach Approved
+            </p>
+            {short && (
+              <button
+                onClick={() => setMuted(m => !m)}
+                style={{ fontSize: 11, color: muted ? 'var(--text-dim)' : '#22c55e', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, padding: 0 }}
+              >
+                {muted ? '🔇 Muted Loop' : '🔊 Audio On'}
+              </button>
+            )}
+          </div>
         </div>
-        <p style={{ fontSize: 9, color: 'var(--text-dim)', padding: '5px 10px', textAlign: 'right', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', background: 'var(--surface2)' }}>
-          Video · Coach Approved
-        </p>
-      </div>
-    )
+      )
+    }
   }
   return (
     <div style={{ marginBottom: 14, padding: '14px 16px', background: 'rgba(59,130,246,0.05)', border: '1px dashed rgba(59,130,246,0.2)', borderRadius: 10, textAlign: 'center' }}>
