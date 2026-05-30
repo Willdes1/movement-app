@@ -99,7 +99,7 @@
 
 ---
 
-## 4. What Was Built This Session (2026-05-28 / 2026-05-29)
+## 4. What Was Built This Session (2026-05-29)
 
 ### Coach Analytics Dashboard
 - **API:** `GET /api/coach/analytics` — JWT-verified, service key. Fetches roster, profiles, active assignments, workout_logs (30d). Groups logs by user counting distinct calendar dates for 7d/30d counts. Returns per-client stats + summary.
@@ -129,6 +129,16 @@
 ### Video Curation Timeout Fix
 - **Problem:** Sequential `for` loop over 50 exercises exceeded 60s Vercel limit.
 - **Fix:** Split `processExercises` into `processOne` (single exercise) + chunked parallel runner (4 concurrent via `Promise.all`). 50 exercises now takes ~25s instead of 100s+.
+
+### YouTube Shorts Support
+- **Files:** `app/exercises/page.tsx`, `app/calendar/page.tsx`, `components/admin/VideoCurationTab.tsx`
+- `extractYouTubeId` regex updated to match `/shorts/VIDEO_ID` URLs in addition to `watch?v=` and `youtu.be/`.
+- `VideoPlayer` detects Shorts via `url.includes('/shorts/')` → renders 9:16 vertical player (`paddingBottom: '177.78%'`).
+- Shorts auto-play muted + loop on open (`autoplay=1&loop=1&playlist=VIDEO_ID&mute=1`). No tap needed.
+- `🔇 Muted Loop` / `🔊 Audio On` toggle button — reloads iframe via `key` prop on toggle.
+- Player container is `position: sticky; top: 0` so it stays visible while scrolling through coaching cues.
+- Admin paste input accepts Shorts URLs and preserves `/shorts/` format when saving to DB (so detection works later).
+- Regular YouTube videos are unchanged (no autoplay, 16:9).
 
 ### Coach ↔ Client Messaging
 - **SQL migration:** `supabase/migrations/20260529_coach_messages.sql`
