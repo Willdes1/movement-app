@@ -224,7 +224,7 @@ const READINESS_DATA = [
       { label: 'Client roster + assignment history', done: true },
       { label: 'Client portal (clients see assigned plans)', done: true },
       { label: 'Stripe billing for coach tiers', done: false },
-      { label: 'Coach onboarding flow', done: false },
+      { label: 'Coach onboarding flow', done: true },
       { label: 'Coach affiliate / referral system', done: false },
       { label: 'Coach analytics dashboard', done: true },
       { label: 'In-app coach ↔ client messaging', done: false },

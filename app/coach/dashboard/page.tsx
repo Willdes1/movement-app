@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import OnboardingOverlay from '@/components/coach/OnboardingOverlay'
 
 interface Stats { activeClients: number; totalPrograms: number; activeAssignments: number }
 
@@ -102,6 +103,7 @@ export default function CoachDashboardPage() {
 
   return (
     <div style={{ padding: '40px 40px 80px', maxWidth: 1100 }}>
+      <OnboardingOverlay />
       {/* Header */}
       <div style={{ marginBottom: 32 }}>
         <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>
