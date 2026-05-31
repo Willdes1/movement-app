@@ -99,7 +99,42 @@
 
 ---
 
-## 4. What Was Built This Session (2026-05-29)
+## 4. What Was Built This Session (2026-05-31)
+
+### TTS 504 Timeout Fix
+- **File:** `app/api/admin/generate-tts/route.ts`
+- Root cause: no `maxDuration` set (Vercel default = 10s) + sequential `for` loop over 25 exercises (~100s total).
+- Fix: added `export const maxDuration = 60` + `export const runtime = 'nodejs'`, reduced batch to 20, chunked 4 exercises at a time in parallel. Now completes in ~20s.
+
+### "Get to Know Your Client" — Coach Client Notes
+- **SQL migration:** `supabase/migrations/20260531_coach_client_notes.sql`
+  - Table: `coach_client_notes` (id, coach_id, client_id, note, session_date, created_at)
+  - RLS: coaches read/write/delete their own notes only; clients cannot see them
+- **Component:** `components/coach/ClientNotesSection.tsx` — added to `/coach/clients/[id]` page
+  - **Last Session Reminder** card at top — shows most recent note with date immediately when coach opens client page
+  - **Add Note** form with session date picker (defaults to today) + 2000-char textarea
+  - **Voice dictation** via Web Speech API (`SpeechRecognition` / `webkitSpeechRecognition`) — free, built into Chrome/Edge, no external service. Mic button with pulsing red indicator while active. Falls back gracefully on unsupported browsers.
+  - Notes history (newest first), show 5 then "show more", per-note delete
+- **Launchpad:** item added and marked done; added to BUILT list
+
+### CLAUDE.md Rewrite
+- Replaced the single-line `@AGENTS.md` stub with a full architecture guide covering: dev commands, the two Supabase client pattern, API route auth pattern, Supabase join array gotcha, AuthContext/effectiveUserId, MIE pipeline, token logging, batch processing pattern, admin portal structure, RLS safety rules, and key file index.
+
+### TODO.md — 10 New Feature Items Added
+1. Missed workout / calendar rescheduling (expanded existing item)
+2. Upload personal workout programs
+3. Custom plan conversion (paid add-on)
+4. Ask AI recovery feature (pain/soreness/mobility)
+5. Saved programs library per user account
+6. PDF program upload + AI conversion for regular users
+7. Dedicated mobility & stretching tab
+8. Targeted exercise library tied to anatomy
+9. "Get to Know Your Client" coach notes ✅ built same session
+10. Nutrition & meal planning in coach portal
+
+---
+
+## Previous Session (2026-05-29)
 
 ### Coach Analytics Dashboard
 - **API:** `GET /api/coach/analytics` — JWT-verified, service key. Fetches roster, profiles, active assignments, workout_logs (30d). Groups logs by user counting distinct calendar dates for 7d/30d counts. Returns per-client stats + summary.
@@ -151,8 +186,26 @@
 
 ---
 
-## 5. PENDING: SQL Migration to Run
+## 5. PENDING: SQL Migrations to Run
 
+**Run both of these in Supabase SQL Editor if not already done:**
+
+### coach_client_notes (Get to Know Your Client)
+```sql
+CREATE TABLE IF NOT EXISTS coach_client_notes (
+  id           uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+  coach_id     uuid        NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  client_id    uuid        NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  note         text        NOT NULL CHECK (char_length(note) BETWEEN 1 AND 2000),
+  session_date date        NOT NULL DEFAULT CURRENT_DATE,
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_coach_client_notes_lookup ON coach_client_notes (coach_id, client_id, created_at DESC);
+ALTER TABLE coach_client_notes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "coach_notes_all" ON coach_client_notes FOR ALL USING (coach_id = auth.uid()) WITH CHECK (coach_id = auth.uid());
+```
+
+### coach_messages (Coach ↔ Client Messaging)
 **The messaging feature will NOT work until this SQL is run in Supabase SQL Editor:**
 
 ```sql
@@ -187,7 +240,7 @@ CREATE POLICY "mark_read" ON coach_messages FOR UPDATE
 ### F&F Beta Readiness — ~94% (18/19 done)
 - Only missing: Exercise videos curated (80%+ of library) — in progress via admin
 
-### Coach Portal Beta Readiness — 79% (11/14 done)
+### Coach Portal Beta Readiness — 86% (12/14 done)
 | Item | Status |
 |------|--------|
 | Programs library | ✅ |
@@ -201,6 +254,7 @@ CREATE POLICY "mark_read" ON coach_messages FOR UPDATE
 | Coach onboarding flow | ✅ |
 | Coach analytics dashboard | ✅ |
 | In-app coach ↔ client messaging | ✅ |
+| Get to Know Your Client (client notes) | ✅ |
 | Stripe billing for coach tiers | ❌ |
 | Coach affiliate / referral system | ❌ |
 | PDF export of programs | ❌ |
@@ -312,12 +366,14 @@ return () => { supabase.removeChannel(channel) }
 
 ## 11. What to Work on Next (Priority Order)
 
-1. **Run the messaging SQL migration** (user needs to do this in Supabase)
+1. **Run both pending SQL migrations** (Section 5 above) — messaging + client notes
 2. **RevenueCat integration** — Critical App Store blocker; replaces Stripe for iOS/Android subscriptions
 3. **Capacitor wrapper** — Wrap PWA as native iOS/Android app
-4. **Coach Portal remaining:** PDF export, Stripe billing for coach tiers
-5. **Video curation:** Continue running daily to get to 80%+ coverage
-6. **TTS coverage:** Continue running Generate 25 daily
+4. **Coach Portal remaining:** PDF export, Stripe billing for coach tiers, nutrition in coach portal
+5. **Ask AI recovery feature** — pain/soreness assistant in Recovery tab (TODO item #4)
+6. **Saved programs library** — save every generated plan to user account (TODO item #5)
+7. **Video curation:** Continue running daily to get to 80%+ coverage
+8. **TTS coverage:** Continue running Generate 25 daily
 
 ---
 
