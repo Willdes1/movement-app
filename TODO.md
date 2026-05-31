@@ -77,7 +77,7 @@
 - [ ] **Two-agent coach generator** — Agent 1 (Planner): JSON skeleton for full program. Library lookup: no tokens (SQL). Agent 2 (Filler): only runs on unmatched slots. Coach-only pipeline, does not touch user generator.
 - [ ] **Affiliate system + admin coach management** — Admin tab for coach accounts, tier assignment, payout review.
 
-- [ ] **Client notes & analysis — "Get to Know Your Client"** (added 2026-05-31) — Per-client notes system inside the coach portal:
+- [x] **Client notes & analysis — "Get to Know Your Client"** (added 2026-05-31) — Per-client notes system inside the coach portal:
     - Each client has a dedicated notes section the coach can add to during or after sessions
     - Input: type or speak (speech-to-text, similar to Wispr Flow) — coach should be able to quickly dictate observations
     - Example note: "Bob was dominating with his traps during dips today"

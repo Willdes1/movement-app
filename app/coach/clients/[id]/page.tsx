@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import ClientNotesSection from '@/components/coach/ClientNotesSection'
 
 interface ClientProfile {
   id: string
@@ -289,6 +290,13 @@ export default function CoachClientDetailPage() {
           Workout history visible once the client logs a session.
         </div>
       )}
+
+      {/* Get to Know Your Client */}
+      <ClientNotesSection
+        coachId={user!.id}
+        clientId={clientId}
+        clientName={name}
+      />
     </div>
   )
 }
