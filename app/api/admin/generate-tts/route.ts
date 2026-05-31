@@ -1,3 +1,6 @@
+export const maxDuration = 60
+export const runtime = 'nodejs'
+
 import OpenAI from 'openai'
 
 let _openai: OpenAI | null = null
@@ -67,7 +70,8 @@ async function generateAndUpload(
 export async function POST() {
   try {
     const supabase = getSupabase() as any
-    const BATCH = 25
+    const BATCH = 20
+    const CONCURRENCY = 4
 
     // Fetch exercises missing male TTS (prioritise those with coaching content)
     const { data: exercises, error } = await supabase
@@ -87,13 +91,18 @@ export async function POST() {
     let femaleOk = 0
     let failed = 0
 
-    for (const ex of exercises) {
-      const [m, f] = await Promise.all([
-        generateAndUpload(supabase, ex, 'onyx'),
-        generateAndUpload(supabase, ex, 'nova'),
-      ])
-      if (m) maleOk++; else failed++
-      if (f) femaleOk++
+    for (let i = 0; i < exercises.length; i += CONCURRENCY) {
+      const chunk = exercises.slice(i, i + CONCURRENCY)
+      const results = await Promise.all(
+        chunk.map(ex => Promise.all([
+          generateAndUpload(supabase, ex, 'onyx'),
+          generateAndUpload(supabase, ex, 'nova'),
+        ]))
+      )
+      for (const [m, f] of results) {
+        if (m) maleOk++; else failed++
+        if (f) femaleOk++
+      }
     }
 
     // Total remaining
