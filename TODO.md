@@ -40,7 +40,12 @@
 - [ ] **Injury → Recovery handoff** — When user starts a recovery playbook, AI modifies remaining training plan to keep them active with safe, injury-appropriate workouts. No full stop.
 - [ ] **Return-to-sport agent** (added 2026-04-27) — During active recovery, a second agent generates a full sport-specific return-to-sport plan. For skateboarding: Day 1 = riding around, pool riding, slappies → Day 2 = shiftys → Day 3 = 50-50s → 180s, etc. Progression is sport- and skill-level-specific. Each day after the recovery workout, a prompt asks how the sport session felt before unlocking the next step. Agent runs token-heavy generation once, saves the full plan (as a stored record), and only reads/updates it on daily check-ins — no re-generation per session. Activates automatically when user enters recovery mode.
 - [ ] **Post-recovery re-entry plan** — After completing recovery, AI does NOT revert to old plan. It rebuilds around the healed area: targeted protective exercises + gradual intensity ramp for that body part over a set period
-- [ ] **Missed session / schedule conflict button** — "I couldn't make it today" button on each day. AI restructures remaining week to maintain balance and progression without losing momentum
+- [ ] **Missed session / calendar rescheduling** — (expanded 2026-05-31) Full rescheduling flow when a user misses a workout day:
+    - "I couldn't work out today" button on each calendar day
+    - Follow-up: "Do you want to rearrange the rest of your week?" with smart options: move missed day to tomorrow, skip it and continue, miss the rest of the week and start fresh Monday, or move it to Saturday/Sunday
+    - Ask "Are you available on the weekend?" — if yes, slot it there; if no, intelligently combine/redistribute remaining days so the week still has logical progression
+    - Scope of changes: current week + following week only. Weeks 3+ stay fixed unless absolutely necessary
+    - Token efficiency: use internal exercise library for rearrangement — do NOT regenerate from scratch. Only call AI if genuinely novel restructuring is needed; patch affected days only, not the whole program
 - [ ] **Progress persistence** — All phases (training, recovery, rest, transition) saved and tracked. Seamless handoffs between states; user can always resume exactly where they left off
 
 ## 🧪 Testing & Dev Safety (added 2026-04-23)
@@ -72,9 +77,76 @@
 - [ ] **Two-agent coach generator** — Agent 1 (Planner): JSON skeleton for full program. Library lookup: no tokens (SQL). Agent 2 (Filler): only runs on unmatched slots. Coach-only pipeline, does not touch user generator.
 - [ ] **Affiliate system + admin coach management** — Admin tab for coach accounts, tier assignment, payout review.
 
+- [ ] **Client notes & analysis — "Get to Know Your Client"** (added 2026-05-31) — Per-client notes system inside the coach portal:
+    - Each client has a dedicated notes section the coach can add to during or after sessions
+    - Input: type or speak (speech-to-text, similar to Wispr Flow) — coach should be able to quickly dictate observations
+    - Example note: "Bob was dominating with his traps during dips today"
+    - Over time the system learns each client's movement patterns, weaknesses, tendencies, and limitations
+    - Smart reminders: "Last time Bob did dips, he overused his traps — watch for that again today"
+    - Program cross-check: when a coach generates or assigns a plan, the system checks it against that client's notes and flags conflicts (e.g. "This client struggles with dips and the plan includes them twice this week — consider a variation")
+    - Research needed: validate whether coaches actually use client notes this way before building full feature
+
+- [ ] **Nutrition & meal planning in the coach portal** (added 2026-05-31) — Coaching portal version of the nutrition feature:
+    - Coach can upload their own nutrition plans/ideas for a client
+    - AI-assisted brainstorm and meal plan generation based on client goals
+    - Manual meal plan builder
+    - Generate plans based on client questionnaire answers
+    - Customize based on client's specific goals (cut, bulk, performance, recovery)
+    - Eventual full feature: strong enough to be a major selling point for the coach tier
+
 ### Exercise Library Backfill (added 2026-05-05)
 - [ ] **58 missing SI joint exercises** — Only 24 of 82 SI joint playbook exercises are in exercise_library. Remaining 58 need individual review and manual addition with clinical-appropriate cues. Not blocking coach portal build, but must be done before coach clinical tool launch.
 - [ ] **Audience-tagging default logic** — When imports write new rows: tag as `clinical` if coach specialty is rehab/PT/therapy, else `both`. When AI generates new rows: tag as `both` unless client has active injury/restriction flag. Document this in the import and generation pipelines when built.
+
+## 📁 User Workout Program Library (added 2026-05-31)
+> Users who have trained for years accumulate workout files, PDFs, and plans from trainers, apps, and programs they've purchased. Give them a home for all of it.
+
+- [ ] **Upload personal workout programs** — Regular users can upload their own workout files (PDF, images, text) in a section accessible from the hamburger menu. Uploaded programs can be assigned as their active workout plan. Styled similarly to the coach portal program library but for personal use.
+
+- [ ] **PDF program import + AI conversion** — Users upload a PDF workout plan; system scans and extracts: workout days, exercises, sets/reps, rest times, instructions, and coach notes. Converts into a structured in-app program. If PDF lacks instructions, MIE generates evidence-backed cues. If any exercise/cue creates injury risk, system adjusts it and includes a brief explanation of why (e.g. "pinkies up" on lateral raises corrected to thumbs-up position with a clear, balanced note). Lock behind upgrade for basic users; free for F&F beta testers.
+
+- [ ] **Saved programs library** — Every generated workout plan is saved in full inside the user's account (whether 1, 2, or 3 months). Each program gets a unique AI-generated name. Users can:
+    - Browse all programs they've ever generated
+    - Search previous programs
+    - Select "Switch to this program"
+    - Choose: "Start from the beginning" (resets to Day 1 intelligently) or "Continue where I left off"
+    - Optionally save their current active calendar before switching so they can return to it later
+    - This tab lives in the hamburger menu
+
+- [ ] **Custom plan conversion — paid add-on** — Users (including F&F) can submit old workout plans and request a full conversion into a structured in-app program:
+    1. User uploads the plan
+    2. They request a quote
+    3. Admin (Will) reviews and approves in the admin portal
+    4. Converted program gets assigned to their account
+    - Start as a manual/concierge service; automate later once patterns are established
+
+## 🧘 Mobility, Stretching & Recovery AI (added 2026-05-31)
+
+- [ ] **"Ask AI" in Recovery tab** — Smart recovery assistant for pain, soreness, and mobility issues:
+    - Entry point: "Ask AI" button inside the Recovery tab
+    - System asks targeted questions: Where does it hurt? When did it start? During workout/sport/normal movement? Pain on bending/twisting/coughing? Sharp, dull, tight, or burning?
+    - Goal: NOT diagnosis — guide toward safe, helpful recovery movements
+    - Output: up to 5 recovery stretches or mobility drills pulled from internal library (sets, reps, timers, video, instructions)
+    - "Refresh" button to swap in 5 new recommendations
+    - Built-in timer so users complete stretches inside the app without leaving
+    - Also handles general soreness (e.g. "hips and mid-back tight after skateboarding yesterday" → returns a quick same-day recovery routine)
+    - Token efficiency: pull from exercise library first; only call AI for the question/recommendation logic, not to generate exercise content
+
+- [ ] **Dedicated mobility & stretching tab** — Hamburger menu tab strictly for mobility, stretching, and recovery movements:
+    - Separate from the workout calendar — for users who just want extra movement work on top of their program
+    - Search: "I did chest yesterday and I'm tight" → returns 5 targeted stretches/drills
+    - Advanced lookup: "What are you looking to stretch?" → user types area/muscle/situation
+    - Ties into anatomy section (future): user taps a body area → gets mobility drills, stretches, targeted exercises for that area
+    - Simple version first; deep anatomy integration later
+
+- [ ] **Targeted exercise library tied to anatomy** — Within the anatomy section, targeted exercises per muscle group (Chest, Back, Biceps, Triceps, Shoulders, Hips, Knees, Ankles, Core):
+    - Entry point: "Targeted Exercises" menu option in anatomy area
+    - Uses internal library with depth — 5 best mobility drills per target area based on research, usefulness, and safety
+    - MIE guides video curation toward trusted channels: ATHLEAN-X, Knees Over Toes Guy, Vanja, and preferred recovery chiropractor
+    - Manual batch URL upload: admin sits down, pastes a batch of links, library builds quickly
+    - Quality gate: if a movement looks strange, creates compliance concerns, or doesn't make sense — exclude it
+    - Token strategy: research and curate once, save internally; token cost paid once per exercise
+    - Video roadmap: YouTube links now → replace with owned video or paid filming later
 
 ## 🗂️ Admin Tools (added 2026-04-23)
 - [ ] **PDF workout plan upload (admin only)** — Admin can upload a PDF of any existing workout program (e.g. Athlean-X Dragon). AI reads and analyzes the plan, then offers to: (1) replace the user's current generated plan with it, or (2) blend it in. If replacing, AI intelligently reschedules any missed days and adjusts the remaining weeks to fit the user's timeline.
@@ -259,4 +331,4 @@ All three feed the same search index. Different shapes, one search surface.
 - [x] Account tab with sign out, edit profile, admin link
 
 ---
-*Last updated: 2026-05-07*
+*Last updated: 2026-05-31*
