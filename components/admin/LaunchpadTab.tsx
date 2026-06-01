@@ -229,7 +229,7 @@ const READINESS_DATA = [
       { label: 'Coach affiliate / referral system', done: false },
       { label: 'Coach analytics dashboard', done: true },
       { label: 'In-app coach ↔ client messaging', done: true },
-      { label: 'PDF export of programs', done: false },
+      { label: 'PDF export of programs', done: true },
     ],
   },
   {
@@ -375,6 +375,7 @@ function OverviewSection() {
     'Exercise Video Curation system — AI auto-discovers fitness YouTube channels (channels.list), scores quality via Claude Haiku, stores approved list; curation pipeline searches 2 channels per exercise (search.list + videos.list), scores 3 candidates per exercise, admin reviews + approves 1; approved video embeds inline in client calendar via YouTube iframe; exercises from real client plans bubble to top of curation queue; 752-exercise library populating at ~50/day within free API quota',
     'YouTube Shorts support — vertical 9:16 player, autoplay muted loop (no tap needed), 🔇/🔊 audio toggle for voiced Shorts, sticky player stays visible while scrolling coaching cues; Shorts URLs now accepted in admin video paste input',
     '"Get to Know Your Client" — coach client notes system: session-dated notes, last-session reminder card, voice dictation via Web Speech API (Chrome/Edge), notes history with show more/less, per-note delete',
+    'PDF export of programs — Export PDF button on program detail page; opens clean printable HTML in new tab with embedded print trigger; includes all weeks, days, movements, phases, coach notes, and footer; zero dependencies',
     'MIE Phase 1 — Domain Knowledge Store: pgvector + OpenAI embeddings + 784 items seeded (15 training principles, 10 sport protocols, 7 rehab protocols, 752 exercises); RAG retrieval wired into plan generation; ivfflat index (lists=30)',
     'MIE Phase 2 — Agent Council v1: S&C Agent drafts full 7-day plan using retrieved knowledge; PT/Rehab Agent runs safety review pass for restricted athletes with veto logic; token usage tracked across both agents',
     'MIE Phase 3 — Full Agent Council: Sports Specialist Agent (sport-specific warmups + coaching cues), Mobility Agent (morning/cooldown/evening blocks), Mindset Agent (Mushin/Kaizen/Shokunin/Zanshin/Fudoshin layer on coaching + warmup tips), Recovery Agent (evidence-based rest day programming); all 4 agents sequential, non-fatal fallback',

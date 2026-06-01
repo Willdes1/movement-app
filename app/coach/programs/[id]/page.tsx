@@ -258,6 +258,100 @@ export default function ProgramDetailPage() {
     return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
 
+  function exportPDF() {
+    const trainingDayCount = weeks.flatMap(w => w.days.filter(d => d.type !== 'rest')).length
+    const exerciseCount = weeks.flatMap(w => w.days.flatMap(d => d.movements)).filter(m => m !== 'Full rest').length
+
+    const weeksHtml = weeks.map(week => {
+      const daysHtml = week.days.map(day => {
+        if (day.type === 'rest') {
+          return `<div class="day rest"><span class="day-label">${day.day}</span><span class="day-title dimmed">Rest Day</span></div>`
+        }
+        const movementsHtml = day.movements.map(m => `<li>${m}</li>`).join('')
+        return `
+          <div class="day">
+            <div class="day-header">
+              <span class="day-label">${day.day}</span>
+              <span class="day-title">${day.label}</span>
+              ${day.focus ? `<span class="day-focus">${day.focus}</span>` : ''}
+              ${day.duration && day.duration !== '—' ? `<span class="day-duration">${day.duration}</span>` : ''}
+            </div>
+            <ul class="movements">${movementsHtml}</ul>
+          </div>`
+      }).join('')
+
+      return `
+        <div class="week">
+          <div class="week-header">
+            <span class="week-label">${week.label || `Week ${week.week_number}`}</span>
+            ${week.phase ? `<span class="week-phase">${week.phase}</span>` : ''}
+          </div>
+          <div class="days">${daysHtml}</div>
+          ${week.coach_notes ? `<div class="coach-notes"><strong>Coach notes:</strong> ${week.coach_notes}</div>` : ''}
+        </div>`
+    }).join('')
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>${program!.name}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 11pt; color: #111; background: #fff; padding: 32px; }
+    .doc-header { border-bottom: 2px solid #111; padding-bottom: 14px; margin-bottom: 24px; }
+    .brand { font-size: 9pt; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #666; margin-bottom: 6px; }
+    h1 { font-size: 22pt; font-weight: 900; letter-spacing: -0.02em; margin-bottom: 8px; }
+    .meta { font-size: 9pt; color: #555; display: flex; gap: 18px; flex-wrap: wrap; }
+    .meta span::before { content: ''; }
+    .week { margin-bottom: 28px; page-break-inside: avoid; }
+    .week-header { display: flex; align-items: center; gap: 10px; background: #f4f4f4; padding: 7px 12px; border-radius: 6px; margin-bottom: 8px; }
+    .week-label { font-size: 10pt; font-weight: 800; }
+    .week-phase { font-size: 8pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #555; background: #e0e0e0; padding: 2px 8px; border-radius: 10px; }
+    .days { display: flex; flex-direction: column; gap: 5px; }
+    .day { display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; border: 1px solid #e0e0e0; border-radius: 7px; }
+    .day.rest { flex-direction: row; align-items: center; gap: 10px; opacity: 0.45; }
+    .day-header { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+    .day-label { font-size: 8pt; font-weight: 900; text-transform: uppercase; letter-spacing: 0.07em; color: #888; min-width: 24px; }
+    .day-title { font-size: 10pt; font-weight: 700; }
+    .day-title.dimmed { color: #aaa; font-weight: 600; }
+    .day-focus { font-size: 8.5pt; color: #666; }
+    .day-duration { font-size: 8pt; color: #888; background: #f0f0f0; padding: 1px 7px; border-radius: 10px; margin-left: auto; }
+    .movements { list-style: none; padding-left: 32px; display: flex; flex-direction: column; gap: 1px; }
+    .movements li { font-size: 9.5pt; color: #333; }
+    .movements li::before { content: '• '; color: #aaa; }
+    .coach-notes { margin-top: 6px; font-size: 9pt; color: #555; padding: 7px 10px; background: #fafafa; border-left: 3px solid #ccc; border-radius: 3px; }
+    .footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #ddd; font-size: 8pt; color: #aaa; }
+    @media print {
+      body { padding: 20px; }
+      .week { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="doc-header">
+    <div class="brand">Training Program</div>
+    <h1>${program!.name}</h1>
+    <div class="meta">
+      <span>${program!.weeks_total} week${program!.weeks_total !== 1 ? 's' : ''}</span>
+      <span>${trainingDayCount} training day${trainingDayCount !== 1 ? 's' : ''}</span>
+      <span>${exerciseCount} exercises</span>
+      <span>Generated ${formatDate(program!.created_at)}</span>
+    </div>
+  </div>
+  ${weeksHtml}
+  <div class="footer">Exported from Coach Portal · ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+  <script>window.onload = () => window.print()</script>
+</body>
+</html>`
+
+    const win = window.open('', '_blank')
+    if (win) {
+      win.document.write(html)
+      win.document.close()
+    }
+  }
+
   if (loading) return <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-dim)', fontSize: 14 }}>Loading program…</div>
 
   if (notFound || !program) return (
@@ -339,6 +433,11 @@ export default function ProgramDetailPage() {
               Restore
             </button>
           )}
+          <button
+            onClick={exportPDF}
+            style={{ padding: '8px 18px', background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+            Export PDF
+          </button>
           <button onClick={openAssignModal}
             style={{ padding: '8px 18px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
             Assign to Client
