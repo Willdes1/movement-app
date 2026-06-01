@@ -106,40 +106,57 @@ export async function POST(req: Request) {
     }
   }
 
-  // Step 2: Queue ALL program exercises (new + existing without video) for priority curation
-  // These become status='queued' in exercise_video_candidates, which puts them at the TOP
-  // of the curation pipeline — ahead of the alphabetical backlog.
+  // Step 2: Queue ALL program exercises (new + existing without video) for priority curation.
+  // Critical: also UPDATE any exercises already in 'queued' status that don't have source_label
+  // yet (from a prior seed run before the source_label migration was run).
   const toQueue = exercises.filter(e => {
     const lib = existingMap.get(e.name_normalized)
     return lib && !lib.video_url // in library but no video yet
   })
 
-  // Don't re-queue exercises that already have proposed/approved candidates
   let queued = 0
+  let updated = 0
   if (toQueue.length > 0) {
     const libIds = toQueue.map(e => existingMap.get(e.name_normalized)!.id).filter(Boolean)
-    const { data: alreadyProposed } = await supabase
+
+    // Get ALL existing candidates for these exercises (any status)
+    const { data: existingCands } = await supabase
       .from('exercise_video_candidates')
-      .select('exercise_id')
+      .select('exercise_id, status')
       .in('exercise_id', libIds)
-      .in('status', ['proposed', 'approved', 'queued'])
-    const alreadyQueuedIds = new Set((alreadyProposed ?? []).map(r => r.exercise_id))
 
-    const queueInserts = libIds
-      .filter(id => !alreadyQueuedIds.has(id))
-      .map(exercise_id => ({ exercise_id, status: 'queued', source_label: sourceLabel }))
+    const alreadyProposedIds = new Set(
+      (existingCands ?? []).filter(r => ['proposed', 'approved'].includes(r.status)).map(r => r.exercise_id)
+    )
+    const alreadyQueuedIds = new Set(
+      (existingCands ?? []).filter(r => r.status === 'queued').map(r => r.exercise_id)
+    )
 
-    if (queueInserts.length > 0) {
+    // UPDATE existing 'queued' entries to stamp source_label (handles re-seed after migration)
+    const toUpdate = libIds.filter(id => alreadyQueuedIds.has(id) && !alreadyProposedIds.has(id))
+    if (toUpdate.length > 0) {
+      const { error: upErr } = await supabase
+        .from('exercise_video_candidates')
+        .update({ source_label: sourceLabel })
+        .in('exercise_id', toUpdate)
+        .eq('status', 'queued')
+      if (!upErr) updated = toUpdate.length
+    }
+
+    // INSERT new 'queued' entries for exercises with no candidate at all
+    const toInsert = libIds.filter(id => !alreadyQueuedIds.has(id) && !alreadyProposedIds.has(id))
+    if (toInsert.length > 0) {
       const { error: qErr } = await supabase
         .from('exercise_video_candidates')
-        .insert(queueInserts)
-      if (!qErr) queued = queueInserts.length
+        .insert(toInsert.map(exercise_id => ({ exercise_id, status: 'queued', source_label: sourceLabel })))
+      if (!qErr) queued = toInsert.length
     }
   }
 
   return NextResponse.json({
     seeded,               // new exercises added to exercise_library
-    queued,               // exercises added to priority video curation queue
+    queued,               // new queue entries created with source_label
+    updated,              // existing queue entries updated with source_label
     total: exercises.length,
     alreadyExisted: existingMap.size - seeded,
   })

@@ -113,11 +113,24 @@ export default function VideoCurationTab() {
       .select('id, name_display, name_normalized, video_url, video_source')
       .order('name_display')
 
-    // Collect ALL queued entries with source_label
-    const { data: queuedRows } = await supabase
+    // Collect ALL queued entries with source_label.
+    // Try selecting source_label; if the column doesn't exist yet (migration not run),
+    // fall back to a query without it so lanes still render with 0 program entries.
+    let queuedRows: { exercise_id: string; source_label: string | null }[] | null = null
+    const { data: qr, error: qrErr } = await supabase
       .from('exercise_video_candidates')
       .select('exercise_id, source_label')
       .eq('status', 'queued')
+    if (!qrErr) {
+      queuedRows = qr as { exercise_id: string; source_label: string | null }[]
+    } else {
+      // Column likely doesn't exist yet — fall back without source_label
+      const { data: qrFallback } = await supabase
+        .from('exercise_video_candidates')
+        .select('exercise_id')
+        .eq('status', 'queued')
+      queuedRows = (qrFallback ?? []).map(r => ({ exercise_id: r.exercise_id, source_label: null }))
+    }
 
     const allQueuedIds = new Set((queuedRows ?? []).map(r => r.exercise_id))
     setQueuedIds(allQueuedIds)
