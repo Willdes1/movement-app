@@ -32,6 +32,7 @@ interface Program {
   import_filename: string | null
   notes: string | null
   created_at: string
+  shared_with_roles: string[]
 }
 
 interface SwapTarget {
@@ -62,7 +63,7 @@ function extractScheme(movement: string): string {
 }
 
 export default function ProgramDetailPage() {
-  const { user } = useAuth()
+  const { user, isAdmin } = useAuth()
   const router = useRouter()
   const params = useParams()
   const id = params.id as string
@@ -100,6 +101,12 @@ export default function ProgramDetailPage() {
   const [swapError, setSwapError] = useState('')
   const swapSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Admin: platform sharing
+  const [sharedRoles, setSharedRoles] = useState<string[]>([])
+  const [sharingLoading, setSharingLoading] = useState(false)
+  const [seedingExercises, setSeedingExercises] = useState(false)
+  const [seedResult, setSeedResult] = useState<{ seeded: number; total: number } | null>(null)
+
   useEffect(() => {
     if (!user || !id) return
     fetchProgram()
@@ -109,14 +116,15 @@ export default function ProgramDetailPage() {
     setLoading(true)
     const { data: prog, error: progErr } = await supabase
       .from('coach_programs')
-      .select('id, name, status, source, weeks_total, import_filename, notes, created_at')
+      .select('id, name, status, source, weeks_total, import_filename, notes, created_at, shared_with_roles')
       .eq('id', id)
       .eq('coach_id', user!.id)
       .single()
 
     if (progErr || !prog) { setNotFound(true); setLoading(false); return }
-    setProgram(prog)
+    setProgram(prog as Program)
     setTitleDraft(prog.name)
+    setSharedRoles(prog.shared_with_roles ?? [])
 
     const { data: weekData } = await supabase
       .from('coach_program_weeks')
@@ -142,6 +150,32 @@ export default function ProgramDetailPage() {
     const { error } = await supabase.from('coach_programs').update({ status: newStatus }).eq('id', id).eq('coach_id', user!.id)
     if (error) setError(error.message)
     else setProgram(prev => prev ? { ...prev, status: newStatus } : prev)
+  }
+
+  async function toggleRole(role: string) {
+    setSharingLoading(true)
+    const next = sharedRoles.includes(role)
+      ? sharedRoles.filter(r => r !== role)
+      : [...sharedRoles, role]
+    const { error } = await supabase.from('coach_programs').update({ shared_with_roles: next }).eq('id', id)
+    if (!error) setSharedRoles(next)
+    setSharingLoading(false)
+  }
+
+  async function seedExercises() {
+    setSeedingExercises(true)
+    setSeedResult(null)
+    const { data: { session } } = await supabase.auth.getSession()
+    try {
+      const resp = await fetch('/api/admin/seed-program-exercises', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ programId: id }),
+      })
+      const data = await resp.json()
+      setSeedResult({ seeded: data.seeded ?? 0, total: data.total ?? 0 })
+    } catch { /* silent */ }
+    setSeedingExercises(false)
   }
 
   function toggleWeek(n: number) {
@@ -460,6 +494,48 @@ export default function ProgramDetailPage() {
           </div>
         ))}
       </div>
+
+      {/* Platform Sharing — admin only */}
+      {isAdmin && (
+        <div style={{ marginBottom: 28, padding: '16px 20px', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+            <p style={{ fontSize: 14, fontWeight: 800, color: 'var(--accent)' }}>Platform Sharing</p>
+            <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Makes this program visible in users' My Programs tab</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+            {(['admin', 'ff'] as const).map(role => {
+              const active = sharedRoles.includes(role)
+              return (
+                <button
+                  key={role}
+                  onClick={() => toggleRole(role)}
+                  disabled={sharingLoading}
+                  style={{ padding: '8px 16px', borderRadius: 20, fontSize: 13, fontWeight: 700, border: `1px solid ${active ? '#22c55e' : 'var(--border)'}`, background: active ? 'rgba(34,197,94,0.12)' : 'var(--surface2)', color: active ? '#22c55e' : 'var(--text-dim)', cursor: sharingLoading ? 'default' : 'pointer' }}
+                >
+                  {active ? '✓ ' : ''}{role === 'ff' ? 'Friends & Family (ff)' : 'Admin'}
+                </button>
+              )
+            })}
+          </div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={seedExercises}
+              disabled={seedingExercises}
+              style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text-dim)', fontSize: 12, cursor: seedingExercises ? 'default' : 'pointer', fontWeight: 700 }}
+            >
+              {seedingExercises ? 'Seeding…' : '🎬  Seed Exercises → Library'}
+            </button>
+            {seedResult !== null && (
+              <span style={{ fontSize: 12, color: '#22c55e', fontWeight: 700 }}>
+                ✓ {seedResult.seeded} new exercises added ({seedResult.total} total) — run Video Curation to generate videos
+              </span>
+            )}
+          </div>
+          <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 10, lineHeight: 1.5 }}>
+            Seeding adds all exercises to the exercise library so video curation and coaching cues can generate. After seeding, go to Admin → Video Curation and run a batch.
+          </p>
+        </div>
+      )}
 
       {program.notes && (
         <div style={{ marginBottom: 28, fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, maxWidth: 720, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 18px' }}>
