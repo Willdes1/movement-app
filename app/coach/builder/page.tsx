@@ -561,7 +561,7 @@ export default function CoachBuilderPage() {
         <div style={{ fontSize: 40 }}>⚙️</div>
         <div style={{ fontSize: 18, fontWeight: 700 }}>Parsing {fileName}…</div>
         <div style={{ fontSize: 13, color: 'var(--text-dim)', textAlign: 'center', maxWidth: 400 }}>
-          Extracting text and running it through the AI normalizer. This usually takes 10–20 seconds.
+          Extracting and analyzing your program. Text-based PDFs take 10–20 seconds. Image-based or scanned PDFs may take up to 40 seconds.
         </div>
         <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
           {[0, 1, 2].map(i => (

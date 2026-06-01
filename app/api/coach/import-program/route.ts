@@ -44,6 +44,10 @@ Rules:
 - week_number must start at 1 and increment by 1
 - Return nothing except the JSON object`
 
+// Minimum character count to consider text extraction successful.
+// Image-based PDFs return a few stray characters or nothing at all.
+const MIN_TEXT_LENGTH = 80
+
 export async function POST(request: Request) {
   try {
     const formData = await request.formData()
@@ -61,6 +65,7 @@ export async function POST(request: Request) {
 
     const buffer = Buffer.from(await file.arrayBuffer())
     let rawText = ''
+    let usedVision = false
 
     if (ext === 'docx') {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -68,17 +73,79 @@ export async function POST(request: Request) {
       const result = await mammoth.extractRawText({ buffer })
       rawText = result.value
     } else {
-      // Lazy require keeps pdf-parse out of module scope — prevents Vercel
-      // from crashing the route on load due to pdfjs-dist canvas dependencies.
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const pdfParse = require('pdf-parse') as (b: Buffer) => Promise<{ text: string }>
-      const data = await pdfParse(buffer)
-      rawText = data.text
+      // Try text extraction first (fast + cheap)
+      try {
+        // Lazy require keeps pdf-parse out of module scope — prevents Vercel
+        // from crashing the route on load due to pdfjs-dist canvas dependencies.
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const pdfParse = require('pdf-parse') as (b: Buffer) => Promise<{ text: string }>
+        const data = await pdfParse(buffer)
+        rawText = data.text ?? ''
+      } catch {
+        // pdf-parse can throw on malformed PDFs — fall through to vision path
+      }
     }
 
+    // ── Vision fallback for image-based PDFs ─────────────────────────────────
+    // Scanned/image PDFs yield no extractable text. Send the raw PDF bytes to
+    // Claude Sonnet as a native document — it converts pages to images internally
+    // and reads the content visually. DOCX files always yield text so never reach here.
+    if (ext === 'pdf' && rawText.trim().length < MIN_TEXT_LENGTH) {
+      usedVision = true
+      const base64 = buffer.toString('base64')
+
+      const visionMessage = await client.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 4096,
+        system: SYSTEM_PROMPT,
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'document',
+              source: {
+                type: 'base64',
+                media_type: 'application/pdf',
+                data: base64,
+              },
+            } as Parameters<typeof client.messages.create>[0]['messages'][0]['content'][0],
+            {
+              type: 'text',
+              text: 'Parse this training program into structured JSON as specified.',
+            },
+          ],
+        }],
+      })
+
+      const visionRaw = visionMessage.content[0].type === 'text' ? visionMessage.content[0].text.trim() : ''
+      const visionCleaned = visionRaw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()
+      const program = JSON.parse(visionCleaned)
+
+      if (!Array.isArray(program.weeks) || program.weeks.length === 0) {
+        throw new Error('Could not read a training program from this file. Make sure it contains a structured workout plan.')
+      }
+
+      program.raw_text = '[image-based PDF — read via vision]'
+
+      logTokens({
+        operation: 'coach_import_program_vision',
+        route: '/api/coach/import-program',
+        input_tokens: visionMessage.usage.input_tokens,
+        output_tokens: visionMessage.usage.output_tokens,
+        user_id: coachId,
+      })
+
+      return Response.json({
+        program,
+        usedVision,
+        usage: { input_tokens: visionMessage.usage.input_tokens, output_tokens: visionMessage.usage.output_tokens },
+      })
+    }
+
+    // ── Text path (DOCX or text-based PDF) ───────────────────────────────────
     if (!rawText.trim()) {
       return Response.json(
-        { error: 'Could not extract text from this file. It may be image-based or scanned — try copying the text into a Word doc first.' },
+        { error: 'Could not extract any content from this file.' },
         { status: 422 }
       )
     }
@@ -102,9 +169,17 @@ export async function POST(request: Request) {
 
     program.raw_text = rawText
 
-    logTokens({ operation: 'coach_import_program', route: '/api/coach/import-program', input_tokens: message.usage.input_tokens, output_tokens: message.usage.output_tokens, user_id: coachId })
+    logTokens({
+      operation: 'coach_import_program',
+      route: '/api/coach/import-program',
+      input_tokens: message.usage.input_tokens,
+      output_tokens: message.usage.output_tokens,
+      user_id: coachId,
+    })
+
     return Response.json({
       program,
+      usedVision,
       usage: { input_tokens: message.usage.input_tokens, output_tokens: message.usage.output_tokens },
     })
   } catch (err) {
