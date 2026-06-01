@@ -21,7 +21,7 @@ function getSupabase() {
   return _supabase!
 }
 
-function buildSpeechText(ex: { name_display: string; how?: string; breathing?: string; core?: string; tip?: string }): string {
+function buildSpeechText(ex: { name_display: string; how?: string | null; breathing?: string | null; core?: string | null; tip?: string | null }): string {
   const parts = [ex.name_display]
   if (ex.how) parts.push(ex.how)
   if (ex.breathing) parts.push('Breathing: ' + ex.breathing)
@@ -32,7 +32,7 @@ function buildSpeechText(ex: { name_display: string; how?: string; breathing?: s
 
 async function generateAndUpload(
   supabase: any,
-  ex: { name_normalized: string; name_display: string; how?: string; breathing?: string; core?: string; tip?: string },
+  ex: { name_normalized: string; name_display: string; how?: string | null; breathing?: string | null; core?: string | null; tip?: string | null },
   voice: 'onyx' | 'nova'
 ): Promise<boolean> {
   try {
@@ -94,7 +94,7 @@ export async function POST() {
     for (let i = 0; i < exercises.length; i += CONCURRENCY) {
       const chunk = exercises.slice(i, i + CONCURRENCY)
       const results = await Promise.all(
-        chunk.map((ex: { name_normalized: string; name_display: string; how: string | null; breathing: string | null; core: string | null; tip: string | null }) => Promise.all([
+        chunk.map((ex) => Promise.all([
           generateAndUpload(supabase, ex, 'onyx'),
           generateAndUpload(supabase, ex, 'nova'),
         ]))
