@@ -103,9 +103,7 @@
 ## 📁 User Workout Program Library (added 2026-05-31)
 > Users who have trained for years accumulate workout files, PDFs, and plans from trainers, apps, and programs they've purchased. Give them a home for all of it.
 
-- [ ] **Upload personal workout programs** — Regular users can upload their own workout files (PDF, images, text) in a section accessible from the hamburger menu. Uploaded programs can be assigned as their active workout plan. Styled similarly to the coach portal program library but for personal use.
-
-- [ ] **PDF program import + AI conversion** — Users upload a PDF workout plan; system scans and extracts: workout days, exercises, sets/reps, rest times, instructions, and coach notes. Converts into a structured in-app program. If PDF lacks instructions, MIE generates evidence-backed cues. If any exercise/cue creates injury risk, system adjusts it and includes a brief explanation of why (e.g. "pinkies up" on lateral raises corrected to thumbs-up position with a clear, balanced note). Lock behind upgrade for basic users; free for F&F beta testers.
+- [x] **Upload personal workout programs + PDF import + AI safety conversion** — Hamburger menu "Import a Program" entry at /import-program. Upload PDF/DOCX (text or scanned/image via Claude vision). PT/Rehab safety pass checks every exercise against user's injury restrictions and replaces contraindicated movements — shows a diff of changes before saving. Preview step with week accordion. "Activate Program" sets active_imported_program_id on profile; "Save for Later" stores as draft. ImportedProgramBanner shows active program with Leave Plan flow (save progress or exit) — same pattern as RecoveryBanner. DB: user_imported_programs + user_imported_program_weeks tables with RLS.
 
 - [ ] **Saved programs library** — Every generated workout plan is saved in full inside the user's account (whether 1, 2, or 3 months). Each program gets a unique AI-generated name. Users can:
     - Browse all programs they've ever generated

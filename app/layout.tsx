@@ -5,6 +5,7 @@ import BottomNav from '@/components/ui/BottomNav'
 import Sidebar from '@/components/ui/Sidebar'
 import MobileMenu from '@/components/ui/MobileMenu'
 import RecoveryBanner from '@/components/ui/RecoveryBanner'
+import ImportedProgramBanner from '@/components/ui/ImportedProgramBanner'
 import ImpersonationBanner from '@/components/ui/ImpersonationBanner'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
@@ -60,6 +61,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <main className="app-main">
                 <ImpersonationBanner />
                 <RecoveryBanner />
+                <ImportedProgramBanner />
                 <GenerationBanner />
                 {children}
               </main>
