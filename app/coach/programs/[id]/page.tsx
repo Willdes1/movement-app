@@ -105,7 +105,7 @@ export default function ProgramDetailPage() {
   const [sharedRoles, setSharedRoles] = useState<string[]>([])
   const [sharingLoading, setSharingLoading] = useState(false)
   const [seedingExercises, setSeedingExercises] = useState(false)
-  const [seedResult, setSeedResult] = useState<{ seeded: number; total: number } | null>(null)
+  const [seedResult, setSeedResult] = useState<{ seeded: number; total: number; queued: number } | null>(null)
 
   useEffect(() => {
     if (!user || !id) return
@@ -173,7 +173,7 @@ export default function ProgramDetailPage() {
         body: JSON.stringify({ programId: id }),
       })
       const data = await resp.json()
-      setSeedResult({ seeded: data.seeded ?? 0, total: data.total ?? 0 })
+      setSeedResult({ seeded: data.seeded ?? 0, total: data.total ?? 0, queued: data.queued ?? 0 })
     } catch { /* silent */ }
     setSeedingExercises(false)
   }
@@ -527,7 +527,7 @@ export default function ProgramDetailPage() {
             </button>
             {seedResult !== null && (
               <span style={{ fontSize: 12, color: '#22c55e', fontWeight: 700 }}>
-                ✓ {seedResult.seeded} new exercises added ({seedResult.total} total) — run Video Curation to generate videos
+                ✓ {seedResult.seeded} new · {seedResult.queued} queued for priority curation ({seedResult.total} total) — run Video Curation now, they&apos;ll come first
               </span>
             )}
           </div>
