@@ -94,7 +94,7 @@ export async function POST() {
     for (let i = 0; i < exercises.length; i += CONCURRENCY) {
       const chunk = exercises.slice(i, i + CONCURRENCY)
       const results = await Promise.all(
-        chunk.map(ex => Promise.all([
+        chunk.map((ex: { name_normalized: string; name_display: string; how: string | null; breathing: string | null; core: string | null; tip: string | null }) => Promise.all([
           generateAndUpload(supabase, ex, 'onyx'),
           generateAndUpload(supabase, ex, 'nova'),
         ]))
