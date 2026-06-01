@@ -56,7 +56,7 @@
 - [ ] **Billing structure brainstorm** — Free tier: basic workouts only. Paid tier: full plan customization and AI generation. Options: (1) per-plan token cost, (2) monthly subscription with a token allowance. Beta tester promo codes grant limited or full protocol access for a set period. Finalize model before public launch.
 
 ## 🔊 Audio & Accessibility (added 2026-04-23)
-- [ ] **Read-aloud workout instructions** — Speaker button on each exercise reads instructions aloud using text-to-speech. Default: American male voice, with option to switch to female. Audio ducks (lowers) background music while reading, then restores — does not pause it. Designed for eyes-free use mid-workout on both iPhone and Android.
+- [x] **Read-aloud workout instructions** — 🔈 speaker button next to every exercise on the Today page. Tapping reads exercise name + how-to + coaching tip via TTS. 🔊 icon while speaking; tapping again stops. Pre-loads exercise library details after plan loads for instant response.
 
 ## 📊 Stats & Tracking (added 2026-04-23)
 - [x] **Workout log system** — `workout_logs` table (user_id, exercise_normalized, sets, reps, weight, logged_at). Exercise modal shows "Last Session" card (weight, sets, reps, date) + "Log Set" form with 3 inputs. Logs persist across plans/weeks. Calendar modal shows last session read-only.
@@ -113,7 +113,7 @@
     - Optionally save their current active calendar before switching so they can return to it later
     - This tab lives in the hamburger menu
 
-- [ ] **Custom plan conversion — paid add-on** — Users (including F&F) can submit old workout plans and request a full conversion into a structured in-app program:
+- [x] **Custom plan conversion — concierge service** — /convert-plan page with drag-drop PDF/DOCX upload, description field, status tracker (Pending/In Review/Completed/Rejected), admin notes visible to user. Admin Conversions tab in portal: filter by status, download file, review + update status + send note to user. SQL migration at supabase/migrations/20260601_plan_conversion_requests.sql (run in Supabase).
     1. User uploads the plan
     2. They request a quote
     3. Admin (Will) reviews and approves in the admin portal
@@ -132,14 +132,14 @@
     - Also handles general soreness (e.g. "hips and mid-back tight after skateboarding yesterday" → returns a quick same-day recovery routine)
     - Token efficiency: pull from exercise library first; only call AI for the question/recommendation logic, not to generate exercise content
 
-- [ ] **Dedicated mobility & stretching tab** — Hamburger menu tab strictly for mobility, stretching, and recovery movements:
+- [x] **Dedicated mobility & stretching tab** — /mobility page with 12 body-area chips (Hip Flexors, Hamstrings, T-Spine, Shoulders, etc.) + text search. Filters exercise_library by keywords. Expandable coaching cards inline. In both MobileMenu and Sidebar.
     - Separate from the workout calendar — for users who just want extra movement work on top of their program
     - Search: "I did chest yesterday and I'm tight" → returns 5 targeted stretches/drills
     - Advanced lookup: "What are you looking to stretch?" → user types area/muscle/situation
     - Ties into anatomy section (future): user taps a body area → gets mobility drills, stretches, targeted exercises for that area
     - Simple version first; deep anatomy integration later
 
-- [ ] **Targeted exercise library tied to anatomy** — Within the anatomy section, targeted exercises per muscle group (Chest, Back, Biceps, Triceps, Shoulders, Hips, Knees, Ankles, Core):
+- [x] **Targeted exercise library tied to anatomy** — Anatomy page restructured: iframe takes top 55vh, "Targeted Exercises" section below. 12 muscle group chips (Chest, Back, Shoulders, Arms, Core, Hips, Quads, Hamstrings, Calves, Knees, Ankles). Filters exercise_library by keywords. Expandable coaching cards. (Chest, Back, Biceps, Triceps, Shoulders, Hips, Knees, Ankles, Core):
     - Entry point: "Targeted Exercises" menu option in anatomy area
     - Uses internal library with depth — 5 best mobility drills per target area based on research, usefulness, and safety
     - MIE guides video curation toward trusted channels: ATHLEAN-X, Knees Over Toes Guy, Vanja, and preferred recovery chiropractor
@@ -154,7 +154,7 @@
 ## 🥗 Nutrition Tab (added 2026-04-27)
 > Replaces "Your Plan" tab slot. Placeholder screen first, full build later.
 - [x] **Placeholder screen** — "We're building this in the background. Stay tuned." Shown immediately after nav merge.
-- [ ] **Nutrition profile** — Separate from training profile. Collects: age, weight, height, wake time, first meal time, intermittent fasting preference, goals, known allergies, health conditions (gout, carpal tunnel, lactose intolerance, diabetes, etc.), doctor letters/dietary recommendations (file upload). If training profile or profile picture is incomplete, nudge user to fill those first.
+- [x] **Nutrition profile** — Existing form enhanced with: wake time, first meal time, IF preference (5 options: None/16:8/14:10/18:6/OMAD), health conditions multi-select (10 pre-populated conditions). All fields passed to AI generation. Already had: age, weight, height, dietary pref, allergies, meals/day.
 - [ ] **AI nutrition agent** — Trained at certified-nutritionist level. Reads training plan phase, activity level tracked in app, biometric data (when integrated), and nutrition profile. Generates a 3-month meal plan synchronized to the current workout program: morning to night, what to eat, when to eat, meal timing, and scheduling recommendations.
 - [ ] **Nutrition plan generation** — Paid feature (cost TBD during billing brainstorm). Token-heavy; runs once and stores the plan, not re-generated daily. Plan adapts as workout phase changes (Foundation → Build → Peak → Maintenance).
 - [ ] **File upload support** — Users can upload doctor letters or dietary notes to inform the nutrition agent.

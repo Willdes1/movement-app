@@ -7,6 +7,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { supabase } from '@/lib/supabase'
 import PushNotificationBanner from '@/components/PushNotificationBanner'
 import { useStreak } from '@/lib/useStreak'
+import { useTTS } from '@/hooks/useTTS'
 
 type DailyBlock = { label: string; duration: string; exercises: string[]; tip?: string }
 type DailySession = { morning?: DailyBlock; warmup?: DailyBlock; workout?: DailyBlock; abs?: DailyBlock; cooldown?: DailyBlock; evening?: DailyBlock }
@@ -67,6 +68,10 @@ export default function TodayPage() {
   const { activeRecovery } = useTheme()
   const router = useRouter()
 
+  const { speak, stop, speaking, loading: ttsLoading, gender } = useTTS()
+  const [speakingKey, setSpeakingKey] = useState<string | null>(null)
+  const [exerciseLib, setExerciseLib] = useState<Record<string, { how: string | null; tip: string | null; tts_url_male: string | null; tts_url_female: string | null }>>({})
+
   const [firstName, setFirstName] = useState<string | null>(null)
   const [currentWeek, setCurrentWeek] = useState<number | null>(null)
   const [todayPlan, setTodayPlan] = useState<DayPlan | null>(null)
@@ -114,6 +119,26 @@ export default function TodayPage() {
 
   useEffect(() => { if (user) loadData() }, [user, loadData])
 
+  // Pre-load exercise library details for today's exercises (enables fast TTS)
+  useEffect(() => {
+    if (!todayPlan || !user) return
+    const names: string[] = todayPlan.daily_session
+      ? (Object.values(todayPlan.daily_session).flatMap(b => b?.exercises ?? []) as string[])
+      : todayPlan.movements
+    const normalized = [...new Set(names.map(normalizeExName))].filter(Boolean)
+    if (!normalized.length) return
+    supabase
+      .from('exercise_library')
+      .select('name_normalized, how, tip, tts_url_male, tts_url_female')
+      .in('name_normalized', normalized)
+      .then(({ data }) => {
+        const map: typeof exerciseLib = {}
+        data?.forEach(e => { map[e.name_normalized] = e })
+        setExerciseLib(map)
+      })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayPlan, user])
+
   useEffect(() => {
     if (!user || loading) return
     if (isAdmin || role === 'admin') return
@@ -125,6 +150,26 @@ export default function TodayPage() {
       localStorage.setItem(key, '1')
     }
   }, [user, userId, loading, isAdmin, role])
+
+  function normalizeExName(raw: string) {
+    return raw.toLowerCase()
+      .replace(/\s+\d+[×x]\d+.*/i, '').replace(/\s+\d+\s+sets?.*/i, '').trim()
+      .replace(/[-–—]/g, ' ').replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '_')
+  }
+
+  async function speakExercise(rawName: string) {
+    const key = normalizeExName(rawName)
+    if (speakingKey === key) { stop(); setSpeakingKey(null); return }
+    setSpeakingKey(key)
+    const lib = exerciseLib[key]
+    const displayName = rawName.replace(/\s+\d+[×x]\d+.*/i, '').replace(/\s+\d+\s+sets?.*/i, '').trim()
+    const parts = [displayName]
+    if (lib?.how) parts.push(lib.how)
+    if (lib?.tip) parts.push('Coaching tip: ' + lib.tip)
+    const preUrl = gender === 'male' ? lib?.tts_url_male : lib?.tts_url_female
+    await speak(parts.join('. '), { preGeneratedUrl: preUrl ?? undefined, nameNormalized: preUrl ? undefined : key })
+    setSpeakingKey(null)
+  }
 
   const isRecovering = !!activeRecovery
   const isRestDay = todayPlan?.type === 'rest'
@@ -241,12 +286,19 @@ export default function TodayPage() {
                           {block.duration && <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 600 }}>{block.duration}</span>}
                         </div>
                         <div style={{ padding: '8px 12px' }}>
-                          {block.exercises.map((ex, ei) => (
-                            <div key={ei} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', borderBottom: ei < block.exercises.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                              <div style={{ width: 4, height: 4, borderRadius: '50%', background: cfg.color, flexShrink: 0 }} />
-                              <span style={{ fontSize: 12, color: 'var(--text-dim)', textTransform: 'capitalize' }}>{ex}</span>
-                            </div>
-                          ))}
+                          {block.exercises.map((ex, ei) => {
+                            const exKey = normalizeExName(ex)
+                            const isSpeaking = speakingKey === exKey && (speaking || ttsLoading)
+                            return (
+                              <div key={ei} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', borderBottom: ei < block.exercises.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                                <div style={{ width: 4, height: 4, borderRadius: '50%', background: cfg.color, flexShrink: 0 }} />
+                                <span style={{ flex: 1, fontSize: 12, color: 'var(--text-dim)', textTransform: 'capitalize' }}>{ex}</span>
+                                <button onClick={() => speakExercise(ex)} style={{ background: 'none', border: 'none', padding: '2px 4px', cursor: 'pointer', fontSize: 13, lineHeight: 1, color: isSpeaking ? cfg.color : 'var(--text-dim)', flexShrink: 0 }}>
+                                  {isSpeaking ? '🔊' : '🔈'}
+                                </button>
+                              </div>
+                            )
+                          })}
                           {block.tip && <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6, fontStyle: 'italic', paddingTop: 6, borderTop: '1px solid var(--border)' }}>💡 {block.tip}</p>}
                         </div>
                       </div>
@@ -293,12 +345,19 @@ export default function TodayPage() {
                           {block.duration && <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 600 }}>{block.duration}</span>}
                         </div>
                         <div style={{ padding: '8px 12px' }}>
-                          {block.exercises.map((ex, ei) => (
-                            <div key={ei} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', borderBottom: ei < block.exercises.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                              <div style={{ width: 4, height: 4, borderRadius: '50%', background: cfg.color, flexShrink: 0 }} />
-                              <span style={{ fontSize: 12, color: 'var(--text-mid)', textTransform: 'capitalize' }}>{ex}</span>
-                            </div>
-                          ))}
+                          {block.exercises.map((ex, ei) => {
+                            const exKey = normalizeExName(ex)
+                            const isSpeaking = speakingKey === exKey && (speaking || ttsLoading)
+                            return (
+                              <div key={ei} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', borderBottom: ei < block.exercises.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                                <div style={{ width: 4, height: 4, borderRadius: '50%', background: cfg.color, flexShrink: 0 }} />
+                                <span style={{ flex: 1, fontSize: 12, color: 'var(--text-mid)', textTransform: 'capitalize' }}>{ex}</span>
+                                <button onClick={() => speakExercise(ex)} style={{ background: 'none', border: 'none', padding: '2px 4px', cursor: 'pointer', fontSize: 13, lineHeight: 1, color: isSpeaking ? cfg.color : 'var(--text-dim)', flexShrink: 0 }}>
+                                  {isSpeaking ? '🔊' : '🔈'}
+                                </button>
+                              </div>
+                            )
+                          })}
                           {block.tip && <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6, fontStyle: 'italic', paddingTop: 6, borderTop: '1px solid var(--border)' }}>💡 {block.tip}</p>}
                         </div>
                       </div>

@@ -12,9 +12,11 @@ const navItems = [
   { href: '/calendar', label: 'Calendar',   emoji: '📅' },
   { href: '/log',      label: 'History',    emoji: '📋' },
   { href: '/exercises', label: 'Exercises',  emoji: '🔍' },
+  { href: '/mobility',       label: 'Mobility',         emoji: '🧘' },
   { href: '/recovery',       label: 'Recovery',         emoji: '🩹' },
   { href: '/import-program', label: 'Import a Program',  emoji: '📄' },
   { href: '/programs',       label: 'My Programs',       emoji: '📋' },
+  { href: '/convert-plan',   label: 'Convert My Plan',   emoji: '🔄' },
   { href: '/account',        label: 'Account',           emoji: '👤' },
 ]
 

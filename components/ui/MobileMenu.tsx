@@ -9,10 +9,12 @@ const MENU_ITEMS = [
   { href: '/for-you',        label: 'For You',           desc: 'Daily feed & mindset',              emoji: '⚡' },
   { href: '/exercises',      label: 'Exercise Library',  desc: 'Search & explore movements',        emoji: '📚' },
   { href: '/log',            label: 'History',           desc: 'Your workout log',                  emoji: '📋' },
+  { href: '/mobility',       label: 'Mobility',           desc: 'Stretching & mobility drills',       emoji: '🧘' },
   { href: '/recovery',       label: 'Recovery',          desc: 'Active recovery tracking',          emoji: '🩹' },
   { href: '/my-coach',       label: 'My Coach',          desc: 'Coach-assigned program',            emoji: '🏋️' },
   { href: '/import-program', label: 'Import a Program',  desc: 'Bring your own PDF — AI-converted', emoji: '📄' },
   { href: '/programs',       label: 'My Programs',       desc: 'All your generated plans',           emoji: '📋' },
+  { href: '/convert-plan',   label: 'Convert My Plan',   desc: 'Submit old plans for conversion',    emoji: '🔄' },
 ]
 
 export default function MobileMenu() {

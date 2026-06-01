@@ -390,6 +390,11 @@ function OverviewSection() {
     'Auto-capture prompt — After tapping ✓ Complete Day, green "Nice work!" prompt appears reminding user to tap any exercise above to log sets; dismissible with ×',
     'Saved Programs Library — /programs page listing every training_programs record for the user in reverse-chronological order; shows start date, date range, weeks built, phase; Active badge on current program; View Plan button; linked from both MobileMenu and Sidebar',
     'Browse & Learn — /browse page rebuilt with live exercise_library data; searchable across 750+ exercises; load-more pagination (30/page); inline expandable coaching cards (how-to, breathing, coaching tip) on tap; video indicator badges',
+    'Mobility tab — /mobility page with 12 body-area chips (Hip Flexors, Hamstrings, T-Spine, Shoulders, Calves, Quads, Glutes, Core, Chest, Hips, Neck, Ankles); text search; keyword filter of exercise_library; expandable coaching cards; MobileMenu + Sidebar',
+    'Read-aloud workout instructions — 🔈 speaker button on every exercise in Today page workout blocks; reads name + how-to + coaching tip via TTS; pre-loads exercise library after plan loads for instant response',
+    'Targeted anatomy exercises — anatomy page restructured: 55vh iframe + Targeted Exercises section below; 12 muscle group chips; keyword filter of exercise_library; expandable inline coaching cards',
+    'Nutrition profile enhancements — added wake time, first meal time, IF preference (5 options), health conditions multi-select (10 conditions); all passed to AI generation',
+    'Custom plan conversion — /convert-plan concierge page + admin Conversions tab; drag-drop PDF/DOCX upload; status tracker; admin can download + review + update status + send note to user',
   ]
   const COMING = [
     'Injury → training handoff: AI-modified safe training plan that runs alongside recovery',

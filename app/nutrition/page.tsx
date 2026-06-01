@@ -10,6 +10,8 @@ import type { UserProfile } from '@/lib/types'
 
 const DIETARY_OPTIONS = ['Omnivore', 'Vegetarian', 'Vegan', 'Pescatarian', 'Keto', 'Paleo']
 const MEALS_OPTIONS = [3, 4, 5, 6]
+const IF_OPTIONS = ['None (eat throughout day)', '16:8 (16h fast, 8h eating)', '14:10', '18:6', 'OMAD (one meal a day)']
+const HEALTH_CONDITIONS = ['Type 2 Diabetes', 'Gout', 'High Blood Pressure', 'High Cholesterol', 'Lactose Intolerance', 'Gluten Sensitivity', 'IBS / Digestive Issues', 'Carpal Tunnel', 'Thyroid Condition', 'Kidney Issues']
 
 type Meal = { name: string; time: string; description: string; protein: number; carbs: number; fat: number; calories: number }
 type Phase = { name: string; calorieNote: string; focus: string; keyFoods: string[] }
@@ -33,6 +35,10 @@ type NutritionSetup = {
   dietaryPref: string
   allergies: string
   mealsPerDay: number
+  wakeTime: string
+  firstMealTime: string
+  ifPref: string
+  healthConditions: string[]
 }
 
 const PHASE_COLORS: Record<string, string> = {
@@ -110,6 +116,7 @@ export default function NutritionPage() {
   const [plan, setPlan] = useState<NutritionPlan | null>(null)
   const [setup, setSetup] = useState<NutritionSetup>({
     age: '', weightLbs: '', heightFt: '', heightIn: '', dietaryPref: 'Omnivore', allergies: '', mealsPerDay: 4,
+    wakeTime: '', firstMealTime: '', ifPref: 'None (eat throughout day)', healthConditions: [],
   })
 
   const loadExisting = useCallback(async () => {
@@ -129,6 +136,7 @@ export default function NutritionPage() {
         dietaryPref: data.dietary_pref ?? 'Omnivore',
         allergies: data.allergies ?? '',
         mealsPerDay: data.meals_per_day ?? 4,
+        wakeTime: '', firstMealTime: '', ifPref: 'None (eat throughout day)', healthConditions: [],
       })
       setScreen('plan')
     } else {
@@ -178,6 +186,10 @@ export default function NutritionPage() {
             dietaryPref: setup.dietaryPref,
             allergies: setup.allergies,
             mealsPerDay: setup.mealsPerDay,
+            wakeTime: setup.wakeTime || null,
+            firstMealTime: setup.firstMealTime || null,
+            ifPref: setup.ifPref !== 'None (eat throughout day)' ? setup.ifPref : null,
+            healthConditions: setup.healthConditions.length > 0 ? setup.healthConditions : null,
           },
         }),
       })
@@ -311,6 +323,70 @@ export default function NutritionPage() {
                   {n}
                 </button>
               ))}
+            </div>
+          </Section>
+
+          {/* Meal timing */}
+          <Section title="Meal Timing" sub="Optional — helps AI schedule your meals around your day">
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <Label>Wake time</Label>
+                <input value={setup.wakeTime} onChange={e => setSetup(s => ({ ...s, wakeTime: e.target.value }))} placeholder="e.g. 6:30 AM" style={inputStyle} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <Label>First meal</Label>
+                <input value={setup.firstMealTime} onChange={e => setSetup(s => ({ ...s, firstMealTime: e.target.value }))} placeholder="e.g. 7:00 AM" style={inputStyle} />
+              </div>
+            </div>
+          </Section>
+
+          {/* Intermittent fasting */}
+          <Section title="Eating Window / Intermittent Fasting">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {IF_OPTIONS.map(opt => (
+                <button
+                  key={opt}
+                  onClick={() => setSetup(s => ({ ...s, ifPref: opt }))}
+                  style={{
+                    padding: '10px 14px', borderRadius: 10, fontSize: 13, fontWeight: setup.ifPref === opt ? 700 : 400,
+                    border: `1px solid ${setup.ifPref === opt ? 'var(--accent)' : 'var(--border)'}`,
+                    background: setup.ifPref === opt ? 'var(--accent-bg)' : 'var(--surface2)',
+                    color: setup.ifPref === opt ? 'var(--accent)' : 'var(--text-mid)',
+                    cursor: 'pointer', textAlign: 'left',
+                  }}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </Section>
+
+          {/* Health conditions */}
+          <Section title="Health Conditions" sub="Optional — AI adjusts recommendations accordingly">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {HEALTH_CONDITIONS.map(cond => {
+                const selected = setup.healthConditions.includes(cond)
+                return (
+                  <button
+                    key={cond}
+                    onClick={() => setSetup(s => ({
+                      ...s,
+                      healthConditions: selected
+                        ? s.healthConditions.filter(c => c !== cond)
+                        : [...s.healthConditions, cond],
+                    }))}
+                    style={{
+                      padding: '7px 12px', borderRadius: 20, fontSize: 12, fontWeight: selected ? 700 : 400,
+                      border: `1px solid ${selected ? 'var(--orange)' : 'var(--border)'}`,
+                      background: selected ? 'rgba(255,140,0,0.1)' : 'var(--surface2)',
+                      color: selected ? 'var(--orange)' : 'var(--text-mid)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {selected ? '✓ ' : ''}{cond}
+                  </button>
+                )
+              })}
             </div>
           </Section>
 
