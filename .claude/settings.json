@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PreCompact": [
+      {
+        "matcher": "auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd c:/Dev/movement-app && node scripts/git-stats.js && git add lib/git-stats.json && git commit -m \"Auto: git-stats update on context compact\" --allow-empty && git push",
+            "timeout": 60,
+            "statusMessage": "Saving git-stats and pushing before compact...",
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}
