@@ -73,7 +73,8 @@
 - [ ] **Layer 1–4 schema migration** — Run in Supabase SQL Editor: ALTER exercise_library (audience, source, notes, contraindications, modality, equipment_required, difficulty), CREATE 11 new tables (coaches, coach_clients, coach_program_templates, coach_programs, coach_program_weeks, coach_exercise_swaps, coach_check_ins, affiliate_referrals, affiliate_ledger, affiliate_payout_requests, coach_ai_generation_log), RLS enabled with stub policies on all new tables.
 - [ ] **Route scaffolding** — Empty shells for /coach/dashboard, /coach/clients, /coach/clients/[id], /coach/builder. Auth role-split: coach role gets coach routes, admin gets all, user gets user routes.
 - [x] **PDF export of programs** — Export PDF button on program detail page; opens printable HTML in new tab with print dialog; all weeks, days, movements, phases, coach notes.
-- [ ] **PDF/DOCX import flow** — Parse uploaded program → normalize to coach_programs schema → assign to client.
+- [x] **PDF/DOCX import flow** — Upload PDF or DOCX on Builder page; mammoth extracts DOCX text, pdf-parse extracts PDF text; Claude Haiku normalizes to coach_programs schema; preview before saving to coach_program_weeks.
+- [ ] **Build Manually** — Drag-and-drop week/day builder for building programs from scratch without AI or file upload.
 - [ ] **Exercise swap modal** — Search exercise_library (filter by movement pattern / equipment), writes swap to coach_exercise_swaps, can write new exercises to library.
 - [ ] **Two-agent coach generator** — Agent 1 (Planner): JSON skeleton for full program. Library lookup: no tokens (SQL). Agent 2 (Filler): only runs on unmatched slots. Coach-only pipeline, does not touch user generator.
 - [ ] **Affiliate system + admin coach management** — Admin tab for coach accounts, tier assignment, payout review.
