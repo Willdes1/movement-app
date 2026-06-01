@@ -12,8 +12,9 @@ const navItems = [
   { href: '/calendar', label: 'Calendar',   emoji: '📅' },
   { href: '/log',      label: 'History',    emoji: '📋' },
   { href: '/exercises', label: 'Exercises',  emoji: '🔍' },
-  { href: '/recovery', label: 'Recovery',   emoji: '🩹' },
-  { href: '/account',  label: 'Account',    emoji: '👤' },
+  { href: '/recovery',       label: 'Recovery',         emoji: '🩹' },
+  { href: '/import-program', label: 'Import a Program',  emoji: '📄' },
+  { href: '/account',        label: 'Account',           emoji: '👤' },
 ]
 
 export default function Sidebar() {
