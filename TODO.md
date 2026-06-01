@@ -7,12 +7,12 @@
 - [x] **Hyperextended elbow recovery plan** — 6-phase: RICE → Passive ROM → Active ROM → Isometric Loading → Progressive Resistance → Sport-Specific Return. Live at /recovery/elbow.
 - [x] **Shoulder Impingement playbook** — 4-phase: Pain Relief & Posture → Mobility → Rotator Cuff Activation → Return to Function. Live at /recovery/shoulder.
 - [x] **Knee Rehab playbook** — 4-phase: Protect → Stability → Strength → Return to Sport (includes hop test clearance). Live at /recovery/knee.
-- [ ] Build out Browse & Learn page (exercise library + articles)
+- [x] Build out Browse & Learn page (exercise library + articles)
 
 ## 🏋️ Profile — Workout Environment
 - [x] **Workout location** — Home / Gym / Both chips on profile
 - [x] **Home equipment selector** — checklist + free-text, feeds AI prompt with hard equipment constraint
-- [ ] **Travel adjustment button** — "Need modifications?" button on calendar days. User describes situation, AI regenerates that day only.
+- [x] **Travel adjustment button** — "Need modifications?" button on calendar days. User describes situation, AI regenerates that day only.
 
 ## 🧠 Plan Generation UX
 - [x] **Pre-generation instructions box** — optional instructions textarea in Regenerate modal
@@ -40,7 +40,7 @@
 - [ ] **Injury → Recovery handoff** — When user starts a recovery playbook, AI modifies remaining training plan to keep them active with safe, injury-appropriate workouts. No full stop.
 - [ ] **Return-to-sport agent** (added 2026-04-27) — During active recovery, a second agent generates a full sport-specific return-to-sport plan. For skateboarding: Day 1 = riding around, pool riding, slappies → Day 2 = shiftys → Day 3 = 50-50s → 180s, etc. Progression is sport- and skill-level-specific. Each day after the recovery workout, a prompt asks how the sport session felt before unlocking the next step. Agent runs token-heavy generation once, saves the full plan (as a stored record), and only reads/updates it on daily check-ins — no re-generation per session. Activates automatically when user enters recovery mode.
 - [ ] **Post-recovery re-entry plan** — After completing recovery, AI does NOT revert to old plan. It rebuilds around the healed area: targeted protective exercises + gradual intensity ramp for that body part over a set period
-- [ ] **Missed session / calendar rescheduling** — (expanded 2026-05-31) Full rescheduling flow when a user misses a workout day:
+- [x] **Missed session / calendar rescheduling** — (expanded 2026-05-31) Skip flow live (mark missed day done and move on). Full reschedule options (move to tomorrow/weekend) coming later.
     - "I couldn't work out today" button on each calendar day
     - Follow-up: "Do you want to rearrange the rest of your week?" with smart options: move missed day to tomorrow, skip it and continue, miss the rest of the week and start fresh Monday, or move it to Saturday/Sunday
     - Ask "Are you available on the weekend?" — if yes, slot it there; if no, intelligently combine/redistribute remaining days so the week still has logical progression
@@ -60,7 +60,7 @@
 
 ## 📊 Stats & Tracking (added 2026-04-23)
 - [x] **Workout log system** — `workout_logs` table (user_id, exercise_normalized, sets, reps, weight, logged_at). Exercise modal shows "Last Session" card (weight, sets, reps, date) + "Log Set" form with 3 inputs. Logs persist across plans/weeks. Calendar modal shows last session read-only.
-- [ ] **Auto-capture from workout flow** — Currently requires manual tap to log. Future: auto-prompt when marking a session complete.
+- [x] **Auto-capture from workout flow** — Green "Nice work!" prompt appears after completing a day, reminding user to tap any exercise to log sets.
 - [ ] **Cross-plan stat persistence with timestamps** — Covered by current `workout_logs` design (exercise_normalized is the key). Just needs display in more places as needed.
 
 ## 🎬 Exercise Demos (added 2026-04-23)
@@ -105,7 +105,7 @@
 
 - [x] **Upload personal workout programs + PDF import + AI safety conversion** — Hamburger menu "Import a Program" entry at /import-program. Upload PDF/DOCX (text or scanned/image via Claude vision). PT/Rehab safety pass checks every exercise against user's injury restrictions and replaces contraindicated movements — shows a diff of changes before saving. Preview step with week accordion. "Activate Program" sets active_imported_program_id on profile; "Save for Later" stores as draft. ImportedProgramBanner shows active program with Leave Plan flow (save progress or exit) — same pattern as RecoveryBanner. DB: user_imported_programs + user_imported_program_weeks tables with RLS.
 
-- [ ] **Saved programs library** — Every generated workout plan is saved in full inside the user's account (whether 1, 2, or 3 months). Each program gets a unique AI-generated name. Users can:
+- [x] **Saved programs library** — /programs page lists all generated plans in reverse-chronological order with start date, date range, weeks built, and phase. Active badge + View Plan button on current program. Full program switching requires DB migration (coming later). Users can:
     - Browse all programs they've ever generated
     - Search previous programs
     - Select "Switch to this program"
@@ -122,7 +122,7 @@
 
 ## 🧘 Mobility, Stretching & Recovery AI (added 2026-05-31)
 
-- [ ] **"Ask AI" in Recovery tab** — Smart recovery assistant for pain, soreness, and mobility issues:
+- [x] **"Ask AI" in Recovery tab** — Smart recovery assistant live at top of /recovery. User describes pain/soreness/tightness → 2-step AI pipeline → 5 targeted exercises with how-to + coaching tips. Refresh button for new set. Pulls from exercise library first, AI-generated cues as fallback.
     - Entry point: "Ask AI" button inside the Recovery tab
     - System asks targeted questions: Where does it hurt? When did it start? During workout/sport/normal movement? Pain on bending/twisting/coughing? Sharp, dull, tight, or burning?
     - Goal: NOT diagnosis — guide toward safe, helpful recovery movements

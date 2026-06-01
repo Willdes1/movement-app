@@ -12,6 +12,7 @@ const MENU_ITEMS = [
   { href: '/recovery',       label: 'Recovery',          desc: 'Active recovery tracking',          emoji: '🩹' },
   { href: '/my-coach',       label: 'My Coach',          desc: 'Coach-assigned program',            emoji: '🏋️' },
   { href: '/import-program', label: 'Import a Program',  desc: 'Bring your own PDF — AI-converted', emoji: '📄' },
+  { href: '/programs',       label: 'My Programs',       desc: 'All your generated plans',           emoji: '📋' },
 ]
 
 export default function MobileMenu() {

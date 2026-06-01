@@ -384,6 +384,12 @@ function OverviewSection() {
     'MIE Phase 3 — Full Agent Council: Sports Specialist Agent (sport-specific warmups + coaching cues), Mobility Agent (morning/cooldown/evening blocks), Mindset Agent (Mushin/Kaizen/Shokunin/Zanshin/Fudoshin layer on coaching + warmup tips), Recovery Agent (evidence-based rest day programming); all 4 agents sequential, non-fatal fallback',
     'MIE Phase 4 — Knowledge Curator Agent: weekly Vercel cron reviews 60 items/pass (least-recently-reviewed first); Claude flags outdated/inaccurate items with suggested replacements; admin accepts (re-embeds + increments version) or dismisses; full review UI in admin MIE tab',
     'Push notifications — VAPID keys configured, service worker live, PushNotificationBanner on Today page, admin send UI; web push delivery to subscribed devices',
+    'Travel adjustment — ✈️ "Need modifications?" button on any workout day in Calendar; user describes situation (hotel gym, no equipment, park); Claude Haiku patches warmup/workout/abs blocks or movements array; saves back to DB; resets on day change',
+    'Ask AI Recovery — 🤖 "Ask AI" collapsible card at top of Recovery page; user describes pain/soreness/tightness; two-step AI pipeline recommends 5 exercises (library lookup first, AI-generated cues as fallback); inline expandable cards with how-to + coaching tip + breathing; Refresh button for new set',
+    'Missed session / Skip — "Couldn\'t make it?" button on past uncompleted workout days in Calendar; expands to option: "Skip this day — mark done and move on"; writes day_completions with skipped:true; resets on day change',
+    'Auto-capture prompt — After tapping ✓ Complete Day, green "Nice work!" prompt appears reminding user to tap any exercise above to log sets; dismissible with ×',
+    'Saved Programs Library — /programs page listing every training_programs record for the user in reverse-chronological order; shows start date, date range, weeks built, phase; Active badge on current program; View Plan button; linked from both MobileMenu and Sidebar',
+    'Browse & Learn — /browse page rebuilt with live exercise_library data; searchable across 750+ exercises; load-more pagination (30/page); inline expandable coaching cards (how-to, breathing, coaching tip) on tap; video indicator badges',
   ]
   const COMING = [
     'Injury → training handoff: AI-modified safe training plan that runs alongside recovery',

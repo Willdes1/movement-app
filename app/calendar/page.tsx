@@ -209,10 +209,29 @@ function CalendarInner() {
   const [lastLog, setLastLog] = useState<WorkoutLog | null>(null)
   const [completions, setCompletions] = useState<Set<string>>(new Set())
   const [completing, setCompleting] = useState(false)
+  // Travel adjustment
+  const [travelOpen, setTravelOpen] = useState(false)
+  const [travelSituation, setTravelSituation] = useState('')
+  const [travelLoading, setTravelLoading] = useState(false)
+  // Missed session
+  const [missedOpen, setMissedOpen] = useState(false)
+  const [missedLoading, setMissedLoading] = useState(false)
+  // Auto-capture prompt after completing
+  const [showLogPrompt, setShowLogPrompt] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !user) router.replace('/auth')
   }, [authLoading, user, router])
+
+  // Reset per-day UI state whenever the selected day changes
+  useEffect(() => {
+    setTravelOpen(false)
+    setTravelSituation('')
+    setTravelLoading(false)
+    setMissedOpen(false)
+    setMissedLoading(false)
+    setShowLogPrompt(false)
+  }, [selectedKey])
 
   const loadData = useCallback(async () => {
     if (!user) return
@@ -333,6 +352,44 @@ function CalendarInner() {
     )
     setCompletions(prev => new Set([...prev, `${weekNum}-${dayIdx}`]))
     setCompleting(false)
+    setShowLogPrompt(true)
+  }
+
+  async function handleTravelAdjust() {
+    if (!program || !selectedEntry || !travelSituation.trim()) return
+    setTravelLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const resp = await fetch('/api/user/travel-adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ programId: program.id, weekNum: selectedEntry.weekNum, dayIdx: selectedEntry.dayIdx, situation: travelSituation }),
+      })
+      const data = await resp.json()
+      if (data.day) {
+        setWeekPlans(prev => {
+          const weekArr = [...(prev[selectedEntry.weekNum] ?? [])]
+          weekArr[selectedEntry.dayIdx] = data.day
+          return { ...prev, [selectedEntry.weekNum]: weekArr }
+        })
+        setTravelOpen(false)
+        setTravelSituation('')
+      }
+    } finally {
+      setTravelLoading(false)
+    }
+  }
+
+  async function skipDay(weekNum: number, dayIdx: number) {
+    if (!program || !user || missedLoading) return
+    setMissedLoading(true)
+    await supabase.from('day_completions').upsert(
+      { user_id: userId, program_id: program.id, week_number: weekNum, day_index: dayIdx, skipped: true },
+      { onConflict: 'user_id,program_id,week_number,day_index' }
+    )
+    setCompletions(prev => new Set([...prev, `${weekNum}-${dayIdx}`]))
+    setMissedOpen(false)
+    setMissedLoading(false)
   }
 
   async function undoCompletion(weekNum: number, dayIdx: number) {
@@ -652,6 +709,45 @@ function CalendarInner() {
               ))}
             </div>
           )}
+          {/* Travel Adjustment — show on any workout day */}
+          {selectedEntry.day.type !== 'rest' && (
+            <div style={{ marginBottom: 10 }}>
+              {!travelOpen ? (
+                <button
+                  onClick={() => setTravelOpen(true)}
+                  style={{ width: '100%', padding: '8px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-dim)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}
+                >
+                  ✈️  Need modifications?
+                </button>
+              ) : (
+                <div style={{ padding: '12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10 }}>
+                  <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Describe your situation</p>
+                  <p style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8, lineHeight: 1.5 }}>
+                    e.g. "hotel gym with dumbbells only" or "at home, no equipment"
+                  </p>
+                  <textarea
+                    value={travelSituation}
+                    onChange={e => setTravelSituation(e.target.value)}
+                    placeholder="What's your situation?"
+                    rows={2}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontSize: 13, fontFamily: 'inherit', resize: 'none', boxSizing: 'border-box', marginBottom: 8, outline: 'none' }}
+                  />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={() => { setTravelOpen(false); setTravelSituation('') }}
+                      style={{ flex: 1, padding: '7px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text-dim)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}
+                    >Cancel</button>
+                    <button
+                      onClick={handleTravelAdjust}
+                      disabled={!travelSituation.trim() || travelLoading}
+                      style={{ flex: 2, padding: '7px', borderRadius: 8, border: 'none', background: !travelSituation.trim() || travelLoading ? 'var(--surface2)' : 'var(--accent)', color: !travelSituation.trim() || travelLoading ? 'var(--text-dim)' : '#fff', fontSize: 12, cursor: !travelSituation.trim() || travelLoading ? 'default' : 'pointer', fontFamily: 'inherit', fontWeight: 700 }}
+                    >{travelLoading ? 'Adapting…' : 'Adapt Workout'}</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {(() => {
             if (!selectedEntry || selectedEntry.day.type === 'rest') return null
             const { dayIdx } = selectedEntry
@@ -660,24 +756,68 @@ function CalendarInner() {
             const isPastOrToday = selectedKey! <= dateKey(new Date())
             if (!isPastOrToday) return null
             return done ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#4ec97a' }}>✓ Completed</div>
-                <button
-                  onClick={() => undoCompletion(selectedEntry.weekNum, dayIdx)}
-                  disabled={completing}
-                  style={{ fontSize: 11, padding: '4px 12px', borderRadius: 20, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text-dim)', cursor: completing ? 'default' : 'pointer', fontFamily: 'inherit', fontWeight: 600 }}
-                >
-                  {completing ? '…' : 'Undo'}
-                </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#4ec97a' }}>✓ Completed</div>
+                  <button
+                    onClick={() => undoCompletion(selectedEntry.weekNum, dayIdx)}
+                    disabled={completing}
+                    style={{ fontSize: 11, padding: '4px 12px', borderRadius: 20, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text-dim)', cursor: completing ? 'default' : 'pointer', fontFamily: 'inherit', fontWeight: 600 }}
+                  >
+                    {completing ? '…' : 'Undo'}
+                  </button>
+                </div>
+                {/* Auto-capture prompt */}
+                {showLogPrompt && (
+                  <div style={{ padding: '10px 12px', background: 'rgba(78,201,122,0.07)', border: '1px solid rgba(78,201,122,0.25)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                    <div>
+                      <p style={{ fontSize: 12, fontWeight: 700, color: '#4ec97a', marginBottom: 1 }}>Nice work!</p>
+                      <p style={{ fontSize: 11, color: 'var(--text-dim)' }}>Tap any exercise above to log your sets.</p>
+                    </div>
+                    <button onClick={() => setShowLogPrompt(false)} style={{ background: 'none', border: 'none', fontSize: 16, color: 'var(--text-dim)', cursor: 'pointer', lineHeight: 1, padding: 0, flexShrink: 0 }}>×</button>
+                  </div>
+                )}
               </div>
             ) : (
-              <button
-                onClick={() => completeDay(selectedEntry.weekNum, dayIdx)}
-                disabled={completing}
-                style={{ width: '100%', padding: '9px', borderRadius: 8, border: '1px solid rgba(78,201,122,0.3)', background: 'rgba(78,201,122,0.08)', color: '#4ec97a', fontWeight: 700, fontSize: 12, cursor: completing ? 'default' : 'pointer', fontFamily: 'inherit', letterSpacing: '0.04em' }}
-              >
-                {completing ? '…' : '✓  Complete Day'}
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <button
+                  onClick={() => completeDay(selectedEntry.weekNum, dayIdx)}
+                  disabled={completing}
+                  style={{ width: '100%', padding: '9px', borderRadius: 8, border: '1px solid rgba(78,201,122,0.3)', background: 'rgba(78,201,122,0.08)', color: '#4ec97a', fontWeight: 700, fontSize: 12, cursor: completing ? 'default' : 'pointer', fontFamily: 'inherit', letterSpacing: '0.04em' }}
+                >
+                  {completing ? '…' : '✓  Complete Day'}
+                </button>
+                {/* Missed session — show on past days only */}
+                {selectedKey! < dateKey(new Date()) && (
+                  !missedOpen ? (
+                    <button
+                      onClick={() => setMissedOpen(true)}
+                      style={{ width: '100%', padding: '7px', borderRadius: 8, border: '1px solid rgba(255,77,77,0.18)', background: 'transparent', color: 'var(--text-dim)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}
+                    >
+                      Couldn&apos;t make it?
+                    </button>
+                  ) : (
+                    <div style={{ padding: '12px', background: 'rgba(255,77,77,0.05)', border: '1px solid rgba(255,77,77,0.15)', borderRadius: 10 }}>
+                      <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>What do you want to do?</p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <button
+                          onClick={() => skipDay(selectedEntry.weekNum, dayIdx)}
+                          disabled={missedLoading}
+                          style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-mid)', fontSize: 12, cursor: missedLoading ? 'default' : 'pointer', fontFamily: 'inherit', fontWeight: 600, textAlign: 'left' }}
+                        >
+                          {missedLoading ? '…' : 'Skip this day — mark it done and move on'}
+                        </button>
+                        <button
+                          onClick={() => setMissedOpen(false)}
+                          style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text-dim)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
             )
           })()}
         </div>
