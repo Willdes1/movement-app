@@ -1,6 +1,6 @@
 # Agent Context — Movement App
 > Full briefing for a new agent to continue this project without any prior conversation history.
-> Last updated: 2026-05-29 | Current branch: master | 217 commits
+> Last updated: 2026-06-01 | Current branch: master | 242 commits
 
 ---
 
@@ -99,7 +99,57 @@
 
 ---
 
-## 4. What Was Built This Session (2026-05-31)
+## 4. What Was Built This Session (2026-06-01)
+
+### PDF Export — Coach Program Detail
+- "Export PDF" button on `/coach/programs/[id]` header row (next to Assign to Client)
+- Generates a complete printable HTML document in memory (all weeks, days, movements, phases, coach notes, branded footer) and opens it in a new tab with `window.onload = () => window.print()` — zero new dependencies
+- File: `app/coach/programs/[id]/page.tsx` — `exportPDF()` function
+
+### Vision Fallback for Image-Based PDF Imports (Coach)
+- `app/api/coach/import-program/route.ts` — if `pdf-parse` returns < 80 chars, falls back to sending raw PDF bytes to Claude Sonnet as a native `document` type (base64). Claude reads pages visually.
+- Text-based PDFs still use Haiku (fast + cheap). Image PDFs use Sonnet vision. Tokens logged separately as `coach_import_program_vision`.
+- Loading message updated to reflect longer wait for image PDFs.
+
+### Manual Program Builder (Coach Portal)
+- **Component:** `components/coach/ManualProgramBuilder.tsx`
+- Setup form: program name, weeks (1–13), days/week (2–7), optional client selection
+- Week accordion: label + phase dropdown, expand/collapse, "Copy to all weeks" button on Week 1
+- Day editor: toggle training/rest, session name, focus, duration selector
+- Exercise list: `@dnd-kit/core` + `@dnd-kit/sortable` drag-to-reorder, Enter to add row, Backspace on empty to remove
+- Autocomplete: searches `exercise_library` as coach types, shows coaching tip under each suggestion
+- **Client notes reminders:** if a client is selected at setup, every exercise input keyword-matches that client's `coach_client_notes` and surfaces relevant notes in amber inline below the input — zero AI cost, pure text matching
+- Saves to `coach_programs` (source: 'manual') + `coach_program_weeks` — same schema as AI/import paths
+- "Build Manually" card on Builder page now active (was disabled)
+- Installed `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities`
+
+### TypeScript Fixes (Unblocked Vercel Builds)
+- `app/api/admin/generate-tts/route.ts` — typed `exercises` as `ExRow[]` to fix implicit `any` on `chunk.map`; also fixed `string | null` vs `string | undefined` mismatch on `buildSpeechText` and `generateAndUpload` signatures
+- `app/api/coach/import-program/route.ts` — cast vision content array as `any` (Anthropic SDK document type mismatch)
+- `components/coach/ManualProgramBuilder.tsx` — updated `inputRef` prop to `RefObject<HTMLInputElement | null>` (React 19 useRef change)
+- `npx tsc --noEmit` now passes with zero errors
+
+### PreCompact Hook
+- `.claude/settings.json` — `PreCompact` hook (matcher: "auto") runs `node scripts/git-stats.js && git add lib/git-stats.json && git commit && git push` asynchronously when Claude auto-compacts context
+
+### Supabase Data API Grants Migration
+- `supabase/migrations/20260601_add_grants.sql` — explicit `GRANT` statements for `coach_client_notes` and new tables per Supabase May 30 policy change (enforcement October 30, 2026)
+
+### User PDF Program Import — Full Feature
+- **DB migration:** `supabase/migrations/20260601_user_imported_programs.sql`
+  - Tables: `user_imported_programs`, `user_imported_program_weeks` (RLS + grants)
+  - Profiles columns: `active_imported_program_id`, `imported_program_current_week`
+- **API:** `app/api/user/import-program/route.ts` — JWT-auth, fetches user profile, parses PDF/DOCX (text or vision fallback), runs PT/Rehab safety pass if user has restrictions, returns `{ program, changes, hasChanges, usedVision }`
+- **Page:** `app/import-program/page.tsx` — upload (drag-drop or tap), processing spinner, preview with week accordion. Amber banner shows count of exercises adjusted with full diff (original ~~struck through~~ → replacement + reason). "Activate Program" sets `active_imported_program_id` on profile; "Save for Later" stores as draft.
+- **Banner:** `components/ui/ImportedProgramBanner.tsx` — mirrors `RecoveryBanner` pattern. Shows active program name + "Week X of Y" + progress bar + "Leave Plan" button. Leave modal: "Save progress & leave" (pauses program, clears active_id) or "Leave without saving". Added to `app/layout.tsx` between RecoveryBanner and GenerationBanner.
+- **Nav:** Added "Import a Program" (📄) to BOTH `components/ui/MobileMenu.tsx` AND `components/ui/Sidebar.tsx`
+
+### Git Remote PAT Fix
+- Root cause of all push failures: remote URL was `https://Willdes1@github.com/...` (username only, no token). Fixed by user running `git remote set-url origin https://Willdes1:TOKEN@github.com/Willdes1/movement-app.git`
+
+---
+
+## Previous Session (2026-05-31)
 
 ### TTS 504 Timeout Fix
 - **File:** `app/api/admin/generate-tts/route.ts`
@@ -188,7 +238,10 @@
 
 ## 5. PENDING: SQL Migrations to Run
 
-**Run both of these in Supabase SQL Editor if not already done:**
+**Run this in Supabase SQL Editor — user_imported_programs tables (2026-06-01):**
+See `supabase/migrations/20260601_user_imported_programs.sql` — creates `user_imported_programs`, `user_imported_program_weeks`, adds `active_imported_program_id` + `imported_program_current_week` to profiles.
+
+**Already run:**
 
 ### coach_client_notes (Get to Know Your Client)
 ```sql
@@ -240,7 +293,7 @@ CREATE POLICY "mark_read" ON coach_messages FOR UPDATE
 ### F&F Beta Readiness — ~94% (18/19 done)
 - Only missing: Exercise videos curated (80%+ of library) — in progress via admin
 
-### Coach Portal Beta Readiness — 86% (12/14 done)
+### Coach Portal Beta Readiness — 87% (13/15 done)
 | Item | Status |
 |------|--------|
 | Programs library | ✅ |
@@ -255,16 +308,18 @@ CREATE POLICY "mark_read" ON coach_messages FOR UPDATE
 | Coach analytics dashboard | ✅ |
 | In-app coach ↔ client messaging | ✅ |
 | Get to Know Your Client (client notes) | ✅ |
+| PDF export of programs | ✅ |
+| Manual program builder | ✅ |
+| PDF/DOCX import (text + image) | ✅ |
 | Stripe billing for coach tiers | ❌ |
 | Coach affiliate / referral system | ❌ |
-| PDF export of programs | ❌ |
 
-### App Store Launch — ~10% (3/25 done)
+### App Store Launch — ~12% (3/27 done)
 Critical blockers (in priority order):
-1. **RevenueCat** — Stripe alone = App Store rejection for subscriptions
-2. **Capacitor wrapper** — PWA → native iOS + Android (nothing submittable without this)
-3. **LLC registration** — Required before Apple Developer Program
-4. App name finalized (rename pending — shortlist: Hone, Caliber, Athlo, Kime, Vantage, Forge)
+1. **LLC registration** — Required before Apple Developer Program; also needed before naming is final
+2. **App name finalized** — shortlist: Hone, Caliber, Athlo, Kime, Vantage, Forge
+3. **RevenueCat** — Stripe alone = App Store rejection for subscriptions
+4. **Capacitor wrapper** — PWA → native iOS + Android (nothing submittable without this)
 
 ---
 
@@ -366,14 +421,16 @@ return () => { supabase.removeChannel(channel) }
 
 ## 11. What to Work on Next (Priority Order)
 
-1. **Run both pending SQL migrations** (Section 5 above) — messaging + client notes
-2. **RevenueCat integration** — Critical App Store blocker; replaces Stripe for iOS/Android subscriptions
-3. **Capacitor wrapper** — Wrap PWA as native iOS/Android app
-4. **Coach Portal remaining:** PDF export, Stripe billing for coach tiers, nutrition in coach portal
-5. **Ask AI recovery feature** — pain/soreness assistant in Recovery tab (TODO item #4)
-6. **Saved programs library** — save every generated plan to user account (TODO item #5)
-7. **Video curation:** Continue running daily to get to 80%+ coverage
-8. **TTS coverage:** Continue running Generate 25 daily
+1. **LLC registration** — Everything App Store blocks on this; do it first
+2. **App name decision** — Brainstorm with friends underway; pick from shortlist once responses come in
+3. **Stripe billing for coach tiers** — Last major revenue-unlock for coach portal (2 items left to 100%)
+4. **Coach affiliate / referral system** — Final coach portal item; depends on Stripe being live
+5. **RevenueCat integration** — Critical App Store blocker; replaces Stripe for iOS/Android
+6. **Capacitor wrapper** — Wrap PWA as native iOS + Android binary
+7. **Saved programs library** — Save every AI-generated plan to user account (TODO item)
+8. **Ask AI recovery feature** — Pain/soreness assistant in Recovery tab
+9. **Video curation:** Continue running daily to get to 80%+ coverage
+10. **TTS coverage:** Continue running Generate 25 daily
 
 ---
 
