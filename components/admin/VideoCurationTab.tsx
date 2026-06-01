@@ -54,11 +54,17 @@ export default function VideoCurationTab() {
   // ── Priority queue (from client plan generation) ───────────────────────────
   const [queuedIds, setQueuedIds]         = useState<Set<string>>(new Set())
 
+  // ── Program lanes ──────────────────────────────────────────────────────────
+  type ProgramLane = { programId: string; name: string; exerciseIds: string[]; pendingCount: number }
+  const [programLanes, setProgramLanes]   = useState<ProgramLane[]>([])
+  const [planQueueIds, setPlanQueueIds]   = useState<string[]>([])
+
   // ── Exercise / candidate state ─────────────────────────────────────────────
   const [exercises, setExercises]   = useState<Exercise[]>([])
   const [loading, setLoading]       = useState(true)
   const [running, setRunning]       = useState(false)
   const [runLog, setRunLog]         = useState<string[]>([])
+  const [runningLane, setRunningLane] = useState<string | null>(null)
   const [filter, setFilter]         = useState<'pending' | 'approved' | 'all'>('pending')
   const [search, setSearch]         = useState('')
   const [batchSize, setBatchSize]   = useState(10)
@@ -107,12 +113,54 @@ export default function VideoCurationTab() {
       .select('id, name_display, name_normalized, video_url, video_source')
       .order('name_display')
 
-    // Collect queued exercise IDs (from client plan generation)
-    const { data: queued } = await supabase
+    // Collect ALL queued entries with source_label
+    const { data: queuedRows } = await supabase
       .from('exercise_video_candidates')
-      .select('exercise_id')
+      .select('exercise_id, source_label')
       .eq('status', 'queued')
-    setQueuedIds(new Set((queued ?? []).map(r => r.exercise_id)))
+
+    const allQueuedIds = new Set((queuedRows ?? []).map(r => r.exercise_id))
+    setQueuedIds(allQueuedIds)
+
+    // Split queued into: plan lane (null/plan source) vs program lanes
+    const planIds: string[] = []
+    const programMap: Record<string, string[]> = {} // label → exercise_ids
+
+    for (const r of (queuedRows ?? []) as { exercise_id: string; source_label: string | null }[]) {
+      if (!r.source_label || r.source_label === 'plan') {
+        planIds.push(r.exercise_id)
+      } else if (r.source_label.startsWith('program:')) {
+        const label = r.source_label
+        if (!programMap[label]) programMap[label] = []
+        programMap[label].push(r.exercise_id)
+      }
+    }
+    setPlanQueueIds(planIds)
+
+    // Resolve exercise_ids → exercise rows for pending count (exclude already-with-video)
+    const { data: libMap } = await supabase
+      .from('exercise_library')
+      .select('id, video_url')
+      .in('id', [...allQueuedIds])
+
+    const hasVideo = new Set((libMap ?? []).filter(e => e.video_url).map(e => e.id))
+
+    // Build program lanes — fetch program names from coach_programs
+    const progLabels = Object.keys(programMap)
+    const lanes: ProgramLane[] = []
+    for (const label of progLabels) {
+      const progName = label.replace(/^program:/, '')
+      const ids = programMap[label]
+      const pendingCount = ids.filter(id => !hasVideo.has(id)).length
+      // Look up the coach_program id for the run button
+      const { data: progRow } = await supabase
+        .from('coach_programs')
+        .select('id')
+        .eq('name', progName)
+        .single()
+      lanes.push({ programId: progRow?.id ?? '', name: progName, exerciseIds: ids.filter(id => !hasVideo.has(id)), pendingCount })
+    }
+    setProgramLanes(lanes)
 
     const { data: cands } = await supabase
       .from('exercise_video_candidates')
@@ -152,6 +200,33 @@ export default function VideoCurationTab() {
       setRunLog(prev => [...prev, `Error: ${err instanceof Error ? err.message : 'Failed'}`])
     }
     setRunning(false)
+  }
+
+  async function runLane(laneId: string, exerciseIds: string[], n: number) {
+    setRunningLane(laneId)
+    setRunLog([`Running ${n} exercises from ${laneId} lane…`])
+    try {
+      const body = laneId === 'plans'
+        ? { batchSize: n, lane: 'plans' }
+        : laneId === 'backlog'
+          ? { batchSize: n, lane: 'backlog' }
+          : { exerciseIds: exerciseIds.slice(0, n), batchSize: n }
+      const res = await fetch('/api/admin/curate-videos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      const lines = (data.results ?? []).map((r: { exercise: string; status: string; candidates?: number }) =>
+        `${r.status === 'proposed' ? '✓' : r.status === 'no_results' ? '○' : '⚠'} ${r.exercise}${r.candidates ? ` — ${r.candidates} candidates` : ''}`
+      )
+      setRunLog([`Done — ${data.processed} processed`, ...lines])
+      await loadExercises()
+    } catch (err) {
+      setRunLog(prev => [...prev, `Error: ${err instanceof Error ? err.message : 'Failed'}`])
+    }
+    setRunningLane(null)
   }
 
   async function runSingle(exerciseId: string, regenerate = false) {
@@ -203,18 +278,26 @@ export default function VideoCurationTab() {
       ? `https://www.youtube.com/shorts/${match[1]}`
       : `https://www.youtube.com/watch?v=${match[1]}`
     setActing(exerciseId)
+    // Save URL to library
     await supabase.from('exercise_library')
       .update({ video_url: savedUrl, video_source: 'custom', video_approved_at: new Date().toISOString(), video_approved_by: user?.id })
       .eq('id', exerciseId)
+    // Mark all candidates for this exercise as superseded so they don't linger
+    // in the pending list or get overwritten by "Approve All"
+    await supabase.from('exercise_video_candidates')
+      .update({ status: 'superseded' })
+      .eq('exercise_id', exerciseId)
+      .in('status', ['proposed', 'queued'])
     setPasteUrls(prev => { const n = { ...prev }; delete n[exerciseId]; return n })
     await loadExercises()
     setActing(null)
   }
 
   async function bulkApproveHighScore() {
-    const toApprove = exercises.flatMap(e =>
-      e.candidates.filter(c => c.status === 'proposed' && c.ai_relevance_score >= 0.85).slice(0, 1)
-    )
+    // Skip exercises that already have a video_url (manual or previously approved)
+    const toApprove = exercises
+      .filter(e => !e.video_url)
+      .flatMap(e => e.candidates.filter(c => c.status === 'proposed' && c.ai_relevance_score >= 0.85).slice(0, 1))
     if (toApprove.length === 0) { alert('No candidates with score ≥ 0.85 to approve'); return }
     if (!confirm(`Approve ${toApprove.length} exercises with AI score ≥ 0.85?`)) return
     setRunning(true)
@@ -323,62 +406,107 @@ export default function VideoCurationTab() {
         ))}
       </div>
 
-      {/* ── Priority Queue (from client plan generation) ───────────────────── */}
-      {queuedIds.size > 0 && (
-        <div style={{ padding: '14px 18px', background: C.surface, border: `1px solid rgba(239,68,68,0.3)`, borderRadius: 10, marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <div>
-              <p style={{ fontSize: 11, fontWeight: 700, color: C.red, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}>
-                🔴 Priority — {queuedIds.size} {queuedIds.size === 1 ? 'Exercise' : 'Exercises'} From Client Plans
-              </p>
-              <p style={{ fontSize: 11, color: C.textDim }}>A client generated a plan with these exercises but no videos are assigned yet. Find videos first.</p>
-            </div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {exercises.filter(e => queuedIds.has(e.id) && !e.video_url).map(ex => (
-              <div key={ex.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 7 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{ex.name_display}</span>
-                <button
-                  onClick={() => runSingle(ex.id)}
-                  disabled={acting === ex.id || !hasChannels}
-                  style={{ padding: '5px 14px', borderRadius: 6, border: 'none', background: acting === ex.id ? C.surface2 : C.red, color: acting === ex.id ? C.textDim : '#fff', fontSize: 11, fontWeight: 700, cursor: acting === ex.id || !hasChannels ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
-                  {acting === ex.id ? '…' : '▶ Find Videos'}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* ── Pipeline controls ───────────────────────────────────────────────── */}
-      <div style={{ padding: '16px 18px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 20 }}>
-        <p style={{ fontSize: 11, fontWeight: 700, color: C.textDim, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>Run Pipeline</p>
-
-        {!hasChannels && !channelsLoading ? (
-          <p style={{ fontSize: 12, color: C.amber }}>⚠ Auto-Discover Channels first — the pipeline needs approved channels to search.</p>
-        ) : (
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 13, color: C.textMid }}>Batch size:</span>
-              <select value={batchSize} onChange={e => setBatchSize(Number(e.target.value))}
-                style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 13 }}>
-                {[5, 10, 25, 50].map(n => <option key={n} value={n}>{n} exercises</option>)}
-              </select>
-            </div>
-            <button onClick={runPipeline} disabled={running || !hasChannels}
-              style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: running || !hasChannels ? C.surface2 : C.accent, color: running || !hasChannels ? C.textDim : '#fff', fontSize: 13, fontWeight: 700, cursor: running || !hasChannels ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
-              {running ? '⏳ Running…' : '▶ Run Curation'}
-            </button>
-            <button onClick={bulkApproveHighScore} disabled={running || !hasChannels}
-              style={{ padding: '8px 18px', borderRadius: 8, border: `1px solid ${C.greenBorder}`, background: C.greenDim, color: C.green, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+      {/* ── Priority Lanes ──────────────────────────────────────────────────── */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 20, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <p style={{ fontSize: 11, fontWeight: 700, color: C.textDim, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Curation Queue — Priority Lanes</p>
+            <p style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>Run specific lanes to stay organized. Program exercises run first.</p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 12, color: C.textMid }}>Batch:</span>
+            <select value={batchSize} onChange={e => setBatchSize(Number(e.target.value))}
+              style={{ padding: '5px 8px', borderRadius: 6, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12 }}>
+              {[5, 10, 25, 50].map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+            <button onClick={bulkApproveHighScore} disabled={running || !!runningLane}
+              style={{ padding: '6px 14px', borderRadius: 7, border: `1px solid ${C.greenBorder}`, background: C.greenDim, color: C.green, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
               ✓ Approve All ≥ 0.85
             </button>
           </div>
-        )}
+        </div>
 
-        {runLog.length > 0 && (
-          <div style={{ marginTop: 12, padding: '10px 12px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 7, maxHeight: 160, overflowY: 'auto' }}>
-            {runLog.map((l, i) => <p key={i} style={{ fontSize: 11, color: C.textMid, fontFamily: 'monospace', lineHeight: 1.7 }}>{l}</p>)}
+        {!hasChannels && !channelsLoading ? (
+          <div style={{ padding: '14px 18px' }}>
+            <p style={{ fontSize: 12, color: C.amber }}>⚠ Auto-Discover Channels first — the pipeline needs approved channels.</p>
+          </div>
+        ) : (
+          <div>
+            {/* Lane rows */}
+            {[
+              // User plans lane
+              {
+                id: 'plans',
+                label: '🔴 User Plans Queue',
+                desc: 'Exercises from generated training plans — highest priority',
+                count: planQueueIds.filter(id => !exercises.find(e => e.id === id)?.video_url).length,
+                ids: planQueueIds,
+                borderColor: 'rgba(239,68,68,0.25)',
+                labelColor: C.red,
+              },
+              // One row per seeded program
+              ...programLanes.map(lane => ({
+                id: `program:${lane.name}`,
+                label: `🔵 ${lane.name}`,
+                desc: `Seeded program — ${lane.pendingCount} exercises need videos`,
+                count: lane.pendingCount,
+                ids: lane.exerciseIds,
+                borderColor: C.accentBorder,
+                labelColor: C.accent,
+              })),
+              // Backlog lane
+              {
+                id: 'backlog',
+                label: '⬜ Full Library Backlog',
+                desc: 'All remaining exercises without videos (alphabetical)',
+                count: exercises.filter(e => !e.video_url && !e.candidates.some(c => c.status === 'proposed') && !queuedIds.has(e.id)).length,
+                ids: [] as string[],
+                borderColor: C.border,
+                labelColor: C.textDim,
+              },
+            ].map(lane => (
+              <div key={lane.id} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '13px 18px', borderBottom: `1px solid ${C.border}` }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 2 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{lane.label}</span>
+                    <span style={{
+                      fontSize: 11, fontWeight: 700, padding: '1px 8px', borderRadius: 10,
+                      background: `${lane.labelColor}18`, color: lane.labelColor,
+                      border: `1px solid ${lane.borderColor}`,
+                    }}>
+                      {lane.count} pending
+                    </span>
+                  </div>
+                  <p style={{ fontSize: 11, color: C.textDim }}>{lane.desc}</p>
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  {[10, 25].map(n => (
+                    <button
+                      key={n}
+                      onClick={() => runLane(lane.id, lane.ids, n)}
+                      disabled={running || !!runningLane || !hasChannels || lane.count === 0}
+                      style={{
+                        padding: '6px 14px', borderRadius: 7, border: `1px solid ${lane.borderColor}`,
+                        background: runningLane === lane.id ? C.surface2 : `${lane.labelColor}12`,
+                        color: (running || !!runningLane || lane.count === 0) ? C.textDim : lane.labelColor,
+                        fontSize: 12, fontWeight: 700, cursor: (running || !!runningLane || lane.count === 0) ? 'not-allowed' : 'pointer',
+                        fontFamily: 'inherit', whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {runningLane === lane.id ? '⏳…' : `▶ Run ${n}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {/* Run log */}
+            {runLog.length > 0 && (
+              <div style={{ padding: '12px 18px', background: C.bg, borderTop: `1px solid ${C.border}`, maxHeight: 160, overflowY: 'auto' }}>
+                {runLog.map((l, i) => <p key={i} style={{ fontSize: 11, color: i === 0 ? C.green : C.textMid, fontFamily: 'monospace', lineHeight: 1.7 }}>{l}</p>)}
+              </div>
+            )}
           </div>
         )}
       </div>

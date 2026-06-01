@@ -46,6 +46,11 @@ export async function POST(req: Request) {
 
   const { programId } = await req.json() as { programId: string }
 
+  // Get program name (for source_label tagging)
+  const { data: prog } = await supabase.from('coach_programs').select('name').eq('id', programId).single()
+  const programName = prog?.name ?? programId
+  const sourceLabel = `program:${programName}`
+
   // Fetch all weeks for this program
   const { data: weekRows } = await supabase
     .from('coach_program_weeks')
@@ -122,7 +127,7 @@ export async function POST(req: Request) {
 
     const queueInserts = libIds
       .filter(id => !alreadyQueuedIds.has(id))
-      .map(exercise_id => ({ exercise_id, status: 'queued' }))
+      .map(exercise_id => ({ exercise_id, status: 'queued', source_label: sourceLabel }))
 
     if (queueInserts.length > 0) {
       const { error: qErr } = await supabase

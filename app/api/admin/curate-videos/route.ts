@@ -123,7 +123,7 @@ Return ONLY valid JSON array, no markdown:
 // ─── Main handler ─────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   try {
-    const { exerciseId, batchSize = 10, regenerate = false } = await request.json().catch(() => ({}))
+    const { exerciseId, exerciseIds, batchSize = 10, regenerate = false, lane = 'all' } = await request.json().catch(() => ({}))
 
     // Load approved channels
     const { data: channels } = await supabaseAdmin
@@ -134,51 +134,80 @@ export async function POST(request: Request) {
 
     if (!channels?.length) return Response.json({ error: 'No approved channels configured' }, { status: 400 })
 
-    // Load exercises to process
-    let query = supabaseAdmin
+    // ── Single exercise (unchanged) ──────────────────────────────────────────
+    if (exerciseId) {
+      const { data: exercises } = await supabaseAdmin
+        .from('exercise_library')
+        .select('id, name_display, how, name_normalized')
+        .eq('id', exerciseId)
+      const results = await processExercises(exercises ?? [], channels, regenerate)
+      return Response.json({ processed: results.length, results })
+    }
+
+    // ── Targeted batch: specific exercise IDs (for program/plans lanes) ──────
+    if (exerciseIds && Array.isArray(exerciseIds) && exerciseIds.length > 0) {
+      const { data: existingCands } = await supabaseAdmin
+        .from('exercise_video_candidates')
+        .select('exercise_id')
+        .in('exercise_id', exerciseIds)
+        .eq('status', 'proposed')
+      const alreadyProposed = new Set((existingCands ?? []).map((r: { exercise_id: string }) => r.exercise_id))
+
+      const { data: targeted } = await supabaseAdmin
+        .from('exercise_library')
+        .select('id, name_display, how, name_normalized')
+        .in('id', exerciseIds)
+        .is('video_url', null)
+
+      const filtered = (targeted ?? []).filter((e: Exercise) => !alreadyProposed.has(e.id)).slice(0, batchSize)
+      const results = await processExercises(filtered, channels, regenerate)
+      return Response.json({ processed: results.length, results })
+    }
+
+    // ── Default batch with lane priority ────────────────────────────────────
+    const { data: existingCands } = await supabaseAdmin
+      .from('exercise_video_candidates')
+      .select('exercise_id, status, source_label')
+      .in('status', ['proposed', 'queued'])
+
+    const skip    = new Set<string>()
+    const queued  = new Set<string>()
+    for (const r of (existingCands ?? []) as { exercise_id: string; status: string; source_label: string | null }[]) {
+      if (r.status === 'proposed') skip.add(r.exercise_id)
+      if (r.status === 'queued')   queued.add(r.exercise_id)
+    }
+
+    // Fetch all unprocessed exercises (no video, not already proposed)
+    const { data: all } = await supabaseAdmin
       .from('exercise_library')
       .select('id, name_display, how, name_normalized')
       .is('video_url', null)
       .order('name_display')
 
-    if (exerciseId) {
-      query = supabaseAdmin.from('exercise_library').select('id, name_display, how, name_normalized').eq('id', exerciseId)
+    const available = (all ?? []).filter((e: Exercise) => !skip.has(e.id))
+
+    // Lane 'plans': only plan-queued (null or 'plan' source_label)
+    // Lane 'backlog': only non-queued
+    // Lane 'all' (default): queued first, then alphabetical
+    let sorted: typeof available
+    if (lane === 'plans') {
+      const planQueuedIds = new Set(
+        ((existingCands ?? []) as { exercise_id: string; status: string; source_label: string | null }[])
+          .filter(r => r.status === 'queued' && (!r.source_label || r.source_label === 'plan'))
+          .map(r => r.exercise_id)
+      )
+      sorted = available.filter((e: Exercise) => planQueuedIds.has(e.id))
+    } else if (lane === 'backlog') {
+      sorted = available.filter((e: Exercise) => !queued.has(e.id))
     } else {
-      // Get candidate statuses in one query
-      const { data: existingCands } = await supabaseAdmin
-        .from('exercise_video_candidates')
-        .select('exercise_id, status')
-        .in('status', ['proposed', 'queued'])
-
-      const skip    = new Set<string>()
-      const queued  = new Set<string>()
-      for (const r of (existingCands ?? [])) {
-        if (r.status === 'proposed') skip.add(r.exercise_id)
-        if (r.status === 'queued')   queued.add(r.exercise_id)
-      }
-
-      // Fetch all unprocessed exercises (no video, not already proposed)
-      const { data: all } = await supabaseAdmin
-        .from('exercise_library')
-        .select('id, name_display, how, name_normalized')
-        .is('video_url', null)
-        .order('name_display')
-
-      const available = (all ?? []).filter((e: Exercise) => !skip.has(e.id))
-
-      // Prioritise exercises queued from real client plans, then alphabetical
-      const sorted = [
+      sorted = [
         ...available.filter((e: Exercise) => queued.has(e.id)),
         ...available.filter((e: Exercise) => !queued.has(e.id)),
       ]
-
-      const filtered = sorted.slice(0, batchSize)
-      const results = await processExercises(filtered, channels, regenerate)
-      return Response.json({ processed: results.length, results })
     }
 
-    const { data: exercises } = await query
-    const results = await processExercises(exercises ?? [], channels, regenerate)
+    const batch = sorted.slice(0, batchSize)
+    const results = await processExercises(batch, channels, regenerate)
     return Response.json({ processed: results.length, results })
 
   } catch (err) {
