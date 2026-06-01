@@ -94,7 +94,7 @@ function SortableExercise({
   onChange: (val: string) => void
   onRemove: () => void
   onKeyDown: (e: React.KeyboardEvent) => void
-  inputRef?: React.RefObject<HTMLInputElement>
+  inputRef?: React.RefObject<HTMLInputElement | null>
   showRemove: boolean
   suggestions: ExerciseSuggestion[]
   onSelectSuggestion: (name: string) => void

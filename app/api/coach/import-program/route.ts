@@ -100,6 +100,7 @@ export async function POST(request: Request) {
         system: SYSTEM_PROMPT,
         messages: [{
           role: 'user',
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           content: [
             {
               type: 'document',
@@ -108,12 +109,12 @@ export async function POST(request: Request) {
                 media_type: 'application/pdf',
                 data: base64,
               },
-            } as Parameters<typeof client.messages.create>[0]['messages'][0]['content'][0],
+            },
             {
               type: 'text',
               text: 'Parse this training program into structured JSON as specified.',
             },
-          ],
+          ] as any,
         }],
       })
 

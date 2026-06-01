@@ -87,12 +87,15 @@ export async function POST() {
       return Response.json({ message: 'All exercises already have TTS audio', generated: 0 })
     }
 
+    type ExRow = { name_normalized: string; name_display: string; how: string | null; breathing: string | null; core: string | null; tip: string | null }
+    const typedExercises = exercises as ExRow[]
+
     let maleOk = 0
     let femaleOk = 0
     let failed = 0
 
-    for (let i = 0; i < exercises.length; i += CONCURRENCY) {
-      const chunk = exercises.slice(i, i + CONCURRENCY)
+    for (let i = 0; i < typedExercises.length; i += CONCURRENCY) {
+      const chunk = typedExercises.slice(i, i + CONCURRENCY)
       const results = await Promise.all(
         chunk.map((ex) => Promise.all([
           generateAndUpload(supabase, ex, 'onyx'),
