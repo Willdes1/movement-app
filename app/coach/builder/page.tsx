@@ -4,8 +4,9 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import ManualProgramBuilder from '@/components/coach/ManualProgramBuilder'
 
-type Step = 'pick' | 'brief' | 'generating-ai' | 'uploading' | 'preview' | 'saving' | 'saved'
+type Step = 'pick' | 'brief' | 'generating-ai' | 'uploading' | 'preview' | 'saving' | 'saved' | 'manual'
 type GenerationSource = 'import' | 'ai'
 
 interface ParsedDay {
@@ -277,6 +278,17 @@ export default function CoachBuilderPage() {
   const trainingDays = program?.weeks.flatMap(w => w.days.filter(d => d.type !== 'rest')).length ?? 0
   const totalExercises = program?.weeks.flatMap(w => w.days.flatMap(d => d.movements)).filter(m => m !== 'Full rest').length ?? 0
 
+  // ── Manual build step ────────────────────────────────────────────────────
+  if (step === 'manual') {
+    return (
+      <ManualProgramBuilder
+        coachId={user!.id}
+        onBack={() => setStep('pick')}
+        onSaved={(id) => { setSavedProgramId(id); setSource('import'); setStep('saved') }}
+      />
+    )
+  }
+
   // ── Pick step ────────────────────────────────────────────────────────────
   if (step === 'pick') {
     return (
@@ -314,11 +326,17 @@ export default function CoachBuilderPage() {
             <div style={{ marginTop: 10, fontSize: 11, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Click to upload ↗</div>
           </div>
 
-          {/* Build Manually — still disabled */}
-          <div style={{ flex: 1, minWidth: 200, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 14, padding: '24px 20px', opacity: 0.45, cursor: 'not-allowed' }}>
+          {/* Build Manually */}
+          <div
+            onClick={() => { setError(''); setStep('manual') }}
+            style={{ flex: 1, minWidth: 200, background: 'var(--surface2)', border: '2px solid var(--border)', borderRadius: 14, padding: '24px 20px', cursor: 'pointer', transition: 'opacity 0.15s' }}
+            onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+            onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+          >
             <div style={{ fontSize: 28, marginBottom: 10 }}>✏️</div>
             <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Build Manually</div>
             <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Drag-and-drop week/day builder</div>
+            <div style={{ marginTop: 10, fontSize: 11, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Start building ↗</div>
           </div>
         </div>
 
