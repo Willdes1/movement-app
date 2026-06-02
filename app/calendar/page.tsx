@@ -62,6 +62,8 @@ type ExerciseDetail = {
   tip: string
   video_url: string | null
   video_source: string | null
+  youtube_start_sec: number | null
+  youtube_end_sec: number | null
   tts_url_male: string | null
   tts_url_female: string | null
 }
@@ -70,15 +72,19 @@ function extractYouTubeId(url: string): string | null {
   return url.match(/(?:v=|youtu\.be\/|shorts\/)([A-Za-z0-9_-]{11})/)?.[1] ?? null
 }
 
-function VideoPlayer({ url, source, name }: { url: string | null; source: string | null; name: string }) {
+function VideoPlayer({ url, source, name, startSec, endSec }: { url: string | null; source: string | null; name: string; startSec?: number | null; endSec?: number | null }) {
   const [muted, setMuted] = useState(true)
   if (url && (source === 'youtube' || source === 'custom')) {
     const videoId = extractYouTubeId(url)
     const short = url.includes('/shorts/')
     if (videoId) {
-      const embedSrc = short
+      let embedSrc = short
         ? `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&autoplay=1&loop=1&playlist=${videoId}&mute=${muted ? 1 : 0}&controls=1`
         : `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`
+      if (!short) {
+        if (startSec != null && startSec > 0) embedSrc += `&start=${startSec}`
+        if (endSec != null) embedSrc += `&end=${endSec}`
+      }
       return (
         <div style={{ marginBottom: 14, borderRadius: 10, overflow: 'hidden', background: '#000', position: 'sticky', top: 0, zIndex: 10 }}>
           <div style={{ position: 'relative', paddingBottom: short ? '177.78%' : '56.25%', height: 0 }}>
@@ -146,6 +152,8 @@ function fallbackDetail(m: string, _day: DayPlan): ExerciseDetail {
     how: 'Coaching for this exercise is loading. Tap again in a moment.',
     breathing: null as unknown as string,
     core: null as unknown as string,
+    youtube_start_sec: null,
+    youtube_end_sec: null,
     tip: null as unknown as string,
     video_url: null,
     video_source: null,
@@ -274,7 +282,7 @@ function CalendarInner() {
       if (normalizedNames.length > 0) {
         const { data: libData } = await supabase
           .from('exercise_library')
-          .select('name_normalized, name_display, how, breathing, core, tip, video_url, video_source, tts_url_male, tts_url_female')
+          .select('name_normalized, name_display, how, breathing, core, tip, video_url, video_source, youtube_start_sec, youtube_end_sec, tts_url_male, tts_url_female')
           .in('name_normalized', normalizedNames)
         if (libData) {
           const libMap: Record<string, ExerciseDetail> = {}
@@ -295,18 +303,18 @@ function CalendarInner() {
     if (cached) { setSelectedExercise(cached); return }
 
     // Show loading placeholder immediately
-    setSelectedExercise({ name_normalized: key, name_display: name, how: 'Loading coaching details…', breathing: null as unknown as string, core: null as unknown as string, tip: null as unknown as string, video_url: null, video_source: null, tts_url_male: null, tts_url_female: null })
+    setSelectedExercise({ name_normalized: key, name_display: name, how: 'Loading coaching details…', breathing: null as unknown as string, core: null as unknown as string, tip: null as unknown as string, video_url: null, video_source: null, youtube_start_sec: null, youtube_end_sec: null, tts_url_male: null, tts_url_female: null })
     setExerciseFetching(true)
     try {
       // Check DB before calling AI — avoids charges on every tap
-      const { data: dbEntry } = await supabase.from('exercise_library').select('name_normalized, name_display, how, breathing, core, tip, video_url, video_source, tts_url_male, tts_url_female').eq('name_normalized', key).single()
+      const { data: dbEntry } = await supabase.from('exercise_library').select('name_normalized, name_display, how, breathing, core, tip, video_url, video_source, youtube_start_sec, youtube_end_sec, tts_url_male, tts_url_female').eq('name_normalized', key).single()
       if (dbEntry) {
         setExerciseLibrary(prev => ({ ...prev, [key]: dbEntry as ExerciseDetail }))
         setSelectedExercise(dbEntry as ExerciseDetail)
         return
       }
       // Not in library — coaching tips are pre-generated at plan generation time
-      setSelectedExercise({ name_normalized: key, name_display: name, how: 'Coaching tips for this exercise are not yet available. Generate your plan to load all coaching details automatically.', breathing: null as unknown as string, core: null as unknown as string, tip: null as unknown as string, video_url: null, video_source: null, tts_url_male: null, tts_url_female: null })
+      setSelectedExercise({ name_normalized: key, name_display: name, how: 'Coaching tips for this exercise are not yet available. Generate your plan to load all coaching details automatically.', breathing: null as unknown as string, core: null as unknown as string, tip: null as unknown as string, video_url: null, video_source: null, youtube_start_sec: null, youtube_end_sec: null, tts_url_male: null, tts_url_female: null })
     } catch { /* keep placeholder visible */ }
     finally { setExerciseFetching(false) }
   }, [exerciseLibrary])
@@ -890,7 +898,7 @@ function CalendarInner() {
             </div>
             <div style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch' as never, padding: '0 24px 40px', flexGrow: 1 }}>
               {/* Video player — YouTube embed now, hosted video in future */}
-              <VideoPlayer url={selectedExercise.video_url ?? null} source={selectedExercise.video_source ?? null} name={selectedExercise.name_display} />
+              <VideoPlayer url={selectedExercise.video_url ?? null} source={selectedExercise.video_source ?? null} name={selectedExercise.name_display} startSec={selectedExercise.youtube_start_sec} endSec={selectedExercise.youtube_end_sec} />
               {/* Last session (read-only) */}
               <div style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)', marginBottom: 14 }}>
                 <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--text-dim)', marginBottom: 6, textTransform: 'uppercase' }}>Last Session</p>

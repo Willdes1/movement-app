@@ -8,6 +8,8 @@ type ExerciseRow = {
   name_display: string
   video_url: string | null
   video_source: string | null
+  youtube_start_sec?: number | null
+  youtube_end_sec?: number | null
 }
 
 type ExerciseDetail = ExerciseRow & {
@@ -15,21 +17,27 @@ type ExerciseDetail = ExerciseRow & {
   breathing: string | null
   core: string | null
   tip: string | null
+  youtube_start_sec?: number | null
+  youtube_end_sec?: number | null
 }
 
 function extractYouTubeId(url: string): string | null {
   return url.match(/(?:v=|youtu\.be\/|shorts\/)([A-Za-z0-9_-]{11})/)?.[1] ?? null
 }
 
-function VideoPlayer({ url, source, name }: { url: string | null; source: string | null; name: string }) {
+function VideoPlayer({ url, source, name, startSec, endSec }: { url: string | null; source: string | null; name: string; startSec?: number | null; endSec?: number | null }) {
   const [muted, setMuted] = useState(true)
   if (url && (source === 'youtube' || source === 'custom')) {
     const videoId = extractYouTubeId(url)
     const short = url.includes('/shorts/')
     if (videoId) {
-      const embedSrc = short
+      let embedSrc = short
         ? `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&autoplay=1&loop=1&playlist=${videoId}&mute=${muted ? 1 : 0}&controls=1`
         : `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`
+      if (!short) {
+        if (startSec != null && startSec > 0) embedSrc += `&start=${startSec}`
+        if (endSec != null) embedSrc += `&end=${endSec}`
+      }
       return (
         <div style={{ marginBottom: 14, borderRadius: 10, overflow: 'hidden', background: '#000', position: 'sticky', top: 0, zIndex: 10 }}>
           <div style={{ position: 'relative', paddingBottom: short ? '177.78%' : '56.25%', height: 0 }}>
@@ -93,7 +101,7 @@ export default function ExercisesPage() {
   useEffect(() => {
     supabase
       .from('exercise_library')
-      .select('name_normalized, name_display, video_url, video_source')
+      .select('name_normalized, name_display, video_url, video_source, youtube_start_sec, youtube_end_sec')
       .order('name_display')
       .then(({ data }) => {
         setAll(data ?? [])
@@ -106,7 +114,7 @@ export default function ExercisesPage() {
     setFetching(ex.name_normalized)
     const { data } = await supabase
       .from('exercise_library')
-      .select('name_normalized, name_display, how, breathing, core, tip, video_url, video_source')
+      .select('name_normalized, name_display, how, breathing, core, tip, video_url, video_source, youtube_start_sec, youtube_end_sec')
       .eq('name_normalized', ex.name_normalized)
       .single()
     if (data) setDetails(prev => ({ ...prev, [ex.name_normalized]: data as ExerciseDetail }))
@@ -318,6 +326,8 @@ export default function ExercisesPage() {
                             url={detail?.video_url ?? ex.video_url ?? null}
                             source={detail?.video_source ?? ex.video_source ?? null}
                             name={ex.name_display}
+                            startSec={detail?.youtube_start_sec ?? ex.youtube_start_sec}
+                            endSec={detail?.youtube_end_sec ?? ex.youtube_end_sec}
                           />
                           <CueRow label="How to perform" value={detail?.how ?? null} />
                           <CueRow label="Breathing"      value={detail?.breathing ?? null} />
