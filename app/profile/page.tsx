@@ -23,6 +23,14 @@ const SINGLE_AREAS = ['Lower back', 'Neck']
 const SIDES = ['Left', 'Right', 'Both']
 const WORKOUT_LOCATIONS = ['Home', 'Gym', 'Both']
 const HOME_EQUIPMENT = ['Treadmill', 'Pull-up bar', 'Bench', 'Dumbbells', 'Barbells', 'Resistance bands', 'Kettlebells', 'Jump rope']
+const TRAINING_LEVELS = [
+  { value: 'beginner',     label: 'Beginner',     sub: '< 1 year' },
+  { value: 'intermediate', label: 'Intermediate', sub: '1–3 years' },
+  { value: 'expert',       label: 'Expert',       sub: '3–5 years' },
+  { value: 'elite',        label: 'Elite',        sub: 'Competitive' },
+  { value: 'pro',          label: 'Pro',          sub: 'Professional' },
+]
+const SPORT_LEVELS = ['Beginner', 'Intermediate', 'Advanced', 'Expert']
 
 function getSideLabel(area: string, side: string) {
   const plural: Record<string, string> = {
@@ -73,6 +81,15 @@ export default function ProfilePage() {
   // Per-field blur confirmations
   const [nameConfirmed, setNameConfirmed] = useState(false)
   const [programsConfirmed, setProgramsConfirmed] = useState(false)
+
+  // New profile fields
+  const [age, setAge] = useState<string>('')
+  const [height, setHeight] = useState<string>('')
+  const [weightLbs, setWeightLbs] = useState<string>('')
+  const [trainingLevel, setTrainingLevel] = useState<string | undefined>(undefined)
+  const [workoutBackground, setWorkoutBackground] = useState<string>('')
+  const [improvementNotes, setImprovementNotes] = useState<string>('')
+  const [showWhyAsk, setShowWhyAsk] = useState(false)
 
   // Sports
   const [selectedSports, setSelectedSports] = useState<string[]>([])
@@ -134,6 +151,9 @@ export default function ProfilePage() {
           const p: UserProfile = {
             name: data.name ?? undefined,
             gender: data.gender ?? undefined,
+            age: data.age ?? undefined,
+            height: data.height ?? undefined,
+            weightLbs: data.weight_lbs ?? undefined,
             sport: data.sport ?? undefined,
             goal: data.goal ?? undefined,
             goalNotes: data.goal_notes ?? undefined,
@@ -147,7 +167,18 @@ export default function ProfilePage() {
             sportSchedule: data.sport_schedule ?? undefined,
             workoutLocation: data.workout_location ?? undefined,
             homeEquipment: data.home_equipment ?? undefined,
+            trainingLevel: data.training_level ?? undefined,
+            workoutBackground: data.workout_background ?? undefined,
+            activities: data.activities ?? undefined,
+            improvementNotes: data.improvement_notes ?? undefined,
           }
+          // Populate new standalone state from DB
+          if (data.age) setAge(String(data.age))
+          if (data.height) setHeight(data.height)
+          if (data.weight_lbs) setWeightLbs(String(data.weight_lbs))
+          if (data.training_level) setTrainingLevel(data.training_level)
+          if (data.workout_background) setWorkoutBackground(data.workout_background)
+          if (data.improvement_notes) setImprovementNotes(data.improvement_notes)
           loadProfileData(p)
           saveProfile(p)
         } else {
@@ -276,6 +307,10 @@ export default function ProfilePage() {
   async function handleSave() {
     const sportString = selectedSports.join(', ') || undefined
     const goalString = selectedGoals.join(', ') || undefined
+    // Build activities array from per-sport skill levels
+    const activities = Object.entries(sportSchedule)
+      .filter(([, entry]) => entry.level)
+      .map(([name, entry]) => ({ name, level: entry.level as string }))
     const profileToSave = { ...profile, sport: sportString, goal: goalString, goalNotes: goalNotes || undefined, sportSchedule, workoutLocation, homeEquipment: selectedEquipment.length ? selectedEquipment : undefined }
     saveProfile(profileToSave)
     if (user) {
@@ -283,6 +318,9 @@ export default function ProfilePage() {
         id: userId,
         name: profileToSave.name ?? null,
         gender: profileToSave.gender ?? null,
+        age: age ? parseInt(age, 10) : null,
+        height: height || null,
+        weight_lbs: weightLbs ? parseFloat(weightLbs) : null,
         sport: profileToSave.sport ?? null,
         goal: profileToSave.goal ?? null,
         goal_notes: goalNotes || null,
@@ -296,6 +334,10 @@ export default function ProfilePage() {
         sport_schedule: Object.keys(sportSchedule).length ? sportSchedule : null,
         workout_location: workoutLocation ?? null,
         home_equipment: selectedEquipment.length ? selectedEquipment : null,
+        training_level: trainingLevel ?? null,
+        workout_background: workoutBackground || null,
+        activities: activities.length ? activities : null,
+        improvement_notes: improvementNotes || null,
         updated_at: new Date().toISOString(),
       })
     }
@@ -316,6 +358,9 @@ export default function ProfilePage() {
         <p style={{ color: 'var(--text-dim)', fontSize: 13, marginBottom: 24 }}>Your athlete profile powers your personalized plan</p>
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden', marginBottom: 16 }}>
           <ProfileRow label="Name" value={profile.name ?? 'Not set'} dim={!profile.name} onClick={() => setScreen('edit')} />
+          <ProfileRow label="Sex at birth" value={profile.gender ?? 'Not set'} dim={!profile.gender} onClick={() => setScreen('edit')} />
+          <ProfileRow label="Age" value={age ? `${age} yrs` : 'Not set'} dim={!age} onClick={() => setScreen('edit')} />
+          <ProfileRow label="Training level" value={trainingLevel ? (TRAINING_LEVELS.find(l => l.value === trainingLevel)?.label ?? trainingLevel) : 'Not set'} dim={!trainingLevel} onClick={() => setScreen('edit')} />
           <ProfileRow label="Sport(s)" value={selectedSports.length ? selectedSports.join(', ') : 'Not set'} dim={!selectedSports.length} onClick={() => setScreen('edit')} />
           <ProfileRow label="Goal(s)" value={selectedGoals.length ? selectedGoals.join(', ') : (goalNotes ? 'Custom goal set' : 'Not set')} dim={!selectedGoals.length && !goalNotes} onClick={() => setScreen('edit')} />
           <ProfileRow label="Days/week" value={profile.daysPerWeek ? `${profile.daysPerWeek} days` : 'Not set'} dim={!profile.daysPerWeek} onClick={() => setScreen('edit')} />
@@ -367,12 +412,64 @@ export default function ProfilePage() {
           {nameConfirmed && <GreenCheck />}
         </Field>
 
-        {/* Gender */}
-        <Field label="Gender">
-          <div style={{ display: 'flex', gap: 8 }}>
+        {/* Sex assigned at birth */}
+        <Field label="Sex assigned at birth">
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
             {['Male', 'Female'].map(g => (
               <Chip key={g} label={g} active={profile.gender === g} onClick={() => update('gender', profile.gender === g ? undefined : g)} />
             ))}
+          </div>
+          <button
+            onClick={() => setShowWhyAsk(p => !p)}
+            style={{ fontSize: 12, color: 'var(--text-dim)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 4 }}
+          >
+            Why we ask {showWhyAsk ? '▲' : '▼'}
+          </button>
+          {showWhyAsk && (
+            <div style={{ marginTop: 8, padding: '10px 12px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)', fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.6 }}>
+              We base our training algorithms on peer-reviewed sports science research. Sex assigned at birth influences muscle fiber composition, hormonal recovery patterns, training volume tolerance, and injury risk profiles — all of which directly shape your AI-generated plan. For example, recovery scheduling between sessions, optimal loading progressions, and rest day programming differ meaningfully based on this information. This data is never shared and is used solely to make your programming more precise.
+            </div>
+          )}
+        </Field>
+
+        {/* Age */}
+        <Field label="Age">
+          <input
+            type="number"
+            min={13}
+            max={99}
+            value={age}
+            onChange={e => setAge(e.target.value)}
+            placeholder="e.g. 28"
+            style={{ ...inputStyle, width: 120 }}
+          />
+        </Field>
+
+        {/* Height + Weight */}
+        <Field label="Height & Weight">
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 120 }}>
+              <p style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Height</p>
+              <input
+                type="text"
+                value={height}
+                onChange={e => setHeight(e.target.value)}
+                placeholder="e.g. 5ft 10in or 178 cm"
+                style={inputStyle}
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: 120 }}>
+              <p style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Weight (lbs)</p>
+              <input
+                type="number"
+                min={50}
+                max={500}
+                value={weightLbs}
+                onChange={e => setWeightLbs(e.target.value)}
+                placeholder="e.g. 175"
+                style={inputStyle}
+              />
+            </div>
           </div>
         </Field>
 
@@ -470,6 +567,53 @@ export default function ProfilePage() {
             )}
           </Field>
         </div>
+
+        {/* Improvement focus */}
+        <Field label="What do you want to improve? (optional)">
+          <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8, lineHeight: 1.5 }}>
+            Describe sport-specific struggles, movement limitations, or performance gaps. Your AI coach will target these in warmups, conditioning, and mobility.
+          </p>
+          <textarea
+            value={improvementNotes}
+            onChange={e => setImprovementNotes(e.target.value)}
+            placeholder="e.g. I'm a skateboarder and I struggle with frontside 180s — I feel restriction during rotation. Backside 180s feel natural but frontside creates tension through my hips and shoulders."
+            rows={4}
+            style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontSize: 13, outline: 'none', resize: 'none', lineHeight: 1.6, boxSizing: 'border-box', fontFamily: 'inherit' }}
+          />
+        </Field>
+
+        {/* Training level */}
+        <Field label="Training experience level">
+          <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10, lineHeight: 1.5 }}>
+            Your overall gym and training experience — not sport skill level. This shapes how your plan is structured and how technical the coaching cues get.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {TRAINING_LEVELS.map(lvl => (
+              <button
+                key={lvl.value}
+                onClick={() => setTrainingLevel(trainingLevel === lvl.value ? undefined : lvl.value)}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: 10, border: `1px solid ${trainingLevel === lvl.value ? 'var(--accent)' : 'var(--border)'}`, background: trainingLevel === lvl.value ? 'var(--accent-bg)' : 'var(--surface2)', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+              >
+                <span style={{ fontSize: 13, fontWeight: trainingLevel === lvl.value ? 700 : 400, color: trainingLevel === lvl.value ? 'var(--accent)' : 'var(--text-mid)' }}>{lvl.label}</span>
+                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{lvl.sub}</span>
+              </button>
+            ))}
+          </div>
+        </Field>
+
+        {/* Training background */}
+        <Field label="Training history (optional)">
+          <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8, lineHeight: 1.5 }}>
+            Tell your coach about your training background. This helps avoid re-teaching the basics and builds on what you already know.
+          </p>
+          <textarea
+            value={workoutBackground}
+            onChange={e => setWorkoutBackground(e.target.value)}
+            placeholder="e.g. 3 years of powerlifting, switched to athletic training 6 months ago. Comfortable with squat, bench, deadlift. Never done Olympic lifting."
+            rows={3}
+            style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontSize: 13, outline: 'none', resize: 'none', lineHeight: 1.6, boxSizing: 'border-box', fontFamily: 'inherit' }}
+          />
+        </Field>
 
         {/* Days */}
         <div ref={daysRef}>
@@ -655,7 +799,7 @@ function getSchedulePlaceholder(sport: string): string {
 
 function SportScheduleRow({ sport, entry, onChange }: {
   sport: string
-  entry: { days: string[]; duration: string; noSchedule?: boolean; description?: string }
+  entry: { days: string[]; duration: string; noSchedule?: boolean; description?: string; level?: string }
   onChange: (e: typeof entry) => void
 }) {
   const [descConfirmed, setDescConfirmed] = useState(false)
@@ -675,6 +819,22 @@ function SportScheduleRow({ sport, entry, onChange }: {
         <button onClick={toggleNoSchedule} style={{ padding: '4px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${entry.noSchedule ? 'var(--accent)' : 'var(--border)'}`, background: entry.noSchedule ? 'var(--accent-bg)' : 'var(--surface)', color: entry.noSchedule ? 'var(--accent)' : 'var(--text-dim)', transition: 'all 0.15s' }}>
           No specific schedule
         </button>
+      </div>
+
+      {/* Skill level */}
+      <div style={{ marginBottom: 12 }}>
+        <p style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Skill level</p>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {SPORT_LEVELS.map(l => (
+            <button
+              key={l}
+              onClick={() => onChange({ ...entry, level: entry.level === l ? undefined : l })}
+              style={{ padding: '5px 12px', borderRadius: 16, border: `1px solid ${entry.level === l ? 'var(--accent)' : 'var(--border)'}`, background: entry.level === l ? 'var(--accent-bg)' : 'var(--surface)', color: entry.level === l ? 'var(--accent)' : 'var(--text-dim)', fontSize: 12, fontWeight: entry.level === l ? 700 : 400, cursor: 'pointer', transition: 'all 0.15s' }}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
       </div>
 
       {entry.noSchedule ? (

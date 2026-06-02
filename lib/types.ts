@@ -33,6 +33,7 @@ export type SportScheduleEntry = {
   duration: string
   noSchedule?: boolean
   description?: string
+  level?: string
 }
 
 export type SportSchedule = Record<string, SportScheduleEntry>
@@ -40,7 +41,9 @@ export type SportSchedule = Record<string, SportScheduleEntry>
 export interface UserProfile {
   name?: string
   gender?: string
-  age?: string
+  age?: number
+  height?: string
+  weightLbs?: number
   sport?: string
   secondarySports?: string[]
   daysPerWeek?: number
@@ -57,4 +60,8 @@ export interface UserProfile {
   sportSchedule?: SportSchedule
   workoutLocation?: string
   homeEquipment?: string[]
+  trainingLevel?: string
+  workoutBackground?: string
+  activities?: Array<{ name: string; level: string }>
+  improvementNotes?: string
 }

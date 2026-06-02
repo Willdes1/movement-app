@@ -253,6 +253,12 @@ function buildPrompt(profile: Record<string, unknown>, weekNumber: number, phase
     lines.push(`Incorporate movement patterns and physical demands relevant to these activities where appropriate.`)
   }
 
+  if (profile.improvement_notes) {
+    lines.push('')
+    lines.push(`IMPROVEMENT FOCUS — what the athlete wants to get better at: ${profile.improvement_notes}`)
+    lines.push(`Target these specific limitations in sport-specific warmup drills, conditioning, and mobility blocks. Do not ignore this — it is the athlete's primary performance gap.`)
+  }
+
   if (instructions?.trim()) {
     lines.push('')
     lines.push(`SPECIFIC INSTRUCTIONS FROM USER: ${instructions.trim()}`)
@@ -363,6 +369,7 @@ export async function POST(request: Request) {
       `Week: ${weekNumber} — ${phaseLabel}`,
       profile.age ? `Age: ${profile.age}` : '',
       profile.training_level ? `Experience: ${profile.training_level}` : '',
+      profile.improvement_notes ? `Improvement focus: ${profile.improvement_notes}` : '',
     ].filter(Boolean).join('\n')
 
     // Agent 3: Sports Specialist — enhances warmup blocks + coaching cues
