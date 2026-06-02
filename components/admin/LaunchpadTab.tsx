@@ -402,6 +402,7 @@ function OverviewSection() {
     'Video Curation Priority Lanes — replaced blind batch with 3 lanes (User Plans / Program / Backlog); each shows pending count + Run 10/25; manual URL bug fixed (supersedes candidates on save); Approve All skips already-approved exercises',
     'Coach Exercise Library — /coach/library tab; YouTube URL with ✂️ clip trimming (M:SS start/end, live preview); own video upload (MP4/MOV/WebM to Supabase storage, with format guidelines); instructions + sets/reps + rest time; expandable list view',
     'YouTube clip trimming in Video Curation — paste URL section expanded with start/end time inputs + live preview + usage guide; clips saved as youtube_start_sec/youtube_end_sec on exercise_library; VideoPlayer in calendar + exercises pages applies ?start=N&end=N embed params',
+    'MIE questionnaire enhancement — 7 new profile fields: sex assigned at birth (Oura-style "Why we ask" explanation), age, height/weight, training level (5-tier Beginner→Pro), training history, sport-specific improvement focus ("What do you want to get better at?"), per-sport skill level chips; all fields wired into MIE buildPrompt + Phase 3 athleteContext',
   ]
   const COMING = [
     'Injury → training handoff: AI-modified safe training plan that runs alongside recovery',

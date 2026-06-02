@@ -1,6 +1,6 @@
 # Agent Context — Movement App
 > Full briefing for a new agent to continue this project without any prior conversation history.
-> Last updated: 2026-06-02 | Current branch: master | 252 commits
+> Last updated: 2026-06-02 | Current branch: master | 256 commits
 
 ---
 
@@ -99,7 +99,29 @@
 
 ---
 
-## 4. What Was Built This Session (2026-06-02)
+## 4. What Was Built This Session (2026-06-02 — continued)
+
+### MIE Questionnaire Audit + Profile Enhancement
+Full audit of what the MIE prompt expects vs. what the profile form actually collected. Added 7 new questions to close every gap:
+- **Sex assigned at birth** — relabeled from "Gender" with Oura-style "Why we ask" collapsible (science explanation: muscle fiber composition, hormonal recovery, training volume research)
+- **Age** — number input; wired to MIE `profile.age` (was in prompt but never collected)
+- **Height & Weight** — side-by-side inputs; stored as `height text` + `weight_lbs numeric` on profiles
+- **Training experience level** — 5-chip selector (Beginner / Intermediate / Expert / Elite / Pro); elaborate per-level MIE guidance was already written, just had no UI
+- **Training history** — textarea for `workout_background`; tells S&C Agent what the athlete already knows
+- **"What do you want to improve?"** — sport-specific struggles/limitations textarea (`improvement_notes`); injected into S&C Agent prompt + Phase 3 `athleteContext` (Sports Specialist + Mobility agents see it); placeholder uses skateboard frontside 180 rotation example
+- **Per-sport skill level** — Beginner/Intermediate/Advanced/Expert chips inside each sport's schedule row; builds `activities[]` array for MIE
+- **SQL:** `supabase/migrations/20260602_athlete_profile_enhancement.sql` — adds `age`, `height`, `weight_lbs`, `training_level`, `workout_background`, `activities`, `improvement_notes` to profiles
+- **Files:** `app/profile/page.tsx`, `lib/types.ts`, `app/api/generate-plan/route.ts`
+
+### Launchpad Fix
+- Coach Portal checklist updated: added Manual program builder, PDF/DOCX import, and Coach Exercise Library as done items — bumped from 13/15 (87%) → 16/18 (89%)
+
+### SQL Migrations All Confirmed Run
+User ran all 7 pending migrations from the previous 2026-06-02 session (plan_conversion_requests, coach_program_sharing, curation_source_label, exercise_library_source_program, coach_exercise_library, exercise_library_clip, user_imported_programs). All confirmed successful.
+
+---
+
+## Previous Session (2026-06-02)
 
 ### 7 Quick-Build Features
 - **Travel adjustment** — ✈️ "Need modifications?" button on any calendar workout day; user describes situation; Claude Haiku patches warmup/workout/abs blocks; saves to DB
@@ -149,13 +171,26 @@
 - SQL: `exercise_library.youtube_start_sec`, `exercise_library.youtube_end_sec`
 
 ### Pending SQL Migrations (run in Supabase SQL Editor)
-All new this session — run if not yet done:
-1. `supabase/migrations/20260601_plan_conversion_requests.sql`
-2. `supabase/migrations/20260601_coach_program_sharing.sql` (includes `source_coach_program_id` on `user_imported_programs`)
-3. `supabase/migrations/20260601_curation_source_label.sql`
-4. `supabase/migrations/20260601_exercise_library_source_program.sql`
-5. `supabase/migrations/20260601_coach_exercise_library.sql`
-6. `supabase/migrations/20260601_exercise_library_clip.sql`
+**NEW — run this migration from the 2026-06-02 continued session:**
+```sql
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS age              integer;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS height           text;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS weight_lbs       numeric;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS training_level   text;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS workout_background text;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS activities       jsonb;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS improvement_notes text;
+```
+File: `supabase/migrations/20260602_athlete_profile_enhancement.sql`
+
+**Already confirmed run (previous session):**
+1. `supabase/migrations/20260601_plan_conversion_requests.sql` ✅
+2. `supabase/migrations/20260601_coach_program_sharing.sql` ✅
+3. `supabase/migrations/20260601_curation_source_label.sql` ✅
+4. `supabase/migrations/20260601_exercise_library_source_program.sql` ✅
+5. `supabase/migrations/20260601_coach_exercise_library.sql` ✅
+6. `supabase/migrations/20260601_exercise_library_clip.sql` ✅
+7. `supabase/migrations/20260601_user_imported_programs.sql` ✅
 
 ---
 
@@ -481,16 +516,17 @@ return () => { supabase.removeChannel(channel) }
 
 ## 11. What to Work on Next (Priority Order)
 
-1. **LLC registration** — Everything App Store blocks on this; do it first
-2. **App name decision** — Pick from shortlist (Hone, Caliber, Athlo, Kime, Vantage, Forge)
-3. **Muscle Beach Method video curation** — Priority lane is now working; run 25 exercises/day until the program lane hits 0; then Approve All ≥ 0.85
-4. **Stripe billing for coach tiers** — Last revenue-unlock for coach portal to hit 100%
-5. **Coach affiliate / referral system** — Final coach portal item; depends on Stripe
-6. **RevenueCat integration** — Critical App Store blocker; replaces Stripe for iOS/Android
-7. **Capacitor wrapper** — Wrap PWA as native iOS + Android binary
-8. **Connect Coach Exercise Library to program builder** — When building programs, coaches should be able to pull from their personal library; currently library is standalone
-9. **TTS coverage** — Continue "Generate 25" daily in admin TTS tab
-10. **Video curation backlog** — After Muscle Beach Method is done, chip through the 592-exercise backlog
+1. **Run SQL migration** — `supabase/migrations/20260602_athlete_profile_enhancement.sql` (7 new profile columns); profile form will error without it
+2. **F&F self-test account** — User wants to create a personal F&F account to start real testing; set role to `ff` in Supabase
+3. **LLC registration** — Everything App Store blocks on this; do it first
+4. **App name decision** — Pick from shortlist (Hone, Caliber, Athlo, Kime, Vantage, Forge)
+5. **Muscle Beach Method video curation** — Priority lane is working; run 25 exercises/day until program lane hits 0; then Approve All ≥ 0.85
+6. **Stripe billing for coach tiers** — Last revenue-unlock for coach portal to hit 100%
+7. **Coach affiliate / referral system** — Final coach portal item; depends on Stripe
+8. **RevenueCat integration** — Critical App Store blocker; replaces Stripe for iOS/Android
+9. **Capacitor wrapper** — Wrap PWA as native iOS + Android binary
+10. **Connect Coach Exercise Library to program builder** — Coaches should pull from their personal library when building programs; currently standalone
+11. **TTS coverage** — Continue "Generate 25" daily in admin TTS tab
 
 ---
 
