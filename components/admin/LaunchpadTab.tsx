@@ -395,6 +395,10 @@ function OverviewSection() {
     'Targeted anatomy exercises — anatomy page restructured: 55vh iframe + Targeted Exercises section below; 12 muscle group chips; keyword filter of exercise_library; expandable inline coaching cards',
     'Nutrition profile enhancements — added wake time, first meal time, IF preference (5 options), health conditions multi-select (10 conditions); all passed to AI generation',
     'Custom plan conversion — /convert-plan concierge page + admin Conversions tab; drag-drop PDF/DOCX upload; status tracker; admin can download + review + update status + send note to user',
+    'Platform program sharing — coach_programs.shared_with_roles; admin toggle in coach portal; Featured Programs section in /programs for admin+ff roles; Activate button copies program to user_imported_programs; seed exercises to library with source_program tagging',
+    'Video Curation Priority Lanes — replaced blind batch with 3 lanes (User Plans / Program / Backlog); each shows pending count + Run 10/25; manual URL bug fixed (supersedes candidates on save); Approve All skips already-approved exercises',
+    'Coach Exercise Library — /coach/library tab; YouTube URL with ✂️ clip trimming (M:SS start/end, live preview); own video upload (MP4/MOV/WebM to Supabase storage, with format guidelines); instructions + sets/reps + rest time; expandable list view',
+    'YouTube clip trimming in Video Curation — paste URL section expanded with start/end time inputs + live preview + usage guide; clips saved as youtube_start_sec/youtube_end_sec on exercise_library; VideoPlayer in calendar + exercises pages applies ?start=N&end=N embed params',
   ]
   const COMING = [
     'Injury → training handoff: AI-modified safe training plan that runs alongside recovery',

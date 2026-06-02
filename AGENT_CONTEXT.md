@@ -1,6 +1,6 @@
 # Agent Context — Movement App
 > Full briefing for a new agent to continue this project without any prior conversation history.
-> Last updated: 2026-06-01 | Current branch: master | 242 commits
+> Last updated: 2026-06-02 | Current branch: master | 252 commits
 
 ---
 
@@ -99,7 +99,67 @@
 
 ---
 
-## 4. What Was Built This Session (2026-06-01)
+## 4. What Was Built This Session (2026-06-02)
+
+### 7 Quick-Build Features
+- **Travel adjustment** — ✈️ "Need modifications?" button on any calendar workout day; user describes situation; Claude Haiku patches warmup/workout/abs blocks; saves to DB
+- **Ask AI Recovery** — 🤖 collapsible card at top of `/recovery`; describes pain/soreness → 2-step AI pipeline → 5 targeted exercises with how-to + tip; library-first, AI fallback
+- **Missed session / Skip** — "Couldn't make it?" on past uncompleted days; expands to skip option; writes `day_completions` with `skipped:true`
+- **Auto-capture prompt** — after ✓ Complete Day, green "Nice work! Tap any exercise to log sets" prompt appears (dismissible)
+- **Saved Programs Library** — `/programs` page listing all `training_programs` records; date range, phase, Active badge, View Plan button; in both navs
+- **Browse & Learn** — `/browse` rebuilt with live `exercise_library` data; searchable 750+ exercises; expandable coaching cards; load-more pagination
+- **API:** `/api/user/travel-adjust` and `/api/user/ask-recovery` created
+
+### 5 Medium-Build Features
+- **Mobility tab** — `/mobility` with 12 body-area chips (Hip Flexors, Hamstrings, T-Spine, Shoulders, etc.) + text search; keyword filters `exercise_library`; in both navs
+- **Read-aloud workout instructions** — `useTTS` wired into Today page; 🔈 speaker button on every exercise in workout blocks; pre-loads library after plan loads; reads name + how-to + tip
+- **Targeted anatomy exercises** — anatomy page restructured from full-screen iframe to 55vh iframe + "Targeted Exercises" section below with 12 muscle group chips
+- **Nutrition profile enhancements** — added wake time, first meal time, IF preference (5 options: None/16:8/14:10/18:6/OMAD), health conditions multi-select (10 conditions) to existing nutrition form
+- **Custom plan conversion** — `/convert-plan` concierge page (PDF/DOCX upload, description, status tracker, admin notes visible to user) + admin "🔄 Conversions" tab; SQL: `plan_conversion_requests` table
+
+### Platform Program Sharing (Muscle Beach Method)
+- **`coach_programs.shared_with_roles text[]`** — admin toggle in coach portal program detail; shares with `admin` / `ff` roles
+- **`/api/user/activate-shared-program`** — copies `coach_program_weeks` → `user_imported_programs` for user; sets `active_imported_program_id` on profile
+- **Programs page** — shows "Featured Programs" section for role-shared programs; Activate / Restart from Week 1 buttons
+- **Seed exercises API** — `/api/admin/seed-program-exercises` extracts exercises → upserts to `exercise_library`; stamps `source_program` on library rows for stable program lane tracking
+- **SQL:** `coach_programs.shared_with_roles`, `user_imported_programs.source_coach_program_id`, `exercise_library.source_program`
+
+### Video Curation — Priority Lanes + Bug Fixes
+- **Priority Lanes UI** — replaced blind batch controls with 3 lanes: 🔴 User Plans Queue / 🔵 Program lanes (one per seeded program) / ⬜ Full Library Backlog; each shows pending count + Run 10/25 buttons
+- **Manual URL bug fix** — `pasteCustom` now supersedes all proposed/queued candidates when manual URL is saved; `Approve All ≥ 0.85` skips exercises that already have `video_url`
+- **`source_label` on `exercise_video_candidates`** — seeds tag queue entries with `program:Name`; tab reads this to build program lanes
+- **`exercise_library.source_program`** — stable permanent tag used for program lane counting (doesn't depend on transient candidate status)
+- **curate-videos API** — accepts `exerciseIds[]` (targeted run) + `lane` param (`plans`/`backlog`/`all`)
+
+### Coach Exercise Library (`/coach/library`)
+- New page with 🎬 Library tab in coach sidebar + mobile nav
+- Add/Edit modal: name, sets×reps, rest between sets, instructions, coach notes
+- Video type tabs: **No Video** / **▶ YouTube / Short** / **🎥 Upload My Video**
+  - YouTube: URL + ✂️ clip trimming (start/end M:SS) + live preview; Shorts auto-detected
+  - Upload: file picker (MP4/MOV/WebM, 200MB) with format guidelines; Supabase storage
+- List view: video badge, clip range badge, Preview toggle, Edit, Delete
+- Expanded row: side-by-side video player + instructions
+- SQL: `coach_exercise_library` table (RLS-protected)
+
+### YouTube Clip Trimming in Video Curation
+- Paste URL section expanded with ✂️ Clip Trimming panel (auto-appears when valid URL detected)
+- Start/End time inputs in M:SS format + inline usage guide + live preview
+- `pasteCustom` saves `youtube_start_sec` / `youtube_end_sec` to `exercise_library`
+- `VideoPlayer` in calendar + exercises pages updated to apply `?start=N&end=N` embed params
+- SQL: `exercise_library.youtube_start_sec`, `exercise_library.youtube_end_sec`
+
+### Pending SQL Migrations (run in Supabase SQL Editor)
+All new this session — run if not yet done:
+1. `supabase/migrations/20260601_plan_conversion_requests.sql`
+2. `supabase/migrations/20260601_coach_program_sharing.sql` (includes `source_coach_program_id` on `user_imported_programs`)
+3. `supabase/migrations/20260601_curation_source_label.sql`
+4. `supabase/migrations/20260601_exercise_library_source_program.sql`
+5. `supabase/migrations/20260601_coach_exercise_library.sql`
+6. `supabase/migrations/20260601_exercise_library_clip.sql`
+
+---
+
+## Previous Session (2026-06-01)
 
 ### PDF Export — Coach Program Detail
 - "Export PDF" button on `/coach/programs/[id]` header row (next to Assign to Client)
@@ -422,15 +482,15 @@ return () => { supabase.removeChannel(channel) }
 ## 11. What to Work on Next (Priority Order)
 
 1. **LLC registration** — Everything App Store blocks on this; do it first
-2. **App name decision** — Brainstorm with friends underway; pick from shortlist once responses come in
-3. **Stripe billing for coach tiers** — Last major revenue-unlock for coach portal (2 items left to 100%)
-4. **Coach affiliate / referral system** — Final coach portal item; depends on Stripe being live
-5. **RevenueCat integration** — Critical App Store blocker; replaces Stripe for iOS/Android
-6. **Capacitor wrapper** — Wrap PWA as native iOS + Android binary
-7. **Saved programs library** — Save every AI-generated plan to user account (TODO item)
-8. **Ask AI recovery feature** — Pain/soreness assistant in Recovery tab
-9. **Video curation:** Continue running daily to get to 80%+ coverage
-10. **TTS coverage:** Continue running Generate 25 daily
+2. **App name decision** — Pick from shortlist (Hone, Caliber, Athlo, Kime, Vantage, Forge)
+3. **Muscle Beach Method video curation** — Priority lane is now working; run 25 exercises/day until the program lane hits 0; then Approve All ≥ 0.85
+4. **Stripe billing for coach tiers** — Last revenue-unlock for coach portal to hit 100%
+5. **Coach affiliate / referral system** — Final coach portal item; depends on Stripe
+6. **RevenueCat integration** — Critical App Store blocker; replaces Stripe for iOS/Android
+7. **Capacitor wrapper** — Wrap PWA as native iOS + Android binary
+8. **Connect Coach Exercise Library to program builder** — When building programs, coaches should be able to pull from their personal library; currently library is standalone
+9. **TTS coverage** — Continue "Generate 25" daily in admin TTS tab
+10. **Video curation backlog** — After Muscle Beach Method is done, chip through the 592-exercise backlog
 
 ---
 
