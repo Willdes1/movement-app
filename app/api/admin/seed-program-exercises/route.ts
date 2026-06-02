@@ -80,30 +80,44 @@ export async function POST(req: Request) {
 
   if (!exercises.length) return NextResponse.json({ seeded: 0, total: 0, queued: 0 })
 
-  // Fetch what's already in exercise_library (id + name_normalized + video_url)
+  // Fetch what's already in exercise_library (id + name_normalized + video_url + source_program)
   const { data: existing } = await supabase
     .from('exercise_library')
-    .select('id, name_normalized, video_url')
+    .select('id, name_normalized, video_url, source_program')
     .in('name_normalized', exercises.map(e => e.name_normalized))
 
   const existingMap = new Map((existing ?? []).map(e => [e.name_normalized, e]))
   const toInsert = exercises.filter(e => !existingMap.has(e.name_normalized))
 
-  // Step 1: Insert any exercises not yet in the library
+  // Step 1a: Insert any exercises not yet in the library (with source_program tagged)
   const BATCH = 50
   let seeded = 0
-  const newlyInserted: { name_normalized: string }[] = []
   for (let i = 0; i < toInsert.length; i += BATCH) {
     const chunk = toInsert.slice(i, i + BATCH)
     const { data: inserted, error } = await supabase
       .from('exercise_library')
-      .insert(chunk.map(e => ({ name_normalized: e.name_normalized, name_display: e.name_display })))
-      .select('id, name_normalized, video_url')
+      .insert(chunk.map(e => ({ name_normalized: e.name_normalized, name_display: e.name_display, source_program: programName })))
+      .select('id, name_normalized, video_url, source_program')
     if (!error && inserted) {
       seeded += inserted.length
       inserted.forEach(e => existingMap.set(e.name_normalized, e))
-      newlyInserted.push(...inserted)
     }
+  }
+
+  // Step 1b: Stamp source_program on existing library rows that don't have it yet
+  // (handles exercises already in library from before seeding was introduced)
+  const toStamp = exercises
+    .filter(e => {
+      const lib = existingMap.get(e.name_normalized)
+      return lib && !lib.source_program
+    })
+    .map(e => existingMap.get(e.name_normalized)!.id)
+    .filter(Boolean)
+
+  if (toStamp.length > 0) {
+    await supabase.from('exercise_library')
+      .update({ source_program: programName })
+      .in('id', toStamp)
   }
 
   // Step 2: Queue ALL program exercises (new + existing without video) for priority curation.

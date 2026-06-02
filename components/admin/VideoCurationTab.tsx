@@ -135,44 +135,35 @@ export default function VideoCurationTab() {
     const allQueuedIds = new Set((queuedRows ?? []).map(r => r.exercise_id))
     setQueuedIds(allQueuedIds)
 
-    // Split queued into: plan lane (null/plan source) vs program lanes
-    const planIds: string[] = []
-    const programMap: Record<string, string[]> = {} // label → exercise_ids
-
-    for (const r of (queuedRows ?? []) as { exercise_id: string; source_label: string | null }[]) {
-      if (!r.source_label || r.source_label === 'plan') {
-        planIds.push(r.exercise_id)
-      } else if (r.source_label.startsWith('program:')) {
-        const label = r.source_label
-        if (!programMap[label]) programMap[label] = []
-        programMap[label].push(r.exercise_id)
-      }
-    }
+    // Plan queue: queued entries with no source_label or source_label='plan'
+    const planIds = (queuedRows ?? [])
+      .filter(r => !r.source_label || r.source_label === 'plan')
+      .map(r => r.exercise_id)
     setPlanQueueIds(planIds)
 
-    // Resolve exercise_ids → exercise rows for pending count (exclude already-with-video)
-    const { data: libMap } = await supabase
+    // Program lanes: read directly from exercise_library.source_program
+    // This is stable regardless of pipeline stage (queued → proposed → approved)
+    const { data: programExercises } = await supabase
       .from('exercise_library')
-      .select('id, video_url')
-      .in('id', [...allQueuedIds])
+      .select('id, source_program, video_url')
+      .not('source_program', 'is', null)
 
-    const hasVideo = new Set((libMap ?? []).filter(e => e.video_url).map(e => e.id))
-
-    // Build program lanes — fetch program names from coach_programs
-    const progLabels = Object.keys(programMap)
-    const lanes: ProgramLane[] = []
-    for (const label of progLabels) {
-      const progName = label.replace(/^program:/, '')
-      const ids = programMap[label]
-      const pendingCount = ids.filter(id => !hasVideo.has(id)).length
-      // Look up the coach_program id for the run button
-      const { data: progRow } = await supabase
-        .from('coach_programs')
-        .select('id')
-        .eq('name', progName)
-        .single()
-      lanes.push({ programId: progRow?.id ?? '', name: progName, exerciseIds: ids.filter(id => !hasVideo.has(id)), pendingCount })
+    // Group by program name
+    const progMap: Record<string, { id: string; video_url: string | null }[]> = {}
+    for (const ex of (programExercises ?? []) as { id: string; source_program: string; video_url: string | null }[]) {
+      if (!progMap[ex.source_program]) progMap[ex.source_program] = []
+      progMap[ex.source_program].push(ex)
     }
+
+    const lanes: ProgramLane[] = Object.entries(progMap).map(([name, exs]) => {
+      const pending = exs.filter(e => !e.video_url)
+      return {
+        programId: name,
+        name,
+        exerciseIds: pending.map(e => e.id),
+        pendingCount: pending.length,
+      }
+    }).filter(l => l.pendingCount > 0) // only show programs that still need videos
     setProgramLanes(lanes)
 
     const { data: cands } = await supabase
