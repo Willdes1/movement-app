@@ -85,7 +85,11 @@ export default function VideoCurationTab() {
 
   // ── Program lanes ──────────────────────────────────────────────────────────
   type ProgramLane = { programId: string; name: string; exerciseIds: string[]; pendingCount: number; needsCurationCount: number }
+  type ProgramDetailEx = { id: string; name_display: string; video_url: string | null; candidates: Candidate[] }
+  type ProgramDetail = { name: string; exercises: ProgramDetailEx[]; total: number; withVideo: number }
   const [programLanes, setProgramLanes]   = useState<ProgramLane[]>([])
+  const [programDetails, setProgramDetails] = useState<ProgramDetail[]>([])
+  const [expandedPrograms, setExpandedPrograms] = useState<Set<string>>(new Set())
   const [planQueueIds, setPlanQueueIds]   = useState<string[]>([])
 
   // ── Exercise / candidate state ─────────────────────────────────────────────
@@ -176,12 +180,13 @@ export default function VideoCurationTab() {
     // This is stable regardless of pipeline stage (queued → proposed → approved)
     const { data: programExercises } = await supabase
       .from('exercise_library')
-      .select('id, source_program, video_url')
+      .select('id, name_display, source_program, video_url')
       .not('source_program', 'is', null)
+      .order('name_display')
 
     // Group by program name
-    const progMap: Record<string, { id: string; video_url: string | null }[]> = {}
-    for (const ex of (programExercises ?? []) as { id: string; source_program: string; video_url: string | null }[]) {
+    const progMap: Record<string, { id: string; name_display: string; video_url: string | null }[]> = {}
+    for (const ex of (programExercises ?? []) as { id: string; name_display: string; source_program: string; video_url: string | null }[]) {
       if (!progMap[ex.source_program]) progMap[ex.source_program] = []
       progMap[ex.source_program].push(ex)
     }
@@ -211,6 +216,19 @@ export default function VideoCurationTab() {
       }
     }).filter(l => l.pendingCount > 0)
     setProgramLanes(lanes)
+
+    const details: ProgramDetail[] = Object.entries(progMap).map(([name, exs]) => ({
+      name,
+      exercises: exs.map(e => ({
+        id: e.id,
+        name_display: e.name_display,
+        video_url: e.video_url,
+        candidates: candMap[e.id] ?? [],
+      })),
+      total: exs.length,
+      withVideo: exs.filter(e => e.video_url).length,
+    }))
+    setProgramDetails(details)
 
     setExercises((exList ?? []).map((e: Omit<Exercise, 'candidates'>) => ({
       ...e, candidates: candMap[e.id] ?? [],
@@ -588,6 +606,142 @@ export default function VideoCurationTab() {
         )}
       </div>
 
+      {/* ── Program Library View ────────────────────────────────────────────── */}
+      {programDetails.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: C.textDim, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Video Library — Programs</p>
+            <span style={{ fontSize: 11, color: C.textDim }}>Programs vanish from Priority Lanes once all exercises have videos.</span>
+          </div>
+
+          {programDetails.map(prog => {
+            const pct = prog.total > 0 ? Math.round((prog.withVideo / prog.total) * 100) : 0
+            const isExpanded = expandedPrograms.has(prog.name)
+            return (
+              <div key={prog.name} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 10, overflow: 'hidden' }}>
+                <div style={{ padding: '13px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
+                  onClick={() => setExpandedPrograms(prev => { const n = new Set(prev); if (n.has(prog.name)) n.delete(prog.name); else n.add(prog.name); return n })}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: C.accent }}>🔵 {prog.name}</span>
+                  <span style={{ fontSize: 12, color: C.textMid, whiteSpace: 'nowrap' }}>{prog.withVideo}/{prog.total} have videos</span>
+                  <div style={{ flex: 1, height: 6, background: C.surface2, borderRadius: 3, overflow: 'hidden', minWidth: 60 }}>
+                    <div style={{ width: `${pct}%`, height: '100%', background: pct === 100 ? C.green : C.accent, borderRadius: 3 }} />
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: pct === 100 ? C.green : C.textMid, minWidth: 36, textAlign: 'right' }}>{pct}%</span>
+                  <span style={{ fontSize: 11, color: C.textDim, marginLeft: 4 }}>{isExpanded ? '▲' : '▼'}</span>
+                </div>
+                {isExpanded && (
+                  <div style={{ borderTop: `1px solid ${C.border}` }}>
+                    {prog.exercises.map(pex => {
+                      const hasProposals = pex.candidates.some(c => c.status === 'proposed')
+                      const rawUrl = pasteUrls[pex.id] ?? ''
+                      return (
+                        <div key={pex.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', borderBottom: `1px solid ${C.border}`, background: pex.video_url ? 'rgba(34,197,94,0.03)' : 'transparent', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 13, flexShrink: 0, width: 18, color: pex.video_url ? C.green : hasProposals ? C.amber : C.red }}>
+                            {pex.video_url ? '✓' : hasProposals ? '○' : '✗'}
+                          </span>
+                          <span style={{ flex: 1, minWidth: 160, fontSize: 13, color: pex.video_url ? C.textMid : C.text }}>{pex.name_display}</span>
+                          {pex.video_url && (
+                            <a href={pex.video_url} target="_blank" rel="noopener noreferrer"
+                              style={{ fontSize: 11, color: C.green, fontWeight: 700, textDecoration: 'none', padding: '3px 8px', borderRadius: 5, border: `1px solid ${C.greenBorder}`, background: C.greenDim, whiteSpace: 'nowrap' }}>
+                              ▶ View
+                            </a>
+                          )}
+                          {!pex.video_url && hasProposals && (
+                            <button onClick={() => { setSearch(pex.name_display); setFilter('pending') }}
+                              style={{ fontSize: 11, color: C.amber, fontWeight: 600, padding: '3px 8px', borderRadius: 5, border: `1px solid ${C.amberBorder}`, background: C.amberDim, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+                              {pex.candidates.filter(c => c.status === 'proposed').length} proposal{pex.candidates.filter(c => c.status === 'proposed').length !== 1 ? 's' : ''} — review ↓
+                            </button>
+                          )}
+                          {!pex.video_url && !hasProposals && (
+                            <>
+                              <button onClick={() => runSingle(pex.id)} disabled={!!acting || !hasChannels}
+                                style={{ fontSize: 11, color: C.textDim, padding: '3px 10px', borderRadius: 5, border: `1px solid ${C.border}`, background: 'transparent', cursor: !!acting || !hasChannels ? 'not-allowed' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                                {acting === pex.id ? '…' : '▶ Run'}
+                              </button>
+                              <input value={rawUrl} onChange={e => setPasteUrls(prev => ({ ...prev, [pex.id]: e.target.value }))}
+                                placeholder="Paste YouTube URL…"
+                                style={{ width: 190, padding: '4px 8px', borderRadius: 5, border: `1px solid ${rawUrl ? C.accentBorder : C.border}`, background: C.bg, color: C.text, fontSize: 11, fontFamily: 'inherit', outline: 'none' }} />
+                              {rawUrl && (
+                                <button onClick={() => pasteCustom(pex.id)} disabled={!!acting}
+                                  style={{ fontSize: 11, color: C.accent, fontWeight: 700, padding: '3px 10px', borderRadius: 5, border: `1px solid ${C.accentBorder}`, background: C.accentDim, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                                  ✓ Save
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+
+          {/* Plan generation queue */}
+          {planQueueIds.length > 0 && (
+            <div style={{ background: C.surface, border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, overflow: 'hidden' }}>
+              <div style={{ padding: '13px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
+                onClick={() => setExpandedPrograms(prev => { const n = new Set(prev); if (n.has('__plan__')) n.delete('__plan__'); else n.add('__plan__'); return n })}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: C.red }}>🔴 From User Plan Generation</span>
+                <span style={{ fontSize: 12, color: C.textMid }}>
+                  {planQueueIds.filter(id => !exercises.find(e => e.id === id)?.video_url).length} still need videos
+                </span>
+                <div style={{ flex: 1 }} />
+                <span style={{ fontSize: 11, color: C.textDim }}>{expandedPrograms.has('__plan__') ? '▲' : '▼'}</span>
+              </div>
+              {expandedPrograms.has('__plan__') && (
+                <div style={{ borderTop: `1px solid ${C.border}` }}>
+                  {planQueueIds.map(id => {
+                    const pex = exercises.find(e => e.id === id)
+                    if (!pex) return null
+                    const hasProposals = pex.candidates.some(c => c.status === 'proposed')
+                    const rawUrl = pasteUrls[pex.id] ?? ''
+                    return (
+                      <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', borderBottom: `1px solid ${C.border}`, background: pex.video_url ? 'rgba(34,197,94,0.03)' : 'transparent', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 13, flexShrink: 0, width: 18, color: pex.video_url ? C.green : hasProposals ? C.amber : C.red }}>
+                          {pex.video_url ? '✓' : hasProposals ? '○' : '✗'}
+                        </span>
+                        <span style={{ flex: 1, minWidth: 160, fontSize: 13, color: pex.video_url ? C.textMid : C.text }}>{pex.name_display}</span>
+                        {pex.video_url && (
+                          <a href={pex.video_url} target="_blank" rel="noopener noreferrer"
+                            style={{ fontSize: 11, color: C.green, fontWeight: 700, textDecoration: 'none', padding: '3px 8px', borderRadius: 5, border: `1px solid ${C.greenBorder}`, background: C.greenDim }}>
+                            ▶ View
+                          </a>
+                        )}
+                        {!pex.video_url && hasProposals && (
+                          <button onClick={() => { setSearch(pex.name_display); setFilter('pending') }}
+                            style={{ fontSize: 11, color: C.amber, fontWeight: 600, padding: '3px 8px', borderRadius: 5, border: `1px solid ${C.amberBorder}`, background: C.amberDim, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+                            {pex.candidates.filter(c => c.status === 'proposed').length} proposals — review ↓
+                          </button>
+                        )}
+                        {!pex.video_url && !hasProposals && (
+                          <>
+                            <button onClick={() => runSingle(pex.id)} disabled={!!acting || !hasChannels}
+                              style={{ fontSize: 11, color: C.textDim, padding: '3px 10px', borderRadius: 5, border: `1px solid ${C.border}`, background: 'transparent', cursor: !!acting || !hasChannels ? 'not-allowed' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                              {acting === pex.id ? '…' : '▶ Run'}
+                            </button>
+                            <input value={rawUrl} onChange={e => setPasteUrls(prev => ({ ...prev, [pex.id]: e.target.value }))}
+                              placeholder="Paste YouTube URL…"
+                              style={{ width: 190, padding: '4px 8px', borderRadius: 5, border: `1px solid ${rawUrl ? C.accentBorder : C.border}`, background: C.bg, color: C.text, fontSize: 11, fontFamily: 'inherit', outline: 'none' }} />
+                            {rawUrl && (
+                              <button onClick={() => pasteCustom(pex.id)} disabled={!!acting}
+                                style={{ fontSize: 11, color: C.accent, fontWeight: 700, padding: '3px 10px', borderRadius: 5, border: `1px solid ${C.accentBorder}`, background: C.accentDim, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                                ✓ Save
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Filters ─────────────────────────────────────────────────────────── */}
       <div style={{ padding: '12px 16px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 14 }}>
         <p style={{ fontSize: 11, fontWeight: 700, color: C.textDim, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
@@ -670,8 +824,9 @@ export default function VideoCurationTab() {
                 {/* Approved edit panel */}
                 {ex.video_url && editingApproved.has(ex.id) && (() => {
                   const rawUrl = pasteUrls[ex.id] ?? ''
-                  const videoId = rawUrl ? extractYouTubeId(rawUrl) : extractYouTubeId(ex.video_url)
                   const previewUrl = rawUrl || ex.video_url
+                  const videoId = rawUrl ? extractYouTubeId(rawUrl) : extractYouTubeId(ex.video_url)
+                  const isShort = previewUrl.includes('/shorts/')
                   const times = pasteTimes[ex.id] ?? { start: '', end: '' }
                   const startSec = parseMMSS(times.start)
                   const endSec = parseMMSS(times.end)
@@ -682,9 +837,12 @@ export default function VideoCurationTab() {
                       {/* Current video preview */}
                       {!rawUrl && (
                         <div>
-                          <p style={{ fontSize: 10, fontWeight: 700, color: C.textDim, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 8 }}>Current Video</p>
-                          <div style={{ borderRadius: 8, overflow: 'hidden', background: '#000', maxWidth: 480 }}>
-                            <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                            <p style={{ fontSize: 10, fontWeight: 700, color: C.textDim, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Current Video</p>
+                            {isShort && <span style={{ fontSize: 10, fontWeight: 700, color: C.purple, padding: '1px 6px', borderRadius: 4, border: '1px solid rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.08)' }}>SHORT 9:16</span>}
+                          </div>
+                          <div style={{ borderRadius: 8, overflow: 'hidden', background: '#000', maxWidth: isShort ? 220 : 480 }}>
+                            <div style={{ position: 'relative', paddingBottom: isShort ? '177.78%' : '56.25%', height: 0 }}>
                               <iframe
                                 src={buildClipEmbedUrl(ex.video_url, null, null)}
                                 style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
@@ -742,11 +900,14 @@ export default function VideoCurationTab() {
                             </div>
                             {embedSrc && (
                               <div>
-                                <p style={{ fontSize: 10, fontWeight: 700, color: C.textDim, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>
-                                  Preview {hasClip ? `(${secondsToMMSS(startSec) || '0:00'} → ${secondsToMMSS(endSec) || 'end'})` : ''}
-                                </p>
-                                <div style={{ borderRadius: 8, overflow: 'hidden', background: '#000' }}>
-                                  <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                  <p style={{ fontSize: 10, fontWeight: 700, color: C.textDim, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                                    Preview {hasClip ? `(${secondsToMMSS(startSec) || '0:00'} → ${secondsToMMSS(endSec) || 'end'})` : ''}
+                                  </p>
+                                  {isShort && <span style={{ fontSize: 10, fontWeight: 700, color: C.purple, padding: '1px 6px', borderRadius: 4, border: '1px solid rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.08)' }}>SHORT 9:16</span>}
+                                </div>
+                                <div style={{ borderRadius: 8, overflow: 'hidden', background: '#000', maxWidth: isShort ? 220 : '100%' }}>
+                                  <div style={{ position: 'relative', paddingBottom: isShort ? '177.78%' : '56.25%', height: 0 }}>
                                     <iframe key={embedSrc} src={embedSrc} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
                                   </div>
                                 </div>
@@ -819,6 +980,7 @@ export default function VideoCurationTab() {
                 {!ex.video_url && (() => {
                   const rawUrl = pasteUrls[ex.id] ?? ''
                   const videoId = rawUrl ? extractYouTubeId(rawUrl) : null
+                  const isShort = rawUrl.includes('/shorts/')
                   const times = pasteTimes[ex.id] ?? { start: '', end: '' }
                   const startSec = parseMMSS(times.start)
                   const endSec = parseMMSS(times.end)
@@ -893,11 +1055,14 @@ export default function VideoCurationTab() {
                           {/* Live preview */}
                           {embedSrc && (
                             <div>
-                              <p style={{ fontSize: 10, fontWeight: 700, color: C.textDim, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>
-                                Live Preview {hasClip ? `(${secondsToMMSS(startSec) || '0:00'} → ${secondsToMMSS(endSec) || 'end'})` : ''}
-                              </p>
-                              <div style={{ borderRadius: 8, overflow: 'hidden', background: '#000' }}>
-                                <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                <p style={{ fontSize: 10, fontWeight: 700, color: C.textDim, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                                  Live Preview {hasClip ? `(${secondsToMMSS(startSec) || '0:00'} → ${secondsToMMSS(endSec) || 'end'})` : ''}
+                                </p>
+                                {isShort && <span style={{ fontSize: 10, fontWeight: 700, color: C.purple, padding: '1px 6px', borderRadius: 4, border: '1px solid rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.08)' }}>SHORT 9:16</span>}
+                              </div>
+                              <div style={{ borderRadius: 8, overflow: 'hidden', background: '#000', maxWidth: isShort ? 220 : '100%' }}>
+                                <div style={{ position: 'relative', paddingBottom: isShort ? '177.78%' : '56.25%', height: 0 }}>
                                   <iframe
                                     key={embedSrc}
                                     src={embedSrc}
