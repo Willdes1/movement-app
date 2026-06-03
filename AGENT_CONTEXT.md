@@ -99,25 +99,55 @@
 
 ---
 
-## 4. What Was Built This Session (2026-06-02 — continued)
+## 4. What Was Built This Session (2026-06-03)
+
+### Video Curation — Lane Bug Fix
+- **Root cause found:** Muscle Beach Method showed "6 pending" but Run 25 returned "0 ran" because all 6 exercises already had `proposed` candidates. The API skips exercises with existing proposals, but the lane counter didn't account for this.
+- **Fix:** `loadExercises` now builds program lanes **after** `candMap` is populated; `needsCurationCount` counts only exercises with no proposals; Run buttons disable when `needsCurationCount === 0`; lane description now shows split — "X need AI curation · Y awaiting review"
+
+### Video Curation — Approved Exercise Edit Panel
+- **✏ Edit button** on every approved exercise row opens an inline panel with:
+  - Current video playing inline so you can verify it's correct
+  - **Replace URL** field with full ✂️ clip trimming (start/end M:SS, live preview) — works for both regular YouTube and Shorts
+  - **↺ Regenerate** button — clears approval + reruns fresh AI search; you review new candidates
+- **File:** `components/admin/VideoCurationTab.tsx`
+
+### Video Curation — Program Library View
+- New **Video Library — Programs** section between Priority Lanes and Quick Search
+- One collapsible card per program (e.g. Muscle Beach Method) with progress bar + percentage
+- Exercise list shows ✓ (has video) / ○ (proposals pending) / ✗ (needs curation) per row
+  - ✓ rows: "▶ View" link
+  - ○ rows: "[X proposals — review ↓]" button auto-filters Quick Search to that exercise name
+  - ✗ rows: inline "▶ Run" button + URL paste field + "✓ Save" (appears when URL typed)
+- **🔴 From User Plan Generation** — same drill-down for plan-queued exercises
+- Programs disappear from Priority Lanes automatically at 100%
+
+### Video Curation — YouTube Shorts Clip Trimming
+- Clip trimming already worked for Shorts (same `?start=&end=` params) — fixed the preview
+- Shorts URLs now render preview iframe at 9:16 vertical aspect ratio (maxWidth 220px) with "SHORT 9:16" badge
+- Applies to both pending paste section and the approved Edit panel
+
+### SQL Migrations — All Confirmed Run
+- User confirmed the athlete profile enhancement migration (`20260602_athlete_profile_enhancement.sql`) was run successfully — all 7 columns now live on profiles table
+
+---
+
+## Previous Session (2026-06-02 — continued)
 
 ### MIE Questionnaire Audit + Profile Enhancement
 Full audit of what the MIE prompt expects vs. what the profile form actually collected. Added 7 new questions to close every gap:
-- **Sex assigned at birth** — relabeled from "Gender" with Oura-style "Why we ask" collapsible (science explanation: muscle fiber composition, hormonal recovery, training volume research)
-- **Age** — number input; wired to MIE `profile.age` (was in prompt but never collected)
+- **Sex assigned at birth** — relabeled from "Gender" with Oura-style "Why we ask" collapsible
+- **Age** — number input; wired to MIE `profile.age`
 - **Height & Weight** — side-by-side inputs; stored as `height text` + `weight_lbs numeric` on profiles
-- **Training experience level** — 5-chip selector (Beginner / Intermediate / Expert / Elite / Pro); elaborate per-level MIE guidance was already written, just had no UI
-- **Training history** — textarea for `workout_background`; tells S&C Agent what the athlete already knows
-- **"What do you want to improve?"** — sport-specific struggles/limitations textarea (`improvement_notes`); injected into S&C Agent prompt + Phase 3 `athleteContext` (Sports Specialist + Mobility agents see it); placeholder uses skateboard frontside 180 rotation example
-- **Per-sport skill level** — Beginner/Intermediate/Advanced/Expert chips inside each sport's schedule row; builds `activities[]` array for MIE
-- **SQL:** `supabase/migrations/20260602_athlete_profile_enhancement.sql` — adds `age`, `height`, `weight_lbs`, `training_level`, `workout_background`, `activities`, `improvement_notes` to profiles
+- **Training experience level** — 5-chip selector (Beginner / Intermediate / Expert / Elite / Pro)
+- **Training history** — textarea for `workout_background`
+- **"What do you want to improve?"** — `improvement_notes` textarea; injected into S&C Agent + Phase 3
+- **Per-sport skill level** — chips inside each sport's schedule row; builds `activities[]` array
+- **SQL:** `supabase/migrations/20260602_athlete_profile_enhancement.sql`
 - **Files:** `app/profile/page.tsx`, `lib/types.ts`, `app/api/generate-plan/route.ts`
 
 ### Launchpad Fix
 - Coach Portal checklist updated: added Manual program builder, PDF/DOCX import, and Coach Exercise Library as done items — bumped from 13/15 (87%) → 16/18 (89%)
-
-### SQL Migrations All Confirmed Run
-User ran all 7 pending migrations from the previous 2026-06-02 session (plan_conversion_requests, coach_program_sharing, curation_source_label, exercise_library_source_program, coach_exercise_library, exercise_library_clip, user_imported_programs). All confirmed successful.
 
 ---
 
@@ -516,17 +546,16 @@ return () => { supabase.removeChannel(channel) }
 
 ## 11. What to Work on Next (Priority Order)
 
-1. **Run SQL migration** — `supabase/migrations/20260602_athlete_profile_enhancement.sql` (7 new profile columns); profile form will error without it
+1. **TTS 504 fix** — Admin TTS generation is stuck at 53/752 exercises with 504 errors. Investigate route timeout handling; current batch is 25 exercises = 50 TTS calls; look at whether the 60s limit is still being hit or if it's a different failure. File: `app/api/admin/generate-tts/route.ts`
 2. **F&F self-test account** — User wants to create a personal F&F account to start real testing; set role to `ff` in Supabase
 3. **LLC registration** — Everything App Store blocks on this; do it first
 4. **App name decision** — Pick from shortlist (Hone, Caliber, Athlo, Kime, Vantage, Forge)
-5. **Muscle Beach Method video curation** — Priority lane is working; run 25 exercises/day until program lane hits 0; then Approve All ≥ 0.85
+5. **Muscle Beach Method video curation** — Program Library View now makes this easy; use drill-down to see exactly which 6 exercises are missing; run/paste per exercise
 6. **Stripe billing for coach tiers** — Last revenue-unlock for coach portal to hit 100%
 7. **Coach affiliate / referral system** — Final coach portal item; depends on Stripe
 8. **RevenueCat integration** — Critical App Store blocker; replaces Stripe for iOS/Android
 9. **Capacitor wrapper** — Wrap PWA as native iOS + Android binary
 10. **Connect Coach Exercise Library to program builder** — Coaches should pull from their personal library when building programs; currently standalone
-11. **TTS coverage** — Continue "Generate 25" daily in admin TTS tab
 
 ---
 
@@ -545,6 +574,6 @@ return () => { supabase.removeChannel(channel) }
 - **Vercel:** Hobby plan. `dentalseowill-5409` account.
 - **Supabase:** Free tier. `main` branch = production.
 - **GitHub:** `Willdes1/movement-app`, master branch.
-- **Current production commit:** `e65ed5c`
+- **Current production commit:** `d6fcf6b`
 - **Credentials:** GitHub PAT (Willdes1) in user's 1Will Gonzalez Google Drive.
 - **Admin portal:** `/admin` — hash-based tab routing (e.g. `/admin#tts`, `/admin#video`, `/admin#launchpad`)
