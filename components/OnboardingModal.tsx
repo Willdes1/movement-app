@@ -92,6 +92,7 @@ function Chip({ label, active, onClick }: { label: string; active: boolean; onCl
 
 // ─── Step 1: You ─────────────────────────────────────────────────────────────
 function StepYou({ form, set }: { form: Form; set: (k: keyof Form, v: string) => void }) {
+  const [showWhyGender, setShowWhyGender] = useState(false)
   return (
     <div>
       <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--text)', marginBottom: 6, letterSpacing: '-0.02em' }}>
@@ -121,12 +122,23 @@ function StepYou({ form, set }: { form: Form; set: (k: keyof Form, v: string) =>
         />
       </Field>
 
-      <Field label="Gender">
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {['Male', 'Female', 'Non-binary', 'Prefer not to say'].map(g => (
+      <Field label="Sex assigned at birth">
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+          {['Male', 'Female'].map(g => (
             <Chip key={g} label={g} active={form.gender === g} onClick={() => set('gender', g)} />
           ))}
         </div>
+        <button
+          onClick={() => setShowWhyGender(v => !v)}
+          style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', padding: 0, textDecoration: 'underline' }}
+        >
+          {showWhyGender ? '▲ Hide' : '▼ Why we ask'}
+        </button>
+        {showWhyGender && (
+          <p style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.6, marginTop: 8, padding: '10px 12px', background: 'var(--surface2)', borderRadius: 8 }}>
+            Biological sex affects hormonal cycles, muscle fiber composition, recovery rates, and injury risk profiles. The AI uses this to calibrate training load and recovery recommendations — not to make assumptions about your identity.
+          </p>
+        )}
       </Field>
     </div>
   )
@@ -368,8 +380,24 @@ export default function OnboardingModal() {
 
   useEffect(() => {
     if (loading || !user) return
-    if (isAdmin || role === 'admin' || role === 'coach') return
-    if (!localStorage.getItem(ONBOARDING_KEY(user.id))) setShow(true)
+    if (isAdmin || role === 'admin' || role === 'coach') {
+      setShow(false) // ensure modal is hidden if role loads after first render
+      return
+    }
+    if (localStorage.getItem(ONBOARDING_KEY(user.id))) return
+    // Secondary check: if profile already has data they've onboarded on another device
+    supabase
+      .from('profiles')
+      .select('name, sport')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => {
+        if (data?.name || data?.sport) {
+          localStorage.setItem(ONBOARDING_KEY(user.id), '1')
+        } else {
+          setShow(true)
+        }
+      })
   }, [user, loading, isAdmin, role])
 
   function set(k: keyof Form, v: string) {
