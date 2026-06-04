@@ -14,6 +14,7 @@ const C = {
 type LibRow = {
   name_normalized: string
   name_display: string
+  how: string | null
   tts_url_male: string | null
   tts_url_female: string | null
 }
@@ -35,6 +36,7 @@ export default function TTSCurationTab() {
   const [libSearch, setLibSearch]     = useState('')
   const [libFilter, setLibFilter]     = useState<'all' | 'generated' | 'missing'>('generated')
   const [playingId, setPlayingId]     = useState<string | null>(null)
+  const [generatingRows, setGeneratingRows] = useState<Set<string>>(new Set())
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   async function loadStats() {
@@ -52,11 +54,33 @@ export default function TTSCurationTab() {
     setLibLoading(true)
     const { data } = await supabase
       .from('exercise_library')
-      .select('name_normalized, name_display, tts_url_male, tts_url_female')
+      .select('name_normalized, name_display, how, tts_url_male, tts_url_female')
       .order('name_display')
     setLibRows(data ?? [])
     setLibLoaded(true)
     setLibLoading(false)
+  }
+
+  async function generateRow(name_normalized: string) {
+    setGeneratingRows(prev => new Set(prev).add(name_normalized))
+    try {
+      await fetch('/api/admin/generate-tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targets: [name_normalized] }),
+      })
+      // Re-fetch just this row so Play buttons appear immediately
+      const { data } = await supabase
+        .from('exercise_library')
+        .select('name_normalized, name_display, how, tts_url_male, tts_url_female')
+        .eq('name_normalized', name_normalized)
+        .single()
+      if (data) {
+        setLibRows(prev => prev.map(r => r.name_normalized === name_normalized ? data as LibRow : r))
+      }
+    } finally {
+      setGeneratingRows(prev => { const s = new Set(prev); s.delete(name_normalized); return s })
+    }
   }
 
   useEffect(() => { loadStats() }, [])
@@ -287,8 +311,20 @@ export default function TTSCurationTab() {
                         >
                           {playingId === `male-${row.name_normalized}` ? '⏸ Playing' : '▶ Play'}
                         </button>
+                      ) : generatingRows.has(row.name_normalized) ? (
+                        <span style={{ fontSize: 11, color: C.textDim, padding: '4px 8px', borderRadius: 6, background: C.surface2, border: `1px solid ${C.border}` }}>Generating…</span>
+                      ) : row.how ? (
+                        <button
+                          onClick={() => generateRow(row.name_normalized)}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 5,
+                            padding: '5px 10px', borderRadius: 6, border: `1px solid ${C.amberBorder}`,
+                            background: C.amberDim, color: C.amber,
+                            fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                          }}
+                        >🎙 Generate</button>
                       ) : (
-                        <span style={{ fontSize: 11, color: C.textDim, padding: '4px 8px', borderRadius: 6, background: C.surface2, border: `1px solid ${C.border}` }}>Missing</span>
+                        <span style={{ fontSize: 11, color: C.textDim, padding: '4px 8px', borderRadius: 6, background: C.surface2, border: `1px solid ${C.border}` }}>No cues</span>
                       )}
                     </div>
 
@@ -307,8 +343,20 @@ export default function TTSCurationTab() {
                         >
                           {playingId === `female-${row.name_normalized}` ? '⏸ Playing' : '▶ Play'}
                         </button>
+                      ) : generatingRows.has(row.name_normalized) ? (
+                        <span style={{ fontSize: 11, color: C.textDim, padding: '4px 8px', borderRadius: 6, background: C.surface2, border: `1px solid ${C.border}` }}>Generating…</span>
+                      ) : row.tts_url_male ? (
+                        <button
+                          onClick={() => generateRow(row.name_normalized)}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 5,
+                            padding: '5px 10px', borderRadius: 6, border: `1px solid ${C.amberBorder}`,
+                            background: C.amberDim, color: C.amber,
+                            fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                          }}
+                        >🎙 Generate</button>
                       ) : (
-                        <span style={{ fontSize: 11, color: C.textDim, padding: '4px 8px', borderRadius: 6, background: C.surface2, border: `1px solid ${C.border}` }}>Missing</span>
+                        <span style={{ fontSize: 11, color: C.textDim, padding: '4px 8px', borderRadius: 6, background: C.surface2, border: `1px solid ${C.border}` }}>—</span>
                       )}
                     </div>
                   </div>

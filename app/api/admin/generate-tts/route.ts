@@ -79,20 +79,31 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   ])
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
     const supabase = getSupabase() as any
     const BATCH = 10
     const CONCURRENCY = 4
 
-    // Fetch exercises missing male TTS (prioritise those with coaching content)
-    const { data: exercises, error } = await supabase
+    const body = await request.json().catch(() => ({}))
+    const targets: string[] | undefined = body?.targets
+
+    // Targeted single/multi exercise generation OR next batch missing male TTS
+    let dbQuery = supabase
       .from('exercise_library')
       .select('name_normalized, name_display, how, breathing, core, tip')
-      .is('tts_url_male', null)
-      .not('how', 'is', null)
-      .order('name_normalized')
-      .limit(BATCH)
+
+    if (targets && targets.length > 0) {
+      dbQuery = dbQuery.in('name_normalized', targets)
+    } else {
+      dbQuery = dbQuery
+        .is('tts_url_male', null)
+        .not('how', 'is', null)
+        .order('name_normalized')
+        .limit(BATCH)
+    }
+
+    const { data: exercises, error } = await dbQuery
 
     if (error) return Response.json({ error: error.message }, { status: 500 })
     if (!exercises || exercises.length === 0) {
