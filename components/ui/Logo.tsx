@@ -2,8 +2,8 @@
 
 // PLACEHOLDER LOGO — replace this single component with final asset later.
 // When the real logo arrives: swap the contents of this file only.
-// Imported by: components/ui/Sidebar.tsx, app/coach/layout.tsx,
-//              app/admin/page.tsx, app/admin/mockup-a/page.tsx
+// Imported by: components/ui/Sidebar.tsx, components/ui/MobileMenu.tsx,
+//              app/coach/layout.tsx, app/admin/page.tsx, app/admin/mockup-a/page.tsx
 
 type LogoVariant = 'app' | 'admin' | 'coach'
 

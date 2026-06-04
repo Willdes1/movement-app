@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
+import Logo from '@/components/ui/Logo'
 
 const MENU_ITEMS = [
   { href: '/for-you',        label: 'For You',           desc: 'Daily feed & mindset',              emoji: '⚡' },
@@ -101,9 +102,7 @@ export default function MobileMenu() {
           justifyContent: 'space-between',
         }}>
           <div>
-            <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: '-0.02em', color: 'var(--text)', lineHeight: 1 }}>
-              Move<span style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-warm))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>.</span>
-            </div>
+            <Logo />
             <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6 }}>
               {firstName} · {sport}
             </div>
