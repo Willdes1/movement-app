@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import Logo from '@/components/ui/Logo'
 
 const navItems = [
   { href: '/today',     label: 'Home',       emoji: '🏠' },
@@ -54,24 +55,7 @@ export default function Sidebar() {
 
       {/* Brand */}
       <div style={{ padding: '22px 20px 18px', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--text)', lineHeight: 1 }}>
-          Move
-          <span style={{
-            background: 'linear-gradient(135deg, var(--accent), var(--accent-warm))',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-          }}>.</span>
-        </div>
-        <div style={{
-          fontSize: 9,
-          color: 'var(--text-dim)',
-          fontWeight: 700,
-          marginTop: 4,
-          letterSpacing: '0.07em',
-          textTransform: 'uppercase',
-        }}>
-          Your Atlas Prime Coach
-        </div>
+        <Logo />
       </div>
 
       {/* Nav items */}

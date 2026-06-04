@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import Logo from '@/components/ui/Logo'
 
 const C = {
   bg: '#0d1117',
@@ -98,15 +99,7 @@ function DesktopLayout({ nav, setNav }: { nav: NavId; setNav: (n: NavId) => void
       {/* Sidebar */}
       <aside style={{ width: 220, flexShrink: 0, background: C.surface, borderRight: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '24px 20px 20px', borderBottom: `1px solid ${C.border}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-            </div>
-            <div>
-              <p style={{ fontWeight: 800, fontSize: 14 }}>Atlas Prime OS</p>
-              <p style={{ fontSize: 10, color: C.textDim, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Admin Portal</p>
-            </div>
-          </div>
+          <Logo variant="admin" />
         </div>
         <nav style={{ padding: '12px 10px', flex: 1 }}>
           <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.textDim, padding: '4px 10px 8px' }}>Platform</p>
@@ -303,10 +296,7 @@ function MobileLayout({ nav, setNav }: { nav: NavId; setNav: (n: NavId) => void 
       {/* Mobile header */}
       <div style={{ padding: '16px 16px 12px', borderBottom: `1px solid ${C.border}`, background: C.surface, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 24, height: 24, borderRadius: 6, background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-          </div>
-          <span style={{ fontWeight: 800, fontSize: 14 }}>Atlas Prime OS</span>
+          <Logo variant="admin" />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ width: 7, height: 7, borderRadius: '50%', background: C.green }} />

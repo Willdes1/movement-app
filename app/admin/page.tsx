@@ -19,6 +19,7 @@ import StripeTab from '@/components/admin/StripeTab'
 import MIETab from '@/components/admin/MIETab'
 import ConversionsTab from '@/components/admin/ConversionsTab'
 import TTSCurationTab from '@/components/admin/TTSCurationTab'
+import Logo from '@/components/ui/Logo'
 
 // ─── PALETTE ─────────────────────────────────────────────────────────────────
 const C = {
@@ -1745,15 +1746,7 @@ export default function AdminPage() {
 
         {/* Logo */}
         <div style={{ padding: '22px 20px 18px', borderBottom: `1px solid ${C.border}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-            </div>
-            <div>
-              <p style={{ fontWeight: 800, fontSize: 14, color: C.text }}>Atlas Prime OS</p>
-              <p style={{ fontSize: 10, color: C.textDim, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Admin Portal</p>
-            </div>
-          </div>
+          <Logo variant="admin" />
         </div>
 
         {/* Nav groups */}

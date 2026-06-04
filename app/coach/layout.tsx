@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
+import Logo from '@/components/ui/Logo'
 
 const coachNav = [
   { href: '/coach/dashboard',  label: 'Dashboard', emoji: '📊' },
@@ -42,20 +43,7 @@ export default function CoachLayout({ children }: { children: React.ReactNode })
       }}>
         {/* Brand */}
         <div style={{ padding: '22px 20px 18px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--text)', lineHeight: 1 }}>
-            Move
-            <span style={{
-              background: 'linear-gradient(135deg, var(--accent), var(--accent-warm))',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}>.</span>
-          </div>
-          <div style={{
-            fontSize: 9, color: 'var(--accent)', fontWeight: 800,
-            marginTop: 4, letterSpacing: '0.1em', textTransform: 'uppercase',
-          }}>
-            Coach Portal
-          </div>
+          <Logo variant="coach" />
         </div>
 
         {/* Nav items */}
