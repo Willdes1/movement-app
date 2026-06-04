@@ -67,7 +67,7 @@
 - **Read-aloud workout instructions**: Each exercise has a speaker button that reads instructions aloud using text-to-speech. On iPhone and Android, audio mixes over music rather than pausing it (uses the "mixWithOthers" audio session category). Designed for eyes-free use mid-workout.
 
 ## 📱 Mobile & Dispatch ✅ Live
-- **Dispatch workflow**: Claude Project on phone ("Movement App Dispatch") handles voice/text commands
+- **Dispatch workflow**: Claude Project on phone ("Atlas Prime Dispatch") handles voice/text commands
 - **Commands**: "Add to ideas: [idea]" or "Add to todo: [task]" → Claude formats + outputs SQL to run in Supabase
 - **Loop**: Phone dispatch → run SQL in Supabase → mention to Claude Code next session → .md files updated
 

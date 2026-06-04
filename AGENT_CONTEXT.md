@@ -1,14 +1,14 @@
-# Agent Context — Movement App
+# Agent Context — Atlas Prime
 > Full briefing for a new agent to continue this project without any prior conversation history.
-> Last updated: 2026-06-02 | Current branch: master | 256 commits
+> Last updated: 2026-06-03 | Current branch: master | 259 commits
 
 ---
 
 ## 1. Project Overview
 
-**What it is:** A Next.js 16 fitness app called "Movement" (rename pending — user is choosing a final brand name). Currently deployed at Vercel, connected to Supabase. Hobby plan on both.
+**What it is:** A Next.js 16 fitness app called **Atlas Prime** (brand: Atlas Prime Performance; parent: Atlas Prime Labs LLC). Currently deployed at Vercel, connected to Supabase. Hobby plan on both.
 
-**Stack:** Next.js 16 (App Router, Turbopack), TypeScript, Supabase (Postgres + Storage + Realtime + Auth), OpenAI API (TTS + AI features), Anthropic Claude API (MIE agents, program generation, video curation), Stripe (web subscriptions — iOS needs RevenueCat).
+**Stack:** Next.js 16 (App Router, Turbopack), TypeScript, Supabase (Postgres + Storage + Realtime + Auth), OpenAI API (TTS + AI features), Anthropic Claude API (APIE agents, program generation, video curation), Stripe (web subscriptions — iOS needs RevenueCat).
 
 **Working directory:** `C:\Dev\movement-app`
 **GitHub repo:** `https://github.com/Willdes1/movement-app`
@@ -72,7 +72,7 @@
 | `coach_invite_codes` | Invite codes coaches generate; clients enter in Account |
 | `coach_messages` | Real-time messages between coach and client |
 | `workout_logs` | User workout completion logs (user_id, logged_at) |
-| `knowledge_items` | MIE vector knowledge store (pgvector) |
+| `knowledge_items` | APIE vector knowledge store (pgvector) |
 | `token_usage` | Claude API cost tracking |
 
 ### Key Files
@@ -82,7 +82,7 @@
 | `components/admin/LaunchpadTab.tsx` | **Launchpad** — tracks readiness percentages |
 | `components/admin/VideoCurationTab.tsx` | Video curation UI |
 | `components/admin/TTSCurationTab.tsx` | TTS audio library browser + generate |
-| `components/admin/MIETab.tsx` | MIE AI agent UI |
+| `components/admin/MIETab.tsx` | APIE AI agent UI (filename rename deferred to Phase 3) |
 | `components/coach/OnboardingOverlay.tsx` | First-time coach setup wizard |
 | `components/ui/MobileMenu.tsx` | Mobile nav drawer (clients) |
 | `app/coach/layout.tsx` | Coach portal sidebar + mobile nav |
@@ -134,10 +134,10 @@
 
 ## Previous Session (2026-06-02 — continued)
 
-### MIE Questionnaire Audit + Profile Enhancement
-Full audit of what the MIE prompt expects vs. what the profile form actually collected. Added 7 new questions to close every gap:
+### APIE Questionnaire Audit + Profile Enhancement
+Full audit of what the APIE prompt expects vs. what the profile form actually collected. Added 7 new questions to close every gap:
 - **Sex assigned at birth** — relabeled from "Gender" with Oura-style "Why we ask" collapsible
-- **Age** — number input; wired to MIE `profile.age`
+- **Age** — number input; wired to APIE `profile.age`
 - **Height & Weight** — side-by-side inputs; stored as `height text` + `weight_lbs numeric` on profiles
 - **Training experience level** — 5-chip selector (Beginner / Intermediate / Expert / Elite / Pro)
 - **Training history** — textarea for `workout_background`
@@ -293,7 +293,7 @@ File: `supabase/migrations/20260602_athlete_profile_enhancement.sql`
 - **Launchpad:** item added and marked done; added to BUILT list
 
 ### CLAUDE.md Rewrite
-- Replaced the single-line `@AGENTS.md` stub with a full architecture guide covering: dev commands, the two Supabase client pattern, API route auth pattern, Supabase join array gotcha, AuthContext/effectiveUserId, MIE pipeline, token logging, batch processing pattern, admin portal structure, RLS safety rules, and key file index.
+- Replaced the single-line `@AGENTS.md` stub with a full architecture guide covering: dev commands, the two Supabase client pattern, API route auth pattern, Supabase join array gotcha, AuthContext/effectiveUserId, APIE pipeline, token logging, batch processing pattern, admin portal structure, RLS safety rules, and key file index.
 
 ### TODO.md — 10 New Feature Items Added
 1. Missed workout / calendar rescheduling (expanded existing item)
@@ -536,7 +536,7 @@ return () => { supabase.removeChannel(channel) }
 
 ---
 
-## 10. MIE (Movement Intelligence Engine)
+## 10. APIE (Atlas Prime Intelligence Engine)
 
 - **Phase 1+2 LIVE:** pgvector knowledge store (784 items) + S&C Agent + PT/Rehab Agent
 - **Phase 3+4:** Full Agent Council — not yet built
@@ -561,7 +561,7 @@ return () => { supabase.removeChannel(channel) }
 
 ## 12. Naming / Branding
 
-- App is currently called "Movement" but rename is planned.
+- App is **Atlas Prime** (consumer brand). Full brand architecture: parent = Atlas Prime Labs LLC, app store name = Atlas Prime Performance, admin portal = Atlas Prime OS, coach portal = Atlas Prime Coach OS.
 - Shortlist: Hone, Caliber, Athlo, Kime, Vantage, Forge
 - Coach portal = "Playbook" (proposed name for that product)
 - Strategy: one LLC + multiple product names

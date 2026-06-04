@@ -23,7 +23,7 @@ There is no test runner configured. No linter script is defined in package.json.
 ### Stack
 - **Next.js 16** — App Router, Turbopack, React 19, TypeScript
 - **Supabase** — Postgres + Auth + Storage + Realtime (free tier; `main` branch = production)
-- **Anthropic Claude API** (`claude-sonnet-4-6`) — plan generation, MIE agents, video curation
+- **Anthropic Claude API** (`claude-sonnet-4-6`) — plan generation, APIE agents, video curation
 - **OpenAI API** — TTS (`tts-1`, voices: `onyx`/`nova`) + embeddings (`text-embedding-3-small`)
 - **Stripe** — web subscriptions (iOS/Android requires RevenueCat instead)
 - **Vercel Hobby** — 60s max serverless function duration (`export const maxDuration = 60`)
@@ -67,7 +67,7 @@ Central auth provider. Key values consumed by most pages:
 - `isAdmin` — boolean, read from `profiles.is_admin`
 - `loggedInsert` / `loggedDelete` — use instead of `supabase.from().insert/delete` when inside any admin impersonation flow; auto-logs the action
 
-### Movement Intelligence Engine (MIE)
+### Atlas Prime Intelligence Engine (APIE)
 Multi-agent RAG pipeline in `app/api/generate-plan/route.ts`. Pipeline:
 1. **RAG retrieval** — `lib/knowledge-retrieval.ts` queries pgvector (`match_knowledge` RPC, `text-embedding-3-small`) against 784-item Domain Knowledge Store
 2. **S&C Agent** — drafts the 7-day JSON plan using retrieved knowledge

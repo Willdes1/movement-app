@@ -1,4 +1,4 @@
-# Movement Intelligence Engine (MIE)
+# Atlas Prime Intelligence Engine (APIE)
 ## Architecture Brief & Build Plan
 
 ---
@@ -9,7 +9,7 @@ Going forward, use these terms:
 
 | What you've been calling it | Correct technical term |
 |---|---|
-| "The brain" or "the engine" | **Movement Intelligence Engine (MIE)** |
+| "The brain" or "the engine" | **Atlas Prime Intelligence Engine (APIE)** |
 | "Internal knowledge library" | **Domain Knowledge Store (DKS)** |
 | "AI pulls from its own knowledge" | **RAG — Retrieval-Augmented Generation** |
 | "Multiple expert AI brains" | **Multi-Agent Agentic Pipeline** |
@@ -18,9 +18,9 @@ Going forward, use these terms:
 | "Main coordinator agent" | **Orchestrator Agent** |
 | "Checks the output for errors" | **Critic / Verification Agent** |
 
-**Full system name:** Movement Intelligence Engine (MIE)
+**Full system name:** Atlas Prime Intelligence Engine (APIE)
 **Architecture type:** Multi-Agent Agentic RAG Pipeline
-**Short reference in conversation:** "the MIE" or "the engine"
+**Short reference in conversation:** "the APIE" or "the engine"
 
 ---
 
@@ -43,13 +43,13 @@ Five live single-pass AI APIs:
 
 ---
 
-## The Vision: What the MIE Becomes
+## The Vision: What the APIE Becomes
 
-### The Knowledge Architecture — How a Human Expert Works vs. How the MIE Works
+### The Knowledge Architecture — How a Human Expert Works vs. How the APIE Works
 
 A certified trainer spends years studying: NASM, ISSA, NSCA, CSCS, DPT programs, peer-reviewed journals, coaching systems, sport-specific clinics. They store all of this in their head and apply it when working with a client. They don't Google "how to program for a skateboarder" every session — they already know.
 
-The MIE replicates this at scale:
+The APIE replicates this at scale:
 
 ```
 [Domain Knowledge Store]
@@ -222,7 +222,7 @@ CREATE TABLE mie_generation_log (
 - ~6,500–8,000 tokens per initial user setup (plan + exercise details + feed)
 - No caching at the knowledge level — everything regenerated from scratch
 
-### MIE Token Efficiency Approach
+### APIE Token Efficiency Approach
 
 **1. Profile Signature Caching**
 Hash the user's profile fields → if the same profile generated a plan recently, retrieve cached structure instead of regenerating. Only re-run agents for changed fields.
@@ -284,7 +284,7 @@ Critic flags specific blocks. Only flagged blocks are re-run, not the entire pla
 - Generation log analytics (which chunks get retrieved most → prioritize quality there)
 
 ### Phase 5 — Coach Portal Integration
-**MIE powers the Coach Portal plan generator**
+**APIE powers the Coach Portal plan generator**
 - Coaches specify client context → same agent council runs
 - Coach can see which agents influenced which parts of the plan
 - Coach override: reject an agent's output and replace manually
@@ -312,14 +312,14 @@ Critic flags specific blocks. Only flagged blocks are re-run, not the entire pla
 
 ## One-Line Summary for Any Stakeholder
 
-> "The Movement Intelligence Engine is a multi-agent RAG system where a council of specialized AI agents — each grounded in our internal Domain Knowledge Store — collaborates to produce training plans that reflect the combined expertise of a certified strength coach, physical therapist, sports specialist, and recovery expert, rather than a single general-purpose AI."
+> "The Atlas Prime Intelligence Engine is a multi-agent RAG system where a council of specialized AI agents — each grounded in our internal Domain Knowledge Store — collaborates to produce training plans that reflect the combined expertise of a certified strength coach, physical therapist, sports specialist, and recovery expert, rather than a single general-purpose AI."
 
 ---
 
 ## Smoke Test (end of Phase 3)
 
 1. User profile: skateboarding, intermediate level, left knee restriction, off-season
-2. MIE generates plan
+2. APIE generates plan
 3. Inspect generation log → confirm Sports Agent, Strength Agent, PT Agent, Mobility Agent all ran
 4. PT Agent should have flagged any knee-loading exercises in early phases
 5. Sports Agent should have included skateboarding-specific prep (ankle mobility, hip flexor, upper body for falls)
