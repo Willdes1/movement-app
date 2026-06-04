@@ -37,12 +37,15 @@ async function generateAndUpload(
 ): Promise<boolean> {
   try {
     const text = buildSpeechText(ex)
-    const response = await getOpenAI().audio.speech.create({
-      model: 'tts-1',
-      voice,
-      input: text.slice(0, 4096),
-      speed: 0.92,
-    })
+    const response = await withTimeout(
+      getOpenAI().audio.speech.create({
+        model: 'tts-1',
+        voice,
+        input: text.slice(0, 4096),
+        speed: 0.92,
+      }),
+      10000
+    )
     const buffer = Buffer.from(await response.arrayBuffer())
     const path = `${voice}/${ex.name_normalized}.mp3`
 
@@ -67,10 +70,19 @@ async function generateAndUpload(
   }
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`TTS call timed out after ${ms}ms`)), ms)
+    ),
+  ])
+}
+
 export async function POST() {
   try {
     const supabase = getSupabase() as any
-    const BATCH = 20
+    const BATCH = 10
     const CONCURRENCY = 4
 
     // Fetch exercises missing male TTS (prioritise those with coaching content)
