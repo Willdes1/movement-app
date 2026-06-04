@@ -406,7 +406,7 @@ export default function TodayPage() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000, padding: '0 0 0 0' }}>
           <div style={{ background: 'var(--surface)', borderRadius: '20px 20px 0 0', padding: '28px 24px 36px', width: '100%', maxWidth: 480, border: '1px solid var(--border)', borderBottom: 'none' }}>
             <p style={{ fontSize: 22, fontWeight: 900, marginBottom: 6, letterSpacing: '-0.02em' }}>
-              Welcome to Movement{firstName ? `, ${firstName}` : ''}! 👋
+              Welcome to Atlas Prime{firstName ? `, ${firstName}` : ''}! 👋
             </p>
             <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 24, lineHeight: 1.5 }}>
               {isFF ? "You're in as a founding member. Here's how to get started." : "Here's how to get started in 3 steps."}

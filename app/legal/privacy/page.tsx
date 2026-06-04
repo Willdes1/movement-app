@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 
-export const metadata: Metadata = { title: 'Privacy Policy — Movement' }
+export const metadata: Metadata = { title: 'Privacy Policy — Atlas Prime' }
 
 const EFFECTIVE = 'May 7, 2026'
 
@@ -55,7 +55,7 @@ export default function PrivacyPage() {
       </Section>
 
       <Section title="3. Admin Access and Impersonation">
-        <P><strong style={{ color: 'var(--text)' }}>This section is important.</strong> Movement platform administrators have the technical ability to temporarily access your account in a read/support mode for quality assurance and customer support purposes.</P>
+        <P><strong style={{ color: 'var(--text)' }}>This section is important.</strong> Atlas Prime platform administrators have the technical ability to temporarily access your account in a read/support mode for quality assurance and customer support purposes.</P>
         <P>Every impersonation session is subject to the following safeguards:</P>
         <UL items={[
           'Full audit log: every session records the administrator\'s identity, the time the session started and ended, the stated reason for access, and every data write made during the session.',
@@ -73,7 +73,7 @@ export default function PrivacyPage() {
           'Supabase — database hosting, authentication, and file storage. Data is stored in secure cloud infrastructure.',
           'Anthropic — the AI that generates your workout programs. Your fitness profile and relevant training context are sent to Anthropic\'s API to produce personalized content. Anthropic\'s privacy policy governs their handling of API data.',
           'Google — if you sign in with Google, your Google account information is shared with Google per their privacy policy.',
-          'Vercel — the platform that hosts and serves the Movement web application.',
+          'Vercel — the platform that hosts and serves the Atlas Prime web application.',
         ]} />
         <P>We may disclose data if required by law, court order, or to protect the safety of our users or the public.</P>
       </Section>

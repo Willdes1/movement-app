@@ -96,7 +96,7 @@ function StepYou({ form, set }: { form: Form; set: (k: keyof Form, v: string) =>
   return (
     <div>
       <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--text)', marginBottom: 6, letterSpacing: '-0.02em' }}>
-        Welcome to Movement.
+        Welcome to Atlas Prime.
       </div>
       <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 28, lineHeight: 1.6 }}>
         Let's set up your profile so the AI can build a plan that actually fits your life. Takes about 2 minutes.

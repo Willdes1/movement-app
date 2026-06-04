@@ -122,7 +122,7 @@ function exportArticlePDF(article: Article, type: ArticleType) {
 <body>
   <div class="badge">${type.emoji} ${type.label}</div>
   <h1 class="headline">${article.headline}</h1>
-  <div class="meta">${article.read_time} &nbsp;·&nbsp; CEO Education Agent &nbsp;·&nbsp; Move.</div>
+  <div class="meta">${article.read_time} &nbsp;·&nbsp; CEO Education Agent &nbsp;·&nbsp; Atlas Prime</div>
 
   <div class="callout callout-blue">
     <div class="callout-label">⚡ The 30-Second Version</div>
@@ -141,7 +141,7 @@ function exportArticlePDF(article: Article, type: ArticleType) {
     <p class="one-liner">"${article.one_liner}"</p>
   </div>
 
-  <div class="footer">Move. CEO Education Agent &nbsp;·&nbsp; ${date}</div>
+  <div class="footer">Atlas Prime CEO Education Agent &nbsp;·&nbsp; ${date}</div>
 </body>
 </html>`
 

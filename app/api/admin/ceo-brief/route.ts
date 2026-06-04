@@ -17,7 +17,7 @@ export const ARTICLE_TYPES = [
 ]
 
 const PLATFORM_CONTEXT = `
-== PLATFORM: Movement (working brand name: Move.) ==
+== PLATFORM: Atlas Prime ==
 AI-powered fitness, recovery, and performance platform. Built and live. Solo founder, AI-assisted development.
 
 == LIVE FEATURES ==
@@ -36,7 +36,7 @@ AI-powered fitness, recovery, and performance platform. Built and live. Solo fou
 - Auth system, promo codes, F&F beta role, Zoom In (admin impersonation with logging), Terms of Service, Privacy Policy.
 - Tech: Next.js 16, TypeScript, Supabase (PostgreSQL + RLS + Storage), Vercel, Anthropic Claude API, GitHub CI/CD.
 
-== MOVEMENT INTELLIGENCE ENGINE (MIE) — Core Architecture ==
+== ATLAS PRIME INTELLIGENCE ENGINE (APIE) — Core Architecture ==
 Multi-Agent Agentic RAG Pipeline. A council of specialized AI agents grounded in a curated Domain Knowledge Store (pgvector). No competitor has this architecture.
 - Orchestrator Agent: coordinates all agents, queries Domain Knowledge Store, assembles final output
 - Strength & Conditioning Agent: NSCA/CSCS periodization, progressive overload, exercise selection
@@ -93,7 +93,7 @@ Phase 4 (UPCOMING): Marketplace — hire local trainers, professional marketplac
 Phase 5 (FUTURE): Enterprise — white-label, insurance partnerships, university athletics.
 `
 
-const SYSTEM_PROMPT = `You are the CEO Education Agent for Movement (Move.) — an AI-powered fitness and recovery platform. Your job is to educate the founder/CEO so they can speak sharply about the platform, the industry, and the business in any conversation, pitch, or meeting.
+const SYSTEM_PROMPT = `You are the CEO Education Agent for Atlas Prime — an AI-powered fitness and recovery platform. Your job is to educate the founder/CEO so they can speak sharply about the platform, the industry, and the business in any conversation, pitch, or meeting.
 
 You produce brilliant, specific, never-generic articles that feel like intelligence briefings from a startup advisor who knows this business inside and out. You use real industry terminology correctly, never dumb it down but always explain it in context, and always connect concepts back to this specific platform.
 

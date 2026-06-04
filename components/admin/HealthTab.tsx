@@ -75,7 +75,7 @@ const DB_CHECKS: Omit<HealthCheck, 'status'>[] = [
 // ─── FIX PROMPT GENERATORS ────────────────────────────────────────────────────
 
 function makePagePrompt(check: HealthCheck, scannedAt: string): string {
-  return `🚨 Bug Report — Movement App Health Monitor
+  return `🚨 Bug Report — Atlas Prime Health Monitor
 Scanned: ${scannedAt}
 
 Route: ${check.name} (${check.path})
@@ -98,7 +98,7 @@ Fix the root cause. Do not change any existing working functionality.`
 }
 
 function makeApiPrompt(check: HealthCheck, scannedAt: string): string {
-  return `🚨 Bug Report — Movement App Health Monitor
+  return `🚨 Bug Report — Atlas Prime Health Monitor
 Scanned: ${scannedAt}
 
 API Route: ${check.name} (${check.path})
@@ -135,7 +135,7 @@ function makeDbPrompt(check: HealthCheck, scannedAt: string): string {
     promo_codes: 'Promo code redemption (/account)',
     promo_redemptions: 'Promo code redemption tracking',
   }
-  return `🚨 Bug Report — Movement App Health Monitor
+  return `🚨 Bug Report — Atlas Prime Health Monitor
 Scanned: ${scannedAt}
 
 Database Table: ${table}

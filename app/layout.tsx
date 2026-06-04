@@ -30,13 +30,13 @@ const spaceMono = Space_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Movement App',
-  description: 'Personalized movement & recovery for athletes',
+  title: 'Atlas Prime',
+  description: 'AI-powered performance training for serious athletes',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Movement',
+    title: 'Atlas Prime',
   },
 }
 

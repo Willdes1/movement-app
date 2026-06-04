@@ -7,7 +7,7 @@ export const maxDuration = 60
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 const PLATFORM_CONTEXT = `
-== PLATFORM: Movement (working brand name: Move.) ==
+== PLATFORM: Atlas Prime ==
 AI-powered fitness, recovery, and performance platform. Built and live. Solo founder, AI-assisted development.
 
 == LIVE FEATURES ==
@@ -20,23 +20,23 @@ AI-powered fitness, recovery, and performance platform. Built and live. Solo fou
 - For You feed: sport-specific training tips + Japanese warrior mindset system (Mushin, Kaizen, Shokunin, Zanshin, Fudoshin). From founder's published book — proprietary IP.
 - Anatomy Explorer: Jarvis HUD with clickable skeleton, joint matrix, recovery protocol lookup.
 - Multi-sport profile: equipment constraints, injury restrictions, training background (beginner → pro).
-- MIE Phase 0: training_level + workout_background + sport activities injected into every plan prompt.
+- APIE Phase 0: training_level + workout_background + sport activities injected into every plan prompt.
 - Coach Portal (full build): programs library, program detail view, assign-to-client modal, exercise swap modal, AI generate with brief form, template library, clients roster.
 - Admin Portal V2: retention dashboard (5 user segments), notes system, billing overview.
 - Auth system, promo codes, F&F beta role, Zoom In (admin impersonation with logging), Terms of Service, Privacy Policy.
 - Tech: Next.js 16, TypeScript, Supabase (PostgreSQL + RLS + Storage), Vercel, Anthropic Claude API.
 
-== MOVEMENT INTELLIGENCE ENGINE (MIE) ==
+== ATLAS PRIME INTELLIGENCE ENGINE (APIE) ==
 Multi-Agent Agentic RAG Pipeline. 9 specialized agents:
 - Orchestrator, Strength & Conditioning, PT/Rehab (veto power), Sports Specialist, Mobility Specialist, Recovery, Mindset (warrior philosophy IP), Critic/Verification, Knowledge Curator.
 Domain Knowledge Store: pgvector semantic search over curated expert knowledge (NSCA, NASM, PT guidelines, sport biomechanics).
-MIE Phase 0 complete. Phase 1 (Domain Knowledge Store) is next.
+APIE Phase 0 complete. Phase 1 (Domain Knowledge Store) is next.
 
 == BUSINESS MODEL ==
 B2C: Free → Pro → Plus → Supreme
 B2B: Trainers/PTs/coaches — Pro (10 clients) → Plus (20 clients) → Supreme (50+ clients + revenue sharing)
 Marketplace: hire local trainers in-app, platform takes commission.
-Flywheel: users attract professionals → professionals bring clients → data improves MIE → better AI attracts more users.
+Flywheel: users attract professionals → professionals bring clients → data improves APIE → better AI attracts more users.
 
 == MARKET ==
 - Global fitness app: $96B by 2032 (22.8% CAGR)
@@ -54,7 +54,7 @@ Flywheel: users attract professionals → professionals bring clients → data i
 - MyFitnessPal: nutrition tracking only
 
 == 6 HARD-TO-COPY ADVANTAGES ==
-1. MIE architecture — multi-agent RAG, cannot be copied quickly
+1. APIE architecture — multi-agent RAG, cannot be copied quickly
 2. Training + Recovery unified — parallel systems, intelligent handoffs
 3. Mindset IP — founder's published book, proprietary
 4. Sports Specialist — every sport worldwide
@@ -63,13 +63,13 @@ Flywheel: users attract professionals → professionals bring clients → data i
 
 == ROADMAP ==
 Phase 1 (COMPLETE): Core consumer app.
-Phase 2 (IN PROGRESS): MIE Domain Knowledge Store, Stripe, nutrition AI, wearables.
+Phase 2 (IN PROGRESS): APIE Domain Knowledge Store, Stripe, nutrition AI, wearables.
 Phase 3 (ACTIVE): Coach portal ✓, Admin V2 ✓. Next: Stripe, training style intelligence.
 Phase 4: Marketplace.
 Phase 5: Enterprise.
 `
 
-const SYSTEM_PROMPT = `You are the CEO Education Agent for Movement (Move.) — an AI-powered fitness and recovery platform. Your job is to answer any question the founder/CEO has about the platform, industry, competitors, or business — and make them sound sharper for it.
+const SYSTEM_PROMPT = `You are the CEO Education Agent for Atlas Prime — an AI-powered fitness and recovery platform. Your job is to answer any question the founder/CEO has about the platform, industry, competitors, or business — and make them sound sharper for it.
 
 ${PLATFORM_CONTEXT}
 

@@ -1750,7 +1750,7 @@ export default function AdminPage() {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
             </div>
             <div>
-              <p style={{ fontWeight: 800, fontSize: 14, color: C.text }}>Movement OS</p>
+              <p style={{ fontWeight: 800, fontSize: 14, color: C.text }}>Atlas Prime OS</p>
               <p style={{ fontSize: 10, color: C.textDim, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Admin Portal</p>
             </div>
           </div>

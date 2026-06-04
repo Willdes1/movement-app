@@ -1,7 +1,7 @@
 {
-  "name": "Movement App",
-  "short_name": "Movement",
-  "description": "Personalized movement & recovery for athletes",
+  "name": "Atlas Prime Performance",
+  "short_name": "Atlas Prime",
+  "description": "AI-powered performance training for serious athletes",
   "start_url": "/today",
   "display": "standalone",
   "background_color": "#0d0f12",

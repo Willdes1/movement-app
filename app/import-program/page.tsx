@@ -180,7 +180,7 @@ export default function ImportProgramPage() {
             Import a Program
           </h1>
           <p style={{ fontSize: 14, color: 'var(--text-dim)', lineHeight: 1.6, margin: 0 }}>
-            Have a program from a trainer, an app, or a PDF you've collected over the years? Upload it and we'll rebuild it inside Move., safety-checked against your profile.
+            Have a program from a trainer, an app, or a PDF you've collected over the years? Upload it and we'll rebuild it inside Atlas Prime, safety-checked against your profile.
           </p>
         </div>
 

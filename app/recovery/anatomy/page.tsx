@@ -63,7 +63,7 @@ export default function AnatomyExplorerPage() {
         <iframe
           src="/anatomy-explorer.html"
           style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
-          title="Anatomy Explorer — Move."
+          title="Anatomy Explorer — Atlas Prime"
         />
       </div>
 

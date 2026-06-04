@@ -70,7 +70,7 @@ export default function Sidebar() {
           letterSpacing: '0.07em',
           textTransform: 'uppercase',
         }}>
-          Your Movement Coach
+          Your Atlas Prime Coach
         </div>
       </div>
 
