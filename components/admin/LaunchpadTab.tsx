@@ -405,6 +405,9 @@ function OverviewSection() {
     'MIE questionnaire enhancement — 7 new profile fields: sex assigned at birth (Oura-style "Why we ask" explanation), age, height/weight, training level (5-tier Beginner→Pro), training history, sport-specific improvement focus ("What do you want to get better at?"), per-sport skill level chips; all fields wired into MIE buildPrompt + Phase 3 athleteContext',
     'Video curation approved-exercise edit panel — ✏ Edit button on every approved row opens inline panel: current video preview, Replace URL with ✂️ clip trimming (regular + Shorts 9:16), Regenerate button clears approval + reruns fresh AI search',
     'Video Library — Programs drill-down — collapsible per-program section shows ✓/○/✗ per exercise with progress bar; ✗ rows get inline Run + paste URL; ○ rows jump search to proposals; programs disappear from Priority Lanes at 100%; plan generation queue shown separately',
+    'TTS batch 504 fix — BATCH reduced 20→10, per-call 10s timeout via Promise.race; per-row 🎙 Generate button in Library tab generates both voices for a specific exercise on demand without a full-batch run',
+    'Atlas Prime rebrand — full rename from Movement/Move./MIE to Atlas Prime/APIE across all user-facing surfaces, legal pages, AI prompts, PWA manifest, push notifications, admin/coach portals; MIETab.tsx→APIETab.tsx; placeholder Logo component (components/ui/Logo.tsx) wires all 5 brand surfaces (Sidebar, MobileMenu, coach layout, admin portal, mockup) to a single swappable file',
+    'Onboarding modal fixes — admin guard timing bug resolved (setShow(false) on role load); DB fallback check prevents re-showing on new browser/device; Step 1 sex field updated to "Sex assigned at birth" with Male/Female + Why we ask collapsible',
   ]
   const COMING = [
     'Injury → training handoff: AI-modified safe training plan that runs alongside recovery',

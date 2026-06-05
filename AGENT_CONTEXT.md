@@ -1,6 +1,6 @@
 # Agent Context — Atlas Prime
 > Full briefing for a new agent to continue this project without any prior conversation history.
-> Last updated: 2026-06-03 | Current branch: master | 259 commits
+> Last updated: 2026-06-04 | Current branch: master | 268 commits
 
 ---
 
@@ -99,36 +99,55 @@
 
 ---
 
-## 4. What Was Built This Session (2026-06-03)
+## 4. What Was Built This Session (2026-06-04)
 
-### Video Curation — Lane Bug Fix
-- **Root cause found:** Muscle Beach Method showed "6 pending" but Run 25 returned "0 ran" because all 6 exercises already had `proposed` candidates. The API skips exercises with existing proposals, but the lane counter didn't account for this.
-- **Fix:** `loadExercises` now builds program lanes **after** `candMap` is populated; `needsCurationCount` counts only exercises with no proposals; Run buttons disable when `needsCurationCount === 0`; lane description now shows split — "X need AI curation · Y awaiting review"
+### TTS Batch 504 Fix
+- **Root cause:** `BATCH=20` × 2 voices = 40 OpenAI TTS calls per run, chunked 4 at a time across 5 sequential chunks — enough to hit Vercel's 60s wall on slow calls
+- **Fix:** `BATCH` reduced 20→10 (20 TTS calls, 3 chunks max); added `withTimeout()` helper wrapping each OpenAI call at 10s so a single slow call fails fast instead of blocking the chunk
+- **File:** `app/api/admin/generate-tts/route.ts`
 
-### Video Curation — Approved Exercise Edit Panel
-- **✏ Edit button** on every approved exercise row opens an inline panel with:
-  - Current video playing inline so you can verify it's correct
-  - **Replace URL** field with full ✂️ clip trimming (start/end M:SS, live preview) — works for both regular YouTube and Shorts
-  - **↺ Regenerate** button — clears approval + reruns fresh AI search; you review new candidates
-- **File:** `components/admin/VideoCurationTab.tsx`
+### TTS Library — Per-Row Generate Button
+- Missing exercises in the Library tab now show a yellow **🎙 Generate** button instead of a grey "Missing" label
+- Clicking generates both male (onyx) + female (nova) voices for that one exercise by calling the batch route with `{ targets: [name_normalized] }`
+- Row shows "Generating…" on both voice cells, then flips to green Play buttons when done — no page refresh
+- Batch route updated to accept optional `targets: string[]` body; normal batch operation unchanged when no body
+- **Files:** `app/api/admin/generate-tts/route.ts`, `components/admin/TTSCurationTab.tsx`
 
-### Video Curation — Program Library View
-- New **Video Library — Programs** section between Priority Lanes and Quick Search
-- One collapsible card per program (e.g. Muscle Beach Method) with progress bar + percentage
-- Exercise list shows ✓ (has video) / ○ (proposals pending) / ✗ (needs curation) per row
-  - ✓ rows: "▶ View" link
-  - ○ rows: "[X proposals — review ↓]" button auto-filters Quick Search to that exercise name
-  - ✗ rows: inline "▶ Run" button + URL paste field + "✓ Save" (appears when URL typed)
-- **🔴 From User Plan Generation** — same drill-down for plan-queued exercises
-- Programs disappear from Priority Lanes automatically at 100%
+### Onboarding Modal — Two Bug Fixes
+- **Admin guard timing bug:** `isAdmin` loads asynchronously; the modal was firing once before that data arrived (saw `isAdmin=false`), then `isAdmin` updated to true but nothing called `setShow(false)`. Fixed: guard now calls `setShow(false)` explicitly.
+- **Cross-device persistence:** Added DB fallback check — if profile already has `name` or `sport` set, stamp localStorage and skip the modal. Prevents re-showing on new browser/device for users who already onboarded.
+- **Sex field updated:** Step 1 "Gender" → "Sex assigned at birth"; options reduced to Male/Female; Oura-style "Why we ask" collapsible added (matches profile edit screen)
+- **File:** `components/OnboardingModal.tsx`
 
-### Video Curation — YouTube Shorts Clip Trimming
-- Clip trimming already worked for Shorts (same `?start=&end=` params) — fixed the preview
-- Shorts URLs now render preview iframe at 9:16 vertical aspect ratio (maxWidth 220px) with "SHORT 9:16" badge
-- Applies to both pending paste section and the approved Edit panel
+### Full Atlas Prime Rebrand (Phases 1–3)
+Complete brand rename from "Movement" / "Move." / "MIE" to "Atlas Prime" / "APIE".
 
-### SQL Migrations — All Confirmed Run
-- User confirmed the athlete profile enhancement migration (`20260602_athlete_profile_enhancement.sql`) was run successfully — all 7 columns now live on profiles table
+**Phase 1 (audit only):** Categorized every reference across the codebase into brand vs. fitness-term vs. code-level identifier. No changes.
+
+**Phase 2 — User-facing renames (22 files):**
+- UI copy: welcome messages, sidebar taglines, portal labels
+- Page metadata (`app/layout.tsx`), PWA manifest, push notification default
+- Admin portal: "Movement OS" → "Atlas Prime OS" in all surfaces
+- Legal pages: all brand "Movement" → "Atlas Prime"
+- AI prompt context strings: dropped all "(working brand name: Move.)" parentheticals; "Movement Intelligence Engine (MIE)" → "Atlas Prime Intelligence Engine (APIE)" in all admin tabs + API prompts
+- Fitness-term "movement" left untouched throughout
+
+**Internal docs commit (separate):** `AGENT_CONTEXT.md`, `CLAUDE.md`, `IDEAS.md`, `to-do/intelligence-engine.md`
+
+**Placeholder Logo component:**
+- `components/ui/Logo.tsx` — single source of truth; stacked ATLAS/PRIME wordmark, CSS-only, no image assets
+- `variant` prop: `'app'` (ATLAS/PRIME) | `'admin'` (+ OS label) | `'coach'` (+ Coach OS label)
+- Wired into all 5 brand surfaces: `Sidebar.tsx`, `MobileMenu.tsx`, `coach/layout.tsx`, `admin/page.tsx`, `admin/mockup-a/page.tsx`
+- Mobile fix: `MobileMenu.tsx` had the old "Move." gradient hardcoded in the drawer — missed in initial pass, fixed in separate commit
+
+**Phase 3 partial:**
+- `MIETab.tsx` → `APIETab.tsx` via `git mv` (history preserved); function renamed; single importer `app/admin/page.tsx` updated
+- `package.json` `"name"` field: `"movement-app"` → `"atlas-prime"` (cosmetic only)
+- **NOT renamed:** folder `C:\Dev\movement-app`, GitHub repo `Willdes1/movement-app`, localStorage keys `movement_welcomed_*` / `movement_impersonation` — all intentionally preserved
+
+---
+
+## Previous Session (2026-06-03)
 
 ---
 
@@ -546,26 +565,31 @@ return () => { supabase.removeChannel(channel) }
 
 ## 11. What to Work on Next (Priority Order)
 
-1. **TTS 504 fix** — Admin TTS generation is stuck at 53/752 exercises with 504 errors. Investigate route timeout handling; current batch is 25 exercises = 50 TTS calls; look at whether the 60s limit is still being hit or if it's a different failure. File: `app/api/admin/generate-tts/route.ts`
-2. **F&F self-test account** — User wants to create a personal F&F account to start real testing; set role to `ff` in Supabase
-3. **LLC registration** — Everything App Store blocks on this; do it first
-4. **App name decision** — Pick from shortlist (Hone, Caliber, Athlo, Kime, Vantage, Forge)
-5. **Muscle Beach Method video curation** — Program Library View now makes this easy; use drill-down to see exactly which 6 exercises are missing; run/paste per exercise
-6. **Stripe billing for coach tiers** — Last revenue-unlock for coach portal to hit 100%
-7. **Coach affiliate / referral system** — Final coach portal item; depends on Stripe
-8. **RevenueCat integration** — Critical App Store blocker; replaces Stripe for iOS/Android
-9. **Capacitor wrapper** — Wrap PWA as native iOS + Android binary
-10. **Connect Coach Exercise Library to program builder** — Coaches should pull from their personal library when building programs; currently standalone
+1. **F&F self-test account** — Create a brand-new account (not flipping the admin account) to experience the full new-user flow as a F&F member. Sign up fresh, go through onboarding, generate a plan, test the whole experience end-to-end.
+2. **TTS backfill** — TTS 504 fix is live; run Generate daily in admin `/admin#tts` (10 exercises per click) to work through the remaining ~700 exercises. Use the new per-row Generate button for specific priority exercises.
+3. **LLC registration** — Everything App Store blocks on this: Apple Developer Program, final trademark, RevenueCat account. Do this first.
+4. **Muscle Beach Method video curation** — Use the Program Library View drill-down (`/admin#video`) to see exactly which exercises are missing; run/paste per exercise.
+5. **Real logo** — When final asset is ready, swap `components/ui/Logo.tsx` only — all 5 surfaces update in one deploy.
+6. **Stripe billing for coach tiers** — Last revenue-unlock for coach portal to hit 100%.
+7. **Coach affiliate / referral system** — Final coach portal item; depends on Stripe.
+8. **RevenueCat integration** — Critical App Store blocker; replaces Stripe for iOS/Android in-app purchases.
+9. **Capacitor wrapper** — Wrap PWA as native iOS + Android binary.
+10. **Connect Coach Exercise Library to program builder** — Coaches should be able to pull from their personal library when building programs; currently standalone.
 
 ---
 
 ## 12. Naming / Branding
 
-- App is **Atlas Prime** (consumer brand). Full brand architecture: parent = Atlas Prime Labs LLC, app store name = Atlas Prime Performance, admin portal = Atlas Prime OS, coach portal = Atlas Prime Coach OS.
-- Shortlist: Hone, Caliber, Athlo, Kime, Vantage, Forge
-- Coach portal = "Playbook" (proposed name for that product)
-- Strategy: one LLC + multiple product names
-- **Do nothing** until user confirms final name
+**Brand architecture (final — decided 2026-06-04):**
+- **Parent / legal entity:** Atlas Prime Labs LLC
+- **Consumer app:** Atlas Prime
+- **App Store name:** Atlas Prime Performance
+- **Admin portal:** Atlas Prime OS
+- **Coach portal:** Atlas Prime Coach OS
+
+**Code-level note:** Folder (`C:\Dev\movement-app`), GitHub repo (`Willdes1/movement-app`), and localStorage keys (`movement_welcomed_*`, `movement_impersonation`) intentionally kept as-is — renaming them would break paths/sessions with zero user-visible benefit.
+
+**Placeholder logo:** `components/ui/Logo.tsx` — stacked ATLAS/PRIME CSS wordmark. Replace this single file with the final asset when ready.
 
 ---
 
