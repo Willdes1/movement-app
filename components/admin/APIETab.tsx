@@ -22,7 +22,7 @@ const CATEGORY_META: Record<string, { label: string; icon: string; color: string
   nutrition_principle:{ label: 'Nutrition Principles', icon: '🥗', color: 'var(--yellow)' },
 }
 
-export default function MIETab() {
+export default function APIETab() {
   const [stats, setStats] = useState<KnowledgeStat[]>([])
   const [loading, setLoading] = useState(true)
   const [seeding, setSeeding] = useState(false)

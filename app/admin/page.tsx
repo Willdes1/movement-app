@@ -16,7 +16,7 @@ import SpendTab from '@/components/admin/SpendTab'
 import VideoCurationTab from '@/components/admin/VideoCurationTab'
 import PushTab from '@/components/admin/PushTab'
 import StripeTab from '@/components/admin/StripeTab'
-import MIETab from '@/components/admin/MIETab'
+import APIETab from '@/components/admin/APIETab'
 import ConversionsTab from '@/components/admin/ConversionsTab'
 import TTSCurationTab from '@/components/admin/TTSCurationTab'
 import Logo from '@/components/ui/Logo'
@@ -1835,7 +1835,7 @@ export default function AdminPage() {
           {tab === 'tts'   && <TTSCurationTab />}
           {tab === 'push'   && <PushTab />}
           {tab === 'stripe' && <StripeTab />}
-          {tab === 'mie'         && <MIETab />}
+          {tab === 'mie'         && <APIETab />}
           {tab === 'conversions' && <ConversionsTab />}
           {tab === 'launchpad' && <LaunchpadTab />}
           {tab === 'ceo' && <CEOBriefingTab />}

@@ -82,7 +82,7 @@
 | `components/admin/LaunchpadTab.tsx` | **Launchpad** — tracks readiness percentages |
 | `components/admin/VideoCurationTab.tsx` | Video curation UI |
 | `components/admin/TTSCurationTab.tsx` | TTS audio library browser + generate |
-| `components/admin/MIETab.tsx` | APIE AI agent UI (filename rename deferred to Phase 3) |
+| `components/admin/APIETab.tsx` | APIE AI agent UI |
 | `components/coach/OnboardingOverlay.tsx` | First-time coach setup wizard |
 | `components/ui/MobileMenu.tsx` | Mobile nav drawer (clients) |
 | `app/coach/layout.tsx` | Coach portal sidebar + mobile nav |
