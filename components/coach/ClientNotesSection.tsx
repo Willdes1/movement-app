@@ -65,6 +65,7 @@ export default function ClientNotesSection({
   const [micSupported, setMicSupported] = useState(true)
   const [showAll, setShowAll] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [editingNote, setEditingNote] = useState<Note | null>(null)
   const [editDraft, setEditDraft] = useState('')
   const [editDate, setEditDate] = useState('')
@@ -167,6 +168,7 @@ export default function ClientNotesSection({
   }
 
   async function deleteNote(id: string) {
+    setConfirmDeleteId(null)
     setDeletingId(id)
     await supabase.from('coach_client_notes').delete().eq('id', id).eq('coach_id', coachId)
     setNotes(prev => prev.filter(n => n.id !== id))
@@ -266,9 +268,19 @@ export default function ClientNotesSection({
                 🔔 Last Session Reminder — {fmtDate(editingNote?.id === mostRecent.id ? editDate : mostRecent.session_date)}
               </div>
               {editingNote?.id !== mostRecent.id && (
-                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                  <button onClick={() => startEdit(mostRecent)} title="Edit note" style={iconBtn}>✏️</button>
-                  <button onClick={() => deleteNote(mostRecent.id)} disabled={deletingId === mostRecent.id} title="Delete note" style={{ ...iconBtn, opacity: deletingId === mostRecent.id ? 0.4 : 1 }}>✕</button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                  {confirmDeleteId === mostRecent.id ? (
+                    <>
+                      <span style={{ fontSize: 11, color: 'var(--text-dim)', marginRight: 2 }}>Delete?</span>
+                      <button onClick={() => deleteNote(mostRecent.id)} disabled={!!deletingId} style={{ padding: '3px 10px', borderRadius: 6, border: 'none', background: '#ef4444', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Yes</button>
+                      <button onClick={() => setConfirmDeleteId(null)} style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-dim)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>No</button>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={() => startEdit(mostRecent)} title="Edit note" style={iconBtn}>✏️</button>
+                      <button onClick={() => setConfirmDeleteId(mostRecent.id)} disabled={deletingId === mostRecent.id} title="Delete note" style={{ ...iconBtn, opacity: deletingId === mostRecent.id ? 0.4 : 1 }}>✕</button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -441,9 +453,19 @@ export default function ClientNotesSection({
                       )}
                     </div>
                     {editingNote?.id !== n.id && (
-                      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                        <button onClick={() => startEdit(n)} title="Edit note" style={iconBtn}>✏️</button>
-                        <button onClick={() => deleteNote(n.id)} disabled={deletingId === n.id} title="Delete note" style={{ ...iconBtn, opacity: deletingId === n.id ? 0.4 : 1 }}>✕</button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                        {confirmDeleteId === n.id ? (
+                          <>
+                            <span style={{ fontSize: 11, color: 'var(--text-dim)', marginRight: 2 }}>Delete?</span>
+                            <button onClick={() => deleteNote(n.id)} disabled={!!deletingId} style={{ padding: '3px 10px', borderRadius: 6, border: 'none', background: '#ef4444', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Yes</button>
+                            <button onClick={() => setConfirmDeleteId(null)} style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-dim)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>No</button>
+                          </>
+                        ) : (
+                          <>
+                            <button onClick={() => startEdit(n)} title="Edit note" style={iconBtn}>✏️</button>
+                            <button onClick={() => setConfirmDeleteId(n.id)} disabled={deletingId === n.id} title="Delete note" style={{ ...iconBtn, opacity: deletingId === n.id ? 0.4 : 1 }}>✕</button>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
