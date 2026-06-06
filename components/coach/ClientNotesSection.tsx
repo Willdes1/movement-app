@@ -24,16 +24,17 @@ export default function ClientNotesSection({
   const [draft, setDraft] = useState('')
   const [sessionDate, setSessionDate] = useState(new Date().toISOString().split('T')[0])
   const [saving, setSaving] = useState(false)
-  const [listening, setListening] = useState(false)
-  const [speechSupported, setSpeechSupported] = useState(false)
+  const [recording, setRecording] = useState(false)
+  const [transcribing, setTranscribing] = useState(false)
+  const [micError, setMicError] = useState<string | null>(null)
+  const [micSupported, setMicSupported] = useState(true)
   const [showAll, setShowAll] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const recognitionRef = useRef<any>(null)
-  const finalRef = useRef('')
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
 
   useEffect(() => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    setSpeechSupported(!!SR)
+    setMicSupported(typeof window !== 'undefined' && !!navigator.mediaDevices?.getUserMedia)
   }, [])
 
   const load = useCallback(async () => {
@@ -49,36 +50,65 @@ export default function ClientNotesSection({
 
   useEffect(() => { load() }, [load])
 
-  function startListening() {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SR) return
-    const rec = new SR()
-    rec.continuous = true
-    rec.interimResults = true
-    rec.lang = 'en-US'
-    finalRef.current = draft
-
-    rec.onresult = (e: any) => {
-      let interim = ''
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) {
-          finalRef.current += e.results[i][0].transcript + ' '
-        } else {
-          interim = e.results[i][0].transcript
-        }
+  async function startRecording() {
+    setMicError(null)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/mp4')
+        ? 'audio/mp4'
+        : 'audio/webm'
+      const mr = new MediaRecorder(stream, { mimeType })
+      chunksRef.current = []
+      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
+      mr.onstop = () => {
+        stream.getTracks().forEach(t => t.stop())
+        sendToWhisper(new Blob(chunksRef.current, { type: mimeType }), mimeType)
       }
-      setDraft(finalRef.current + interim)
+      mr.start()
+      mediaRecorderRef.current = mr
+      setRecording(true)
+    } catch {
+      setMicError('Microphone permission denied. Please allow mic access and try again.')
     }
-    rec.onend = () => { setListening(false); setDraft(finalRef.current) }
-    rec.onerror = () => { setListening(false) }
-    recognitionRef.current = rec
-    rec.start()
-    setListening(true)
   }
 
-  function stopListening() {
-    recognitionRef.current?.stop()
-    setListening(false)
+  function stopRecording() {
+    mediaRecorderRef.current?.stop()
+    mediaRecorderRef.current = null
+    setRecording(false)
+    setTranscribing(true)
+  }
+
+  async function sendToWhisper(blob: Blob, mimeType: string) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const ext = mimeType.includes('mp4') ? 'mp4' : 'webm'
+      const fd = new FormData()
+      fd.append('audio', new File([blob], `recording.${ext}`, { type: mimeType }))
+      const res = await fetch('/api/coach/transcribe', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: fd,
+      })
+      const json = await res.json()
+      if (json.text) {
+        setDraft(prev => (prev ? prev.trimEnd() + ' ' + json.text : json.text))
+      } else {
+        setMicError('Transcription failed. Please type your note.')
+      }
+    } catch {
+      setMicError('Transcription failed. Please type your note.')
+    } finally {
+      setTranscribing(false)
+    }
+  }
+
+  function toggleMic() {
+    if (recording) stopRecording()
+    else startRecording()
   }
 
   async function saveNote() {
@@ -91,7 +121,6 @@ export default function ClientNotesSection({
       session_date: sessionDate,
     })
     setDraft('')
-    finalRef.current = ''
     setSessionDate(new Date().toISOString().split('T')[0])
     setAdding(false)
     await load()
@@ -110,9 +139,9 @@ export default function ClientNotesSection({
   }
 
   function cancelAdd() {
-    if (listening) stopListening()
+    if (recording) { mediaRecorderRef.current?.stop(); setRecording(false) }
     setDraft('')
-    finalRef.current = ''
+    setMicError(null)
     setAdding(false)
   }
 
@@ -199,13 +228,13 @@ export default function ClientNotesSection({
             <div style={{ position: 'relative' }}>
               <textarea
                 value={draft}
-                onChange={e => { setDraft(e.target.value); finalRef.current = e.target.value }}
+                onChange={e => setDraft(e.target.value)}
                 placeholder={`e.g. "${clientName.split(' ')[0]} was overusing traps on dips today — watch form next session. Left hip flexor still tight."`}
                 rows={4}
                 style={{
                   width: '100%', padding: '12px 44px 12px 14px',
-                  borderRadius: 9, border: `1px solid ${listening ? 'rgba(239,68,68,0.5)' : 'var(--border)'}`,
-                  background: listening ? 'rgba(239,68,68,0.04)' : 'var(--surface)',
+                  borderRadius: 9, border: `1px solid ${recording ? 'rgba(239,68,68,0.5)' : 'var(--border)'}`,
+                  background: recording ? 'rgba(239,68,68,0.04)' : 'var(--surface)',
                   color: 'var(--text)', fontSize: 13, lineHeight: 1.6,
                   resize: 'vertical', outline: 'none', fontFamily: 'inherit',
                   boxSizing: 'border-box',
@@ -213,37 +242,49 @@ export default function ClientNotesSection({
                 }}
               />
               {/* Mic button */}
-              {speechSupported && (
+              {micSupported && (
                 <button
-                  onClick={listening ? stopListening : startListening}
-                  title={listening ? 'Stop recording' : 'Dictate note (Chrome/Edge)'}
+                  onClick={toggleMic}
+                  disabled={transcribing}
+                  title={recording ? 'Stop & transcribe' : 'Dictate note (all browsers)'}
                   style={{
                     position: 'absolute', right: 10, top: 10,
                     width: 28, height: 28, borderRadius: '50%', border: 'none',
-                    background: listening ? 'rgba(239,68,68,0.15)' : 'var(--surface2)',
-                    color: listening ? '#ef4444' : 'var(--text-dim)',
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: recording ? 'rgba(239,68,68,0.15)' : 'var(--surface2)',
+                    color: recording ? '#ef4444' : transcribing ? 'var(--text-dim)' : 'var(--text-dim)',
+                    cursor: transcribing ? 'not-allowed' : 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 14, transition: 'all 0.2s',
+                    opacity: transcribing ? 0.5 : 1,
                   }}
                 >
-                  {listening ? '⏹' : '🎙️'}
+                  {recording ? '⏹' : '🎙️'}
                 </button>
               )}
             </div>
 
-            {/* Recording indicator */}
-            {listening && (
+            {/* Status indicators */}
+            {recording && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 7, fontSize: 11, color: '#ef4444', fontWeight: 600 }}>
                 <span style={{
                   display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
                   background: '#ef4444', animation: 'pulse 1s infinite',
                 }} />
-                Listening… speak now. Click ⏹ to stop.
+                Recording… tap ⏹ when done.
               </div>
             )}
-            {speechSupported === false && (
-              <div style={{ marginTop: 7, fontSize: 11, color: 'var(--text-dim)' }}>
-                Voice dictation requires Chrome or Edge.
+            {transcribing && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 7, fontSize: 11, color: 'var(--text-dim)', fontWeight: 600 }}>
+                <span style={{
+                  display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
+                  background: 'var(--accent)', animation: 'pulse 1s infinite',
+                }} />
+                Transcribing…
+              </div>
+            )}
+            {micError && (
+              <div style={{ marginTop: 7, fontSize: 11, color: '#ef4444' }}>
+                {micError}
               </div>
             )}
 
