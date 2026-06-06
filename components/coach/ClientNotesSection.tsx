@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 
 interface Note {
@@ -7,6 +7,41 @@ interface Note {
   note: string
   session_date: string
   created_at: string
+}
+
+const iconBtn: React.CSSProperties = {
+  background: 'none', border: 'none', cursor: 'pointer',
+  fontSize: 13, padding: '2px 5px', borderRadius: 4,
+  color: 'var(--text-dim)', lineHeight: 1,
+}
+
+function NoteEditForm({ draft, setDraft, date, setDate, onSave, onCancel, saving }: {
+  draft: string; setDraft: (v: string) => void
+  date: string; setDate: (v: string) => void
+  onSave: () => void; onCancel: () => void; saving: boolean
+}) {
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-dim)', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Date</span>
+        <input
+          type="date" value={date} onChange={e => setDate(e.target.value)}
+          style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontSize: 11, outline: 'none', fontFamily: 'inherit' }}
+        />
+      </div>
+      <textarea
+        value={draft} onChange={e => setDraft(e.target.value)}
+        rows={3}
+        style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(167,139,250,0.4)', background: 'var(--surface2)', color: 'var(--text)', fontSize: 13, lineHeight: 1.6, resize: 'vertical', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+      />
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+        <button onClick={onCancel} style={{ padding: '6px 14px', borderRadius: 7, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-dim)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+        <button onClick={onSave} disabled={saving || !draft.trim()} style={{ padding: '6px 16px', borderRadius: 7, border: 'none', background: saving || !draft.trim() ? 'var(--surface2)' : 'rgba(167,139,250,1)', color: saving || !draft.trim() ? 'var(--text-dim)' : '#fff', fontSize: 12, fontWeight: 700, cursor: saving || !draft.trim() ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+    </div>
+  )
 }
 
 export default function ClientNotesSection({
@@ -30,6 +65,10 @@ export default function ClientNotesSection({
   const [micSupported, setMicSupported] = useState(true)
   const [showAll, setShowAll] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [editingNote, setEditingNote] = useState<Note | null>(null)
+  const [editDraft, setEditDraft] = useState('')
+  const [editDate, setEditDate] = useState('')
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
 
@@ -134,6 +173,33 @@ export default function ClientNotesSection({
     setDeletingId(null)
   }
 
+  function startEdit(note: Note) {
+    setEditingNote(note)
+    setEditDraft(note.note)
+    setEditDate(note.session_date)
+  }
+
+  function cancelEdit() {
+    setEditingNote(null)
+    setEditDraft('')
+    setEditDate('')
+  }
+
+  async function saveEdit() {
+    if (!editingNote || !editDraft.trim()) return
+    setUpdatingId(editingNote.id)
+    await supabase
+      .from('coach_client_notes')
+      .update({ note: editDraft.trim(), session_date: editDate })
+      .eq('id', editingNote.id)
+      .eq('coach_id', coachId)
+    setNotes(prev => prev.map(n =>
+      n.id === editingNote.id ? { ...n, note: editDraft.trim(), session_date: editDate } : n
+    ))
+    setUpdatingId(null)
+    cancelEdit()
+  }
+
   function fmtDate(iso: string) {
     return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
@@ -190,17 +256,32 @@ export default function ClientNotesSection({
         {!adding && mostRecent && (
           <div style={{
             background: 'rgba(167,139,250,0.07)',
-            border: '1px solid rgba(167,139,250,0.2)',
+            border: `1px solid ${editingNote?.id === mostRecent.id ? 'rgba(167,139,250,0.5)' : 'rgba(167,139,250,0.2)'}`,
             borderRadius: 10,
             padding: '14px 16px',
             marginBottom: notes.length > 1 ? 16 : 0,
           }}>
-            <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(167,139,250,0.8)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 6 }}>
-              🔔 Last Session Reminder — {fmtDate(mostRecent.session_date)}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(167,139,250,0.8)', letterSpacing: '0.09em', textTransform: 'uppercase' }}>
+                🔔 Last Session Reminder — {fmtDate(editingNote?.id === mostRecent.id ? editDate : mostRecent.session_date)}
+              </div>
+              {editingNote?.id !== mostRecent.id && (
+                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                  <button onClick={() => startEdit(mostRecent)} title="Edit note" style={iconBtn}>✏️</button>
+                  <button onClick={() => deleteNote(mostRecent.id)} disabled={deletingId === mostRecent.id} title="Delete note" style={{ ...iconBtn, opacity: deletingId === mostRecent.id ? 0.4 : 1 }}>✕</button>
+                </div>
+              )}
             </div>
-            <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6 }}>
-              {mostRecent.note}
-            </div>
+            {editingNote?.id === mostRecent.id ? (
+              <NoteEditForm
+                draft={editDraft} setDraft={setEditDraft}
+                date={editDate} setDate={setEditDate}
+                onSave={saveEdit} onCancel={cancelEdit}
+                saving={updatingId === mostRecent.id}
+              />
+            ) : (
+              <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6 }}>{mostRecent.note}</div>
+            )}
           </div>
         )}
 
@@ -342,33 +423,38 @@ export default function ClientNotesSection({
                   key={n.id}
                   style={{
                     background: 'var(--surface)',
-                    border: '1px solid var(--border)',
+                    border: `1px solid ${editingNote?.id === n.id ? 'rgba(167,139,250,0.4)' : 'var(--border)'}`,
                     borderRadius: 10,
                     padding: '12px 14px',
-                    display: 'flex', gap: 12, alignItems: 'flex-start',
                     opacity: i === 0 && !adding ? 0.6 : 1,
                   }}
                 >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 4 }}>
-                      {fmtDate(n.session_date)}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: editingNote?.id === n.id ? 10 : 0 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-dim)', marginBottom: editingNote?.id === n.id ? 0 : 4 }}>
+                        {fmtDate(editingNote?.id === n.id ? editDate : n.session_date)}
+                      </div>
+                      {editingNote?.id !== n.id && (
+                        <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                          {n.note}
+                        </div>
+                      )}
                     </div>
-                    <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                      {n.note}
-                    </div>
+                    {editingNote?.id !== n.id && (
+                      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                        <button onClick={() => startEdit(n)} title="Edit note" style={iconBtn}>✏️</button>
+                        <button onClick={() => deleteNote(n.id)} disabled={deletingId === n.id} title="Delete note" style={{ ...iconBtn, opacity: deletingId === n.id ? 0.4 : 1 }}>✕</button>
+                      </div>
+                    )}
                   </div>
-                  <button
-                    onClick={() => deleteNote(n.id)}
-                    disabled={deletingId === n.id}
-                    title="Delete note"
-                    style={{
-                      flexShrink: 0, background: 'none', border: 'none',
-                      color: 'var(--text-dim)', cursor: 'pointer', fontSize: 13,
-                      padding: '2px 4px', borderRadius: 4, opacity: deletingId === n.id ? 0.4 : 1,
-                    }}
-                  >
-                    ✕
-                  </button>
+                  {editingNote?.id === n.id && (
+                    <NoteEditForm
+                      draft={editDraft} setDraft={setEditDraft}
+                      date={editDate} setDate={setEditDate}
+                      onSave={saveEdit} onCancel={cancelEdit}
+                      saving={updatingId === n.id}
+                    />
+                  )}
                 </div>
               ))}
             </div>
