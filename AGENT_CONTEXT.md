@@ -99,7 +99,32 @@
 
 ---
 
-## 4. What Was Built This Session (2026-06-04)
+## 4. What Was Built This Session (2026-06-06)
+
+### Coach Note Voice Dictation — Cross-Browser Fix
+- Replaced Web Speech API (Chrome/Edge desktop only) with `MediaRecorder` + OpenAI Whisper
+- Works on all browsers: Chrome, Firefox, Safari 14.1+, iOS Safari, Android Chrome
+- New API route: `app/api/coach/transcribe/route.ts` — JWT-verified, accepts audio blob, calls `whisper-1`, returns transcript
+- Frontend: mic button records audio via `MediaRecorder`, auto-detects MIME type (webm/mp4), sends to transcribe route, appends transcript to draft
+- Voice dictation earmarked as a **paid coach upgrade** (pricing TBD); gate behind tier check when Stripe billing is built
+- **Files:** `app/api/coach/transcribe/route.ts`, `components/coach/ClientNotesSection.tsx`
+
+### Coach Notes — Edit + Delete
+- Every note now has ✏️ edit and ✕ delete — including the single-note "Last Session Reminder" card (previously had no actions)
+- Edit: inline form pre-filled with note text + session date; saves via Supabase UPDATE; no page refresh
+- Delete: clicking ✕ shows inline "Delete? Yes / No" confirmation before firing; No dismisses back to normal
+- `NoteEditForm` extracted as shared sub-component used by both the reminder card and the All Notes list
+- **File:** `components/coach/ClientNotesSection.tsx`
+
+### Business Formation (non-code)
+- **Domains purchased (Namecheap, 2026-06-06):** `atlasprime.app` ($12.98), `atlasprime.fit` ($2.98), `atlasprime.health` ($12.98) — all with free domain privacy; $29.54 total logged in Spend Tracker
+- **`atlasprime.com`** is parked by a domain investor since 2017 (NameBright); estimated $1,500-5,000+ to acquire; deferred until post-launch
+- **Atlas Prime Labs LLC** filed with California Secretary of State (Articles of Organization, standard processing, certified copy); $75 total logged in Spend Tracker; receipt saved to Google Drive
+- Next: Mercury business bank account, then point atlasprime.app domain to Vercel
+
+---
+
+## Previous Session (2026-06-04)
 
 ### TTS Batch 504 Fix
 - **Root cause:** `BATCH=20` × 2 voices = 40 OpenAI TTS calls per run, chunked 4 at a time across 5 sequential chunks — enough to hit Vercel's 60s wall on slow calls
@@ -565,16 +590,17 @@ return () => { supabase.removeChannel(channel) }
 
 ## 11. What to Work on Next (Priority Order)
 
-1. **F&F self-test account** — Create a brand-new account (not flipping the admin account) to experience the full new-user flow as a F&F member. Sign up fresh, go through onboarding, generate a plan, test the whole experience end-to-end.
-2. **TTS backfill** — TTS 504 fix is live; run Generate daily in admin `/admin#tts` (10 exercises per click) to work through the remaining ~700 exercises. Use the new per-row Generate button for specific priority exercises.
-3. **LLC registration** — Everything App Store blocks on this: Apple Developer Program, final trademark, RevenueCat account. Do this first.
-4. **Muscle Beach Method video curation** — Use the Program Library View drill-down (`/admin#video`) to see exactly which exercises are missing; run/paste per exercise.
-5. **Real logo** — When final asset is ready, swap `components/ui/Logo.tsx` only — all 5 surfaces update in one deploy.
-6. **Stripe billing for coach tiers** — Last revenue-unlock for coach portal to hit 100%.
-7. **Coach affiliate / referral system** — Final coach portal item; depends on Stripe.
-8. **RevenueCat integration** — Critical App Store blocker; replaces Stripe for iOS/Android in-app purchases.
-9. **Capacitor wrapper** — Wrap PWA as native iOS + Android binary.
-10. **Connect Coach Exercise Library to program builder** — Coaches should be able to pull from their personal library when building programs; currently standalone.
+1. **Mercury business bank account** — Go to mercury.com, open an account with SSN + LLC name + Articles of Organization receipt (saved to Google Drive). Free, no minimums, integrates with Stripe.
+2. **Point atlasprime.app domain to Vercel** — Log into Namecheap → Domain List → atlasprime.app → Manage DNS. In Vercel, add atlasprime.app as a custom domain on the project. Namecheap needs CNAME or A record pointing to Vercel.
+3. **Google Workspace business email** — Set up `will@atlasprime.app` after domain is pointed to Vercel. Use Google Workspace ($6/mo). Needed for Apple Developer Program, Stripe, Mercury.
+4. **Apple Developer Program** — Requires LLC docs + business email + $99/yr. Unblocks App Store submission.
+5. **F&F self-test account** — Create a brand-new account to experience full new-user flow as F&F member.
+6. **TTS backfill** — Run Generate daily in admin `/admin#tts` (~700 exercises remaining).
+7. **Muscle Beach Method video curation** — Use Program Library drill-down (`/admin#video`).
+8. **Real logo** — Swap `components/ui/Logo.tsx` when final asset is ready.
+9. **Stripe billing for coach tiers** — Gate voice dictation + other premium features behind paid tier.
+10. **RevenueCat integration** — Critical App Store blocker for iOS/Android subscriptions.
+11. **Capacitor wrapper** — Wrap PWA as native iOS + Android binary.
 
 ---
 

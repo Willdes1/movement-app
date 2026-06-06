@@ -408,6 +408,9 @@ function OverviewSection() {
     'TTS batch 504 fix — BATCH reduced 20→10, per-call 10s timeout via Promise.race; per-row 🎙 Generate button in Library tab generates both voices for a specific exercise on demand without a full-batch run',
     'Atlas Prime rebrand — full rename from Movement/Move./MIE to Atlas Prime/APIE across all user-facing surfaces, legal pages, AI prompts, PWA manifest, push notifications, admin/coach portals; MIETab.tsx→APIETab.tsx; placeholder Logo component (components/ui/Logo.tsx) wires all 5 brand surfaces (Sidebar, MobileMenu, coach layout, admin portal, mockup) to a single swappable file',
     'Onboarding modal fixes — admin guard timing bug resolved (setShow(false) on role load); DB fallback check prevents re-showing on new browser/device; Step 1 sex field updated to "Sex assigned at birth" with Male/Female + Why we ask collapsible',
+    'Coach note dictation — replaced Web Speech API (Chrome-only) with MediaRecorder + OpenAI Whisper; works on all browsers and devices including iOS Safari, Firefox, Android; mic button records audio, sends to /api/coach/transcribe, appends transcript to draft',
+    'Coach notes edit + delete — ✏️ edit and ✕ delete on every note including single-note Last Session Reminder card; inline edit form with date + textarea, saves via UPDATE; delete requires inline "Delete? Yes / No" confirmation before firing',
+    'Business formation — Atlas Prime Labs LLC filed with CA Secretary of State (2026-06-06, $75); domains atlasprime.app + atlasprime.fit + atlasprime.health registered on Namecheap ($29.54); expenses logged in Spend Tracker',
   ]
   const COMING = [
     'Injury → training handoff: AI-modified safe training plan that runs alongside recovery',
