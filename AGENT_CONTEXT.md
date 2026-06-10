@@ -99,7 +99,38 @@
 
 ---
 
-## 4. What Was Built This Session (2026-06-09)
+## 4. What Was Built This Session (2026-06-10)
+
+### Coach Portal — Full Mobile Responsiveness Pass
+Complete mobile overhaul of the coach portal across all 10 pages. Two commit batch.
+
+**Layout (app/coach/layout.tsx + app/globals.css):**
+- Added fixed mobile header bar (`.coach-mobile-header`) showing Atlas Prime Coach OS logo; hidden on desktop
+- Bottom nav: labels completely removed on mobile (icons only); 9 items fit cleanly at ~43px each
+- Added `padding-top: calc(56px + env(safe-area-inset-top))` to `.coach-main` so content clears the header bar
+- Added `overflow-x: hidden` to `.coach-main` to prevent any child from creating a horizontal scrollbar
+- Safe area insets applied to both header bar (`padding-top: env(safe-area-inset-top)`) and coach-main
+
+**New CSS classes (app/globals.css):**
+- `.coach-page` — responsive padding: 16px horizontal on mobile, 40px on desktop. Applied to all 10 coach pages.
+- `.coach-page-header` — stacks title+button vertically on mobile (<600px), horizontal space-between on desktop
+- `.coach-grid-2` / `.coach-grid-3` — responsive 1-col → 2/3-col grids (breakpoint: 600px)
+- `.coach-messages-layout` — full-height layout that subtracts mobile header from `100vh`
+
+**Per-page changes (10 files):**
+- All pages: replaced `padding: '40px 40px 80px'` inline style with `className="coach-page"`
+- All pages: "Coach Portal" eyebrow text → "Atlas Prime"
+- `dashboard/page.tsx`: invite code + quick actions 2-col grid → `.coach-grid-2`
+- `builder/page.tsx`: Sport/Goal, Duration/Days/Session, Restrictions/Notes form grids → `.coach-grid-2` / `.coach-grid-3`
+- `messages/page.tsx`: outer height container changed from `height: 100vh` inline → `.coach-messages-layout` class
+- `programs/page.tsx`, `analytics/page.tsx`, `library/page.tsx`, `builder/page.tsx` (preview), `programs/[id]/page.tsx`: header rows changed to `.coach-page-header`
+
+### Business Formation — Mercury Approved
+- Mercury business bank account approved (2026-06-10). Ready to fund with first transfer.
+
+---
+
+## Previous Session (2026-06-09)
 
 ### Business Formation — EIN + Mercury (non-code)
 - **EIN obtained (2026-06-09):** Applied via IRS online EIN tool; Atlas Prime Labs LLC is now a legally recognized federal tax entity. EIN confirmation letter saved to Google Drive.
@@ -598,7 +629,7 @@ return () => { supabase.removeChannel(channel) }
 
 ## 11. What to Work on Next (Priority Order)
 
-1. **Mercury approval** — Check email for Mercury approval (submitted 2026-06-09, ~1 day review). Once approved, fund the account with a small transfer from personal bank.
+1. **Fund Mercury** — Mercury is approved (2026-06-10). Transfer a small amount from personal bank to activate the business account.
 2. **Point atlasprime.app domain to Vercel** — Log into Namecheap → Domain List → atlasprime.app → Manage DNS. In Vercel, add atlasprime.app as a custom domain. Add CNAME or A record pointing to Vercel.
 3. **Google Workspace business email** — Set up `will@atlasprime.app` after domain is pointed. Use Google Workspace ($6/mo). Needed for Apple Developer Program, Stripe, Mercury profile update.
 4. **Apple Developer Program** — Requires LLC docs + business email + $99/yr. Unblocks App Store submission.

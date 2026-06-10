@@ -231,6 +231,7 @@ const READINESS_DATA = [
       { label: 'Manual program builder', done: true },
       { label: 'PDF/DOCX import (text + image PDFs)', done: true },
       { label: 'Coach exercise library (YouTube clip trimming + video upload)', done: true },
+      { label: 'Coach portal mobile responsive layout', done: true },
       { label: 'Stripe billing for coach tiers', done: false },
       { label: 'Coach affiliate / referral system', done: false },
     ],
@@ -411,7 +412,8 @@ function OverviewSection() {
     'Coach note dictation — replaced Web Speech API (Chrome-only) with MediaRecorder + OpenAI Whisper; works on all browsers and devices including iOS Safari, Firefox, Android; mic button records audio, sends to /api/coach/transcribe, appends transcript to draft',
     'Coach notes edit + delete — ✏️ edit and ✕ delete on every note including single-note Last Session Reminder card; inline edit form with date + textarea, saves via UPDATE; delete requires inline "Delete? Yes / No" confirmation before firing',
     'Business formation — Atlas Prime Labs LLC filed with CA Secretary of State (2026-06-06, $75); domains atlasprime.app + atlasprime.fit + atlasprime.health registered on Namecheap ($29.54); expenses logged in Spend Tracker',
-    'EIN obtained (2026-06-09) — IRS Employer Identification Number issued for Atlas Prime Labs LLC; confirmation letter saved to Google Drive; Mercury business bank account application submitted (in review)',
+    'EIN obtained (2026-06-09) — IRS Employer Identification Number issued for Atlas Prime Labs LLC; confirmation letter saved to Google Drive; Mercury business bank account approved (2026-06-10)',
+    'Coach Portal mobile UX overhaul — fixed mobile layout across all 10 coach pages: Atlas Prime header bar on mobile, icons-only bottom nav (9 items), responsive padding (.coach-page 16px mobile/40px desktop), .coach-page-header stacks title+button on mobile, .coach-grid-2/.coach-grid-3 responsive grids, messages height fix, overflow-x: hidden safety net; all "Coach Portal" eyebrow text → "Atlas Prime"',
   ]
   const COMING = [
     'Injury → training handoff: AI-modified safe training plan that runs alongside recovery',
