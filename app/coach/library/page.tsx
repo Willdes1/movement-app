@@ -281,12 +281,12 @@ export default function CoachLibraryPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div style={{ padding: '32px 40px 80px', maxWidth: 900 }}>
+    <div className="coach-page" style={{ maxWidth: 900 }}>
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>Coach Portal</div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>Atlas Prime</div>
           <h1 style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.03em', marginBottom: 4 }}>Exercise Library</h1>
           <p style={{ fontSize: 13, color: 'var(--text-dim)' }}>
             Your personal exercise database — with videos, instructions, and coaching notes.

@@ -249,7 +249,7 @@ input, textarea, select { transition: border-color 0.2s; }
 
 /* ── COACH PORTAL RESPONSIVE ── */
 .coach-sidebar { display: none; flex-direction: column; }
-.coach-main    { margin-left: 0; padding-bottom: 80px; flex: 1; min-height: 100vh; }
+.coach-main    { margin-left: 0; padding-top: calc(56px + env(safe-area-inset-top, 0px)); padding-bottom: 80px; flex: 1; min-height: 100vh; }
 .coach-mobile-nav {
   display: flex; position: fixed; bottom: 0; left: 0; right: 0;
   height: auto; min-height: 64px;
@@ -260,11 +260,33 @@ input, textarea, select { transition: border-color 0.2s; }
   padding-bottom: env(safe-area-inset-bottom);
   z-index: 100;
 }
+.coach-mobile-header {
+  display: flex; position: fixed; top: 0; left: 0; right: 0;
+  min-height: 56px;
+  padding: env(safe-area-inset-top, 0px) 16px 0;
+  background: rgba(13,17,23,0.97);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(48,54,61,0.8);
+  align-items: center; z-index: 50;
+}
+.coach-page { padding: 16px 16px 96px; box-sizing: border-box; width: 100%; }
+.coach-messages-layout { display: flex; overflow: hidden; height: calc(100vh - 56px - env(safe-area-inset-top, 0px)); }
+.coach-grid-2 { display: grid; grid-template-columns: 1fr; gap: 16px; }
+.coach-grid-3 { display: grid; grid-template-columns: 1fr; gap: 16px; }
+.coach-nav-label { display: none; }
 
+@media (min-width: 400px) { .coach-nav-label { display: block; } }
+@media (min-width: 600px) {
+  .coach-grid-2 { grid-template-columns: 1fr 1fr; }
+  .coach-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+}
 @media (min-width: 768px) {
-  .coach-sidebar    { display: flex; }
-  .coach-main       { margin-left: 230px; padding-bottom: 0; }
-  .coach-mobile-nav { display: none; }
+  .coach-sidebar       { display: flex; }
+  .coach-main          { margin-left: 230px; padding-top: 0; padding-bottom: 0; }
+  .coach-mobile-nav    { display: none; }
+  .coach-mobile-header { display: none; }
+  .coach-page          { padding: 40px 40px 40px; }
+  .coach-messages-layout { height: 100vh; }
 }
 
 /* ── SAFE AREA INSETS (notched phones) ── */

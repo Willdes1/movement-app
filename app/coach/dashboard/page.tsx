@@ -102,12 +102,12 @@ export default function CoachDashboardPage() {
   }
 
   return (
-    <div style={{ padding: '40px 40px 80px', maxWidth: 1100 }}>
+    <div className="coach-page" style={{ maxWidth: 1100 }}>
       <OnboardingOverlay />
       {/* Header */}
       <div style={{ marginBottom: 32 }}>
         <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>
-          Coach Portal
+          Atlas Prime
         </div>
         <h1 style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.03em', margin: 0 }}>Dashboard</h1>
       </div>
@@ -137,7 +137,7 @@ export default function CoachDashboardPage() {
       </div>
 
       {/* Invite Code + Quick Actions */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 26 }}>
+      <div className="coach-grid-2" style={{ gap: 20, marginBottom: 26 }}>
         {/* Invite code */}
         <div style={{ background: 'var(--surface2)', border: '1px solid var(--accent-border, rgba(59,130,246,0.3))', borderRadius: 14, padding: '22px' }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>

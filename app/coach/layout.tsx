@@ -32,6 +32,11 @@ export default function CoachLayout({ children }: { children: React.ReactNode })
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
+      {/* Mobile header — shows Atlas Prime logo; hidden on desktop */}
+      <div className="coach-mobile-header">
+        <Logo variant="coach" />
+      </div>
+
       {/* Coach sidebar — hidden on mobile via CSS class */}
       <nav className="coach-sidebar" style={{
         position: 'fixed',
@@ -126,7 +131,7 @@ export default function CoachLayout({ children }: { children: React.ReactNode })
               }}
             >
               <span style={{ fontSize: 18 }}>{item.emoji}</span>
-              {item.label}
+              <span className="coach-nav-label">{item.label}</span>
             </Link>
           )
         })}
@@ -148,7 +153,7 @@ export default function CoachLayout({ children }: { children: React.ReactNode })
           }}
         >
           <span style={{ fontSize: 18 }}>←</span>
-          My App
+          <span className="coach-nav-label">My App</span>
         </Link>
       </nav>
     </div>

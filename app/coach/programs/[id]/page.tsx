@@ -403,7 +403,7 @@ export default function ProgramDetailPage() {
   const totalExercises = weeks.flatMap(w => w.days.flatMap(d => d.movements)).filter(m => m !== 'Full rest').length
 
   return (
-    <div style={{ padding: '40px 40px 80px', maxWidth: 1100 }}>
+    <div className="coach-page" style={{ maxWidth: 1100 }}>
       <button onClick={() => router.push('/coach/programs')}
         style={{ fontSize: 12, color: 'var(--text-dim)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 4 }}>
         ← My Programs
@@ -418,7 +418,7 @@ export default function ProgramDetailPage() {
       {/* Title row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 8, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>Coach Portal</div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>Atlas Prime</div>
           {editingTitle ? (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <input value={titleDraft} onChange={e => setTitleDraft(e.target.value)}

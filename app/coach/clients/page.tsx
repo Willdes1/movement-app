@@ -146,12 +146,12 @@ export default function CoachClientsPage() {
   const modalProgram = programs.find(p => p.id === selProgramId)
 
   return (
-    <div style={{ padding: '40px 40px 80px', maxWidth: 1100 }}>
+    <div className="coach-page" style={{ maxWidth: 1100 }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 36, gap: 16, flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>
-            Coach Portal
+            Atlas Prime
           </div>
           <h1 style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.03em', margin: 0 }}>Clients</h1>
           <p style={{ fontSize: 14, color: 'var(--text-dim)', marginTop: 6 }}>

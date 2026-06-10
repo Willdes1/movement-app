@@ -200,7 +200,7 @@ export default function CoachMessagesPage() {
   const groups      = buildGroups(messages)
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+    <div className="coach-messages-layout">
 
       {/* ── CLIENT LIST ──────────────────────────────────────────────────────── */}
       <div style={{
@@ -215,7 +215,7 @@ export default function CoachMessagesPage() {
         {/* Header */}
         <div style={{ padding: '24px 20px 16px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>
-            Coach Portal
+            Atlas Prime
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <h1 style={{ fontSize: 20, fontWeight: 900, letterSpacing: '-0.02em', margin: 0 }}>Messages</h1>

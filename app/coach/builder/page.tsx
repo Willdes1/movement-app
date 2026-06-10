@@ -292,9 +292,9 @@ export default function CoachBuilderPage() {
   // ── Pick step ────────────────────────────────────────────────────────────
   if (step === 'pick') {
     return (
-      <div style={{ padding: '40px 40px 80px', maxWidth: 1100 }}>
+      <div className="coach-page" style={{ maxWidth: 1100 }}>
         <div style={{ marginBottom: 40 }}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>Coach Portal</div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>Atlas Prime</div>
           <h1 style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.03em', marginBottom: 6 }}>Program Builder</h1>
           <p style={{ fontSize: 14, color: 'var(--text-dim)' }}>Create, import, and AI-generate training programs for your clients.</p>
         </div>
@@ -367,7 +367,7 @@ export default function CoachBuilderPage() {
   if (step === 'brief') {
     const canGenerate = brief.sport.trim().length > 0 && brief.goal.trim().length > 0
     return (
-      <div style={{ padding: '40px 40px 80px', maxWidth: 760 }}>
+      <div className="coach-page" style={{ maxWidth: 760 }}>
         <button onClick={() => setStep('pick')}
           style={{ fontSize: 12, color: 'var(--text-dim)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 4 }}>
           ← Back
@@ -429,7 +429,7 @@ export default function CoachBuilderPage() {
           </div>
 
           {/* Sport + Goal */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div className="coach-grid-2" style={{ gap: 16 }}>
             <div>
               <label style={labelStyle}>Sport / Activity <span style={{ color: '#ef4444' }}>*</span></label>
               <input value={brief.sport} onChange={e => setBrief(p => ({ ...p, sport: e.target.value }))}
@@ -445,7 +445,7 @@ export default function CoachBuilderPage() {
           </div>
 
           {/* Duration + Days + Session */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+          <div className="coach-grid-3" style={{ gap: 16 }}>
             <div>
               <label style={labelStyle}>Program Length</label>
               <select value={brief.weeks_total} onChange={e => setBrief(p => ({ ...p, weeks_total: Number(e.target.value) }))} style={selectStyle}>
@@ -516,7 +516,7 @@ export default function CoachBuilderPage() {
           </div>
 
           {/* Restrictions + Notes */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div className="coach-grid-2" style={{ gap: 16 }}>
             <div>
               <label style={labelStyle}>Injury / Restrictions <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>(optional)</span></label>
               <input value={brief.restrictions} onChange={e => setBrief(p => ({ ...p, restrictions: e.target.value }))}
@@ -556,7 +556,7 @@ export default function CoachBuilderPage() {
   // ── Generating (AI) step ─────────────────────────────────────────────────
   if (step === 'generating-ai') {
     return (
-      <div style={{ padding: '40px', maxWidth: 1100, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 400, gap: 20 }}>
+      <div className="coach-page" style={{ maxWidth: 1100, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 400, gap: 20 }}>
         <div style={{ fontSize: 40 }}>🤖</div>
         <div style={{ fontSize: 18, fontWeight: 700 }}>Building your program…</div>
         <div style={{ fontSize: 13, color: 'var(--text-dim)', textAlign: 'center', maxWidth: 400 }}>
@@ -575,7 +575,7 @@ export default function CoachBuilderPage() {
   // ── Uploading (import) step ──────────────────────────────────────────────
   if (step === 'uploading') {
     return (
-      <div style={{ padding: '40px', maxWidth: 1100, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 400, gap: 20 }}>
+      <div className="coach-page" style={{ maxWidth: 1100, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 400, gap: 20 }}>
         <div style={{ fontSize: 40 }}>⚙️</div>
         <div style={{ fontSize: 18, fontWeight: 700 }}>Parsing {fileName}…</div>
         <div style={{ fontSize: 13, color: 'var(--text-dim)', textAlign: 'center', maxWidth: 400 }}>
@@ -594,7 +594,7 @@ export default function CoachBuilderPage() {
   // ── Saved step ───────────────────────────────────────────────────────────
   if (step === 'saved') {
     return (
-      <div style={{ padding: '40px', maxWidth: 680, display: 'flex', flexDirection: 'column', gap: 20, minHeight: 400, justifyContent: 'center' }}>
+      <div className="coach-page" style={{ maxWidth: 680, display: 'flex', flexDirection: 'column', gap: 20, minHeight: 400, justifyContent: 'center' }}>
         <div style={{ fontSize: 48, textAlign: 'center' }}>✅</div>
         <div style={{ fontSize: 22, fontWeight: 800, textAlign: 'center' }}>Program saved as draft</div>
         <div style={{ fontSize: 14, color: 'var(--text-dim)', textAlign: 'center' }}>
@@ -649,7 +649,7 @@ export default function CoachBuilderPage() {
 
   // ── Preview + Saving step ────────────────────────────────────────────────
   return (
-    <div style={{ padding: '40px 40px 80px', maxWidth: 1100 }}>
+    <div className="coach-page" style={{ maxWidth: 1100 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 32, gap: 16, flexWrap: 'wrap' }}>
         <div>
           <button
