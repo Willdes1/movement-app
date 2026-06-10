@@ -99,7 +99,16 @@
 
 ---
 
-## 4. What Was Built This Session (2026-06-06)
+## 4. What Was Built This Session (2026-06-09)
+
+### Business Formation — EIN + Mercury (non-code)
+- **EIN obtained (2026-06-09):** Applied via IRS online EIN tool; Atlas Prime Labs LLC is now a legally recognized federal tax entity. EIN confirmation letter saved to Google Drive.
+- **Mercury business bank account:** Application submitted 2026-06-09; in review (~1 day approval). Connected to Atlas Prime Labs LLC + EIN. Account type: Fitness / LLC / single member.
+- **SQL migration:** `supabase/migrations/20260601_user_imported_programs.sql` confirmed — tables already existed; migration was previously run.
+
+---
+
+## Previous Session (2026-06-06)
 
 ### Coach Note Voice Dictation — Cross-Browser Fix
 - Replaced Web Speech API (Chrome/Edge desktop only) with `MediaRecorder` + OpenAI Whisper
@@ -120,7 +129,6 @@
 - **Domains purchased (Namecheap, 2026-06-06):** `atlasprime.app` ($12.98), `atlasprime.fit` ($2.98), `atlasprime.health` ($12.98) — all with free domain privacy; $29.54 total logged in Spend Tracker
 - **`atlasprime.com`** is parked by a domain investor since 2017 (NameBright); estimated $1,500-5,000+ to acquire; deferred until post-launch
 - **Atlas Prime Labs LLC** filed with California Secretary of State (Articles of Organization, standard processing, certified copy); $75 total logged in Spend Tracker; receipt saved to Google Drive
-- Next: Mercury business bank account, then point atlasprime.app domain to Vercel
 
 ---
 
@@ -590,9 +598,9 @@ return () => { supabase.removeChannel(channel) }
 
 ## 11. What to Work on Next (Priority Order)
 
-1. **Mercury business bank account** — Go to mercury.com, open an account with SSN + LLC name + Articles of Organization receipt (saved to Google Drive). Free, no minimums, integrates with Stripe.
-2. **Point atlasprime.app domain to Vercel** — Log into Namecheap → Domain List → atlasprime.app → Manage DNS. In Vercel, add atlasprime.app as a custom domain on the project. Namecheap needs CNAME or A record pointing to Vercel.
-3. **Google Workspace business email** — Set up `will@atlasprime.app` after domain is pointed to Vercel. Use Google Workspace ($6/mo). Needed for Apple Developer Program, Stripe, Mercury.
+1. **Mercury approval** — Check email for Mercury approval (submitted 2026-06-09, ~1 day review). Once approved, fund the account with a small transfer from personal bank.
+2. **Point atlasprime.app domain to Vercel** — Log into Namecheap → Domain List → atlasprime.app → Manage DNS. In Vercel, add atlasprime.app as a custom domain. Add CNAME or A record pointing to Vercel.
+3. **Google Workspace business email** — Set up `will@atlasprime.app` after domain is pointed. Use Google Workspace ($6/mo). Needed for Apple Developer Program, Stripe, Mercury profile update.
 4. **Apple Developer Program** — Requires LLC docs + business email + $99/yr. Unblocks App Store submission.
 5. **F&F self-test account** — Create a brand-new account to experience full new-user flow as F&F member.
 6. **TTS backfill** — Run Generate daily in admin `/admin#tts` (~700 exercises remaining).

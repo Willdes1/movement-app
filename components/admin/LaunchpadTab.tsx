@@ -411,6 +411,7 @@ function OverviewSection() {
     'Coach note dictation — replaced Web Speech API (Chrome-only) with MediaRecorder + OpenAI Whisper; works on all browsers and devices including iOS Safari, Firefox, Android; mic button records audio, sends to /api/coach/transcribe, appends transcript to draft',
     'Coach notes edit + delete — ✏️ edit and ✕ delete on every note including single-note Last Session Reminder card; inline edit form with date + textarea, saves via UPDATE; delete requires inline "Delete? Yes / No" confirmation before firing',
     'Business formation — Atlas Prime Labs LLC filed with CA Secretary of State (2026-06-06, $75); domains atlasprime.app + atlasprime.fit + atlasprime.health registered on Namecheap ($29.54); expenses logged in Spend Tracker',
+    'EIN obtained (2026-06-09) — IRS Employer Identification Number issued for Atlas Prime Labs LLC; confirmation letter saved to Google Drive; Mercury business bank account application submitted (in review)',
   ]
   const COMING = [
     'Injury → training handoff: AI-modified safe training plan that runs alongside recovery',
