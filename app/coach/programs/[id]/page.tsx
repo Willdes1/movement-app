@@ -416,7 +416,7 @@ export default function ProgramDetailPage() {
       )}
 
       {/* Title row */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 8, flexWrap: 'wrap' }}>
+      <div className="coach-page-header" style={{ marginBottom: 8 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>Atlas Prime</div>
           {editingTitle ? (

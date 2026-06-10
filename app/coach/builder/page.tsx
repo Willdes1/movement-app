@@ -650,7 +650,7 @@ export default function CoachBuilderPage() {
   // ── Preview + Saving step ────────────────────────────────────────────────
   return (
     <div className="coach-page" style={{ maxWidth: 1100 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 32, gap: 16, flexWrap: 'wrap' }}>
+      <div className="coach-page-header">
         <div>
           <button
             onClick={() => { setStep(source === 'ai' ? 'brief' : 'pick'); setProgram(null); setError('') }}

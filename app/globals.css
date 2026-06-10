@@ -249,7 +249,7 @@ input, textarea, select { transition: border-color 0.2s; }
 
 /* ── COACH PORTAL RESPONSIVE ── */
 .coach-sidebar { display: none; flex-direction: column; }
-.coach-main    { margin-left: 0; padding-top: calc(56px + env(safe-area-inset-top, 0px)); padding-bottom: 80px; flex: 1; min-height: 100vh; }
+.coach-main    { margin-left: 0; padding-top: calc(56px + env(safe-area-inset-top, 0px)); padding-bottom: 80px; flex: 1; min-height: 100vh; overflow-x: hidden; }
 .coach-mobile-nav {
   display: flex; position: fixed; bottom: 0; left: 0; right: 0;
   height: auto; min-height: 64px;
@@ -274,11 +274,12 @@ input, textarea, select { transition: border-color 0.2s; }
 .coach-grid-2 { display: grid; grid-template-columns: 1fr; gap: 16px; }
 .coach-grid-3 { display: grid; grid-template-columns: 1fr; gap: 16px; }
 .coach-nav-label { display: none; }
+.coach-page-header { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; margin-bottom: 24px; }
 
-@media (min-width: 400px) { .coach-nav-label { display: block; } }
 @media (min-width: 600px) {
   .coach-grid-2 { grid-template-columns: 1fr 1fr; }
   .coach-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .coach-page-header { flex-direction: row; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 36px; }
 }
 @media (min-width: 768px) {
   .coach-sidebar       { display: flex; }

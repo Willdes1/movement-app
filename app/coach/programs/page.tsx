@@ -104,7 +104,7 @@ export default function CoachProgramsPage() {
   return (
     <div className="coach-page" style={{ maxWidth: 1100 }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 36, gap: 16, flexWrap: 'wrap' }}>
+      <div className="coach-page-header">
         <div>
           <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>
             Atlas Prime
