@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, useRef, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -79,11 +79,13 @@ function dateDivider(iso: string) {
   return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
 }
 
-export default function MyCoachPage() {
+function MyCoachInner() {
   const { user } = useAuth()
   const router   = useRouter()
+  const searchParams = useSearchParams()
 
-  const [tab, setTab]               = useState<'program' | 'messages'>('program')
+  // Deep link support: /my-coach?tab=messages&draft=<starter text>
+  const [tab, setTab]               = useState<'program' | 'messages'>(searchParams.get('tab') === 'messages' ? 'messages' : 'program')
   const [program, setProgram]       = useState<Program | null>(null)
   const [weeks, setWeeks]           = useState<Week[]>([])
   const [assignment, setAssignment] = useState<AssignmentData | null>(null)
@@ -95,7 +97,7 @@ export default function MyCoachPage() {
 
   // Messages state
   const [chatMsgs, setChatMsgs]     = useState<ChatMsg[]>([])
-  const [chatInput, setChatInput]   = useState('')
+  const [chatInput, setChatInput]   = useState(searchParams.get('draft') ?? '')
   const [chatSending, setChatSending] = useState(false)
   const [chatLoading, setChatLoading] = useState(false)
   const [unread, setUnread]         = useState(0)
@@ -570,5 +572,13 @@ export default function MyCoachPage() {
 
       </>}
     </div>
+  )
+}
+
+export default function MyCoachPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: '80px 20px', textAlign: 'center', color: 'var(--text-dim)', fontSize: 14 }}>Loading…</div>}>
+      <MyCoachInner />
+    </Suspense>
   )
 }

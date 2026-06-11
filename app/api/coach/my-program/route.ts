@@ -43,7 +43,37 @@ export async function GET(request: Request) {
       .limit(1)
       .single()
 
-    if (!assignment) return Response.json({ assignment: null })
+    if (!assignment) {
+      // No active program — surface the most recent ended assignment so the
+      // app can ask "are you still working with a coach?" (win-back flow)
+      const { data: ended } = await supabase
+        .from('coach_program_assignments')
+        .select('id, status, start_date, created_at, coach_id, coach_programs(name)')
+        .eq('client_id', targetId)
+        .neq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (!ended) return Response.json({ assignment: null })
+
+      const { data: endedCoach } = await supabase
+        .from('profiles').select('name').eq('id', ended.coach_id).single()
+      const endedProgramName =
+        (ended.coach_programs as unknown as { name: string }[] | null)?.[0]?.name
+        ?? (ended.coach_programs as unknown as { name: string } | null)?.name
+        ?? null
+
+      return Response.json({
+        assignment: null,
+        endedAssignment: {
+          id: ended.id,
+          status: ended.status,
+          programName: endedProgramName,
+          coachName: endedCoach?.name ?? 'your coach',
+        },
+      })
+    }
 
     // Get coach name
     const { data: coachProfile } = await supabase

@@ -310,9 +310,17 @@ export default function CoachedSessionCard() {
       >
         {completed ? '✓ Day Completed — Tap to Undo' : '✓ Complete Day'}
       </button>
-      <Link href="/my-coach" style={{ display: 'block', padding: '12px', borderRadius: 12, background: 'transparent', color: 'var(--text-dim)', fontWeight: 700, fontSize: 13, textAlign: 'center', textDecoration: 'none' }}>
-        View Full Program →
-      </Link>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <Link href="/my-coach" style={{ flex: 1, display: 'block', padding: '12px', borderRadius: 12, background: 'transparent', color: 'var(--text-dim)', fontWeight: 700, fontSize: 13, textAlign: 'center', textDecoration: 'none' }}>
+          View Full Program →
+        </Link>
+        <Link
+          href={`/my-coach?tab=messages&draft=${encodeURIComponent(`Hey Coach — I need a modification for today's session (${todayDay.label || 'training day'}): `)}`}
+          style={{ flex: 1, display: 'block', padding: '12px', borderRadius: 12, background: 'transparent', color: 'var(--text-dim)', fontWeight: 700, fontSize: 13, textAlign: 'center', textDecoration: 'none', border: '1px dashed var(--border)' }}
+        >
+          ✈️ Need changes? Message coach
+        </Link>
+      </div>
     </>
   )
 }

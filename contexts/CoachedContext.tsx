@@ -35,6 +35,13 @@ export type CoachAssignment = {
   status: string
 }
 
+export type EndedAssignment = {
+  id: string
+  status: string
+  programName: string | null
+  coachName: string
+}
+
 type CoachedContextType = {
   coached: boolean
   loading: boolean
@@ -43,6 +50,7 @@ type CoachedContextType = {
   assignment: CoachAssignment | null
   program: CoachProgram | null
   weeks: CoachWeek[]
+  endedAssignment: EndedAssignment | null
   refresh: () => void
 }
 
@@ -54,6 +62,7 @@ const CoachedContext = createContext<CoachedContextType>({
   assignment: null,
   program: null,
   weeks: [],
+  endedAssignment: null,
   refresh: () => {},
 })
 
@@ -65,6 +74,7 @@ export function CoachedProvider({ children }: { children: React.ReactNode }) {
   const [assignment, setAssignment] = useState<CoachAssignment | null>(null)
   const [program, setProgram] = useState<CoachProgram | null>(null)
   const [weeks, setWeeks] = useState<CoachWeek[]>([])
+  const [endedAssignment, setEndedAssignment] = useState<EndedAssignment | null>(null)
 
   const load = useCallback(async () => {
     if (!user || !effectiveUserId) { setLoading(false); return }
@@ -84,8 +94,10 @@ export function CoachedProvider({ children }: { children: React.ReactNode }) {
         setWeeks(data.weeks ?? [])
         setCoachName(data.coachName ?? '')
         setCoachId(data.coachId ?? null)
+        setEndedAssignment(null)
       } else {
         setAssignment(null); setProgram(null); setWeeks([]); setCoachName(''); setCoachId(null)
+        setEndedAssignment(data.endedAssignment ?? null)
       }
     } catch {
       // network failure — treat as not coached rather than blocking the app
@@ -100,7 +112,7 @@ export function CoachedProvider({ children }: { children: React.ReactNode }) {
   return (
     <CoachedContext.Provider value={{
       coached: !!assignment && !!program,
-      loading, coachName, coachId, assignment, program, weeks,
+      loading, coachName, coachId, assignment, program, weeks, endedAssignment,
       refresh: load,
     }}>
       {children}
