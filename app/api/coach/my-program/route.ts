@@ -25,11 +25,19 @@ export async function GET(request: Request) {
 
     const supabase = getServiceClient()
 
+    // Admins may request another user's assignment (Zoom In impersonation)
+    let targetId = user.id
+    const overrideId = new URL(request.url).searchParams.get('userId')
+    if (overrideId && overrideId !== user.id) {
+      const { data: caller } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
+      if (caller?.is_admin === true) targetId = overrideId
+    }
+
     // Get active assignment for this client
     const { data: assignment } = await supabase
       .from('coach_program_assignments')
       .select('id, program_id, coach_id, start_date, status, created_at, coach_programs(id, name, weeks_total, notes, description)')
-      .eq('client_id', user.id)
+      .eq('client_id', targetId)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)

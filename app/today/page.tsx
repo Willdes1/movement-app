@@ -4,8 +4,10 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useCoached } from '@/contexts/CoachedContext'
 import { supabase } from '@/lib/supabase'
 import PushNotificationBanner from '@/components/PushNotificationBanner'
+import CoachedSessionCard from '@/components/CoachedSessionCard'
 import { useStreak } from '@/lib/useStreak'
 import { useTTS } from '@/hooks/useTTS'
 
@@ -62,6 +64,7 @@ function getGreeting() {
 
 export default function TodayPage() {
   const { user, loading: authLoading, effectiveUserId, role, isAdmin } = useAuth()
+  const { coached, loading: coachedLoading, coachName, assignment: coachAssignment, program: coachProgram } = useCoached()
   const { currentStreak, longestStreak } = useStreak()
   const isFF = !isAdmin && role === 'ff'
   const userId = effectiveUserId ?? user?.id ?? ''
@@ -177,7 +180,12 @@ export default function TodayPage() {
   const typeColor = todayPlan ? (TYPE_COLOR[todayPlan.type] ?? 'var(--accent)') : 'var(--accent)'
   const tip = TIPS[new Date().getDate() % TIPS.length]
 
-  if (authLoading || loading) {
+  // Coached mode — active coach assignment replaces the AI program as the main program
+  const coachWeekNum = coached && coachAssignment && coachProgram
+    ? Math.min(Math.max(Math.floor((Date.now() - new Date(coachAssignment.start_date).getTime()) / (7 * 86_400_000)) + 1, 1), coachProgram.weeks_total)
+    : null
+
+  if (authLoading || loading || coachedLoading) {
     return <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-dim)' }}>Loading...</div>
   }
 
@@ -199,16 +207,20 @@ export default function TodayPage() {
       {/* Stats row */}
       <div style={{ display: 'flex', gap: 8, padding: '0 16px 16px' }}>
         <div style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '12px 10px', textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 900, color: phase?.color ?? 'var(--text-dim)' }}>
-            {currentWeek ?? '—'}<span style={{ fontSize: 12 }}>{currentWeek ? '/13' : ''}</span>
+          <div style={{ fontSize: 20, fontWeight: 900, color: coached ? 'var(--accent)' : (phase?.color ?? 'var(--text-dim)') }}>
+            {coached
+              ? <>{coachWeekNum}<span style={{ fontSize: 12 }}>/{coachProgram?.weeks_total}</span></>
+              : <>{currentWeek ?? '—'}<span style={{ fontSize: 12 }}>{currentWeek ? '/13' : ''}</span></>}
           </div>
           <div style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 700, marginTop: 3, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Week</div>
         </div>
         <div style={{ flex: 2, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '12px 10px', textAlign: 'center' }}>
-          <div style={{ fontSize: 15, fontWeight: 900, color: phase?.color ?? 'var(--text-dim)', paddingTop: 2 }}>
-            {phase?.label ?? '—'}
+          <div style={{ fontSize: coached ? 13 : 15, fontWeight: 900, color: coached ? 'var(--accent)' : (phase?.color ?? 'var(--text-dim)'), paddingTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {coached ? `Coach ${coachName.split(' ')[0] || ''}` : (phase?.label ?? '—')}
           </div>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 700, marginTop: 3, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Phase</div>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 700, marginTop: 3, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            {coached ? 'Program' : 'Phase'}
+          </div>
         </div>
         <div style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '12px 10px', textAlign: 'center' }}>
           <div style={{ fontSize: 20, fontWeight: 900, color: isRecovering ? 'var(--accent)' : 'var(--text-dim)' }}>
@@ -247,7 +259,10 @@ export default function TodayPage() {
           </>
         )}
 
-        {!isRecovering && !hasProgram && (
+        {/* Coached mode — the coach's program is the main program */}
+        {!isRecovering && coached && <CoachedSessionCard />}
+
+        {!isRecovering && !coached && !hasProgram && (
           <>
             <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 4 }}>No Active Plan</div>
             <div style={{ fontSize: 12, color: 'var(--text-mid)', lineHeight: 1.5, marginBottom: 14 }}>Set up your profile and generate your personalized 3-month program.</div>
@@ -257,7 +272,7 @@ export default function TodayPage() {
           </>
         )}
 
-        {!isRecovering && hasProgram && !weekGenerated && (
+        {!isRecovering && !coached && hasProgram && !weekGenerated && (
           <>
             <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 4 }}>Week {currentWeek} Not Built Yet</div>
             <div style={{ fontSize: 12, color: 'var(--text-mid)', lineHeight: 1.5, marginBottom: 14 }}>Head to Your Plan to generate this week&apos;s workouts.</div>
@@ -267,7 +282,7 @@ export default function TodayPage() {
           </>
         )}
 
-        {!isRecovering && weekGenerated && isRestDay && (
+        {!isRecovering && !coached && weekGenerated && isRestDay && (
           <>
             <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 4 }}>Rest Day</div>
             <div style={{ fontSize: 12, color: 'var(--text-mid)', lineHeight: 1.5, marginBottom: 14 }}>Recovery is part of training. Let your body absorb the work.</div>
@@ -319,7 +334,7 @@ export default function TodayPage() {
           </>
         )}
 
-        {!isRecovering && weekGenerated && todayPlan && !isRestDay && (
+        {!isRecovering && !coached && weekGenerated && todayPlan && !isRestDay && (
           <>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
               <div style={{ fontSize: 20, fontWeight: 900 }}>{todayPlan.label}</div>
@@ -381,10 +396,10 @@ export default function TodayPage() {
 
       {/* Quick nav */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '0 16px 16px' }}>
-        <Link href="/plan" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '18px 16px', textDecoration: 'none', color: 'var(--text)' }}>
-          <div style={{ fontSize: 24, marginBottom: 8 }}>📅</div>
-          <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 2 }}>Your Plan</div>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Full week view</div>
+        <Link href={coached ? '/my-coach' : '/plan'} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '18px 16px', textDecoration: 'none', color: 'var(--text)' }}>
+          <div style={{ fontSize: 24, marginBottom: 8 }}>{coached ? '🏋️' : '📅'}</div>
+          <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 2 }}>{coached ? 'My Coach' : 'Your Plan'}</div>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{coached ? 'Program & messages' : 'Full week view'}</div>
         </Link>
         <Link href="/recovery" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '18px 16px', textDecoration: 'none', color: 'var(--text)' }}>
           <div style={{ fontSize: 24, marginBottom: 8 }}>🩹</div>
@@ -419,13 +434,19 @@ export default function TodayPage() {
                   desc: 'Tell us your sport, goals, schedule, and any injuries.',
                   done: profileReady,
                 },
-                {
-                  title: 'Generate your plan',
-                  desc: isFF
-                    ? 'Your AI coach builds a custom 1-month program in ~2 minutes.'
-                    : 'Your AI coach builds a personalized program in ~2 minutes.',
-                  done: hasProgram,
-                },
+                coached
+                  ? {
+                      title: 'Your coach has your program',
+                      desc: `Coach ${coachName.split(' ')[0] || ''} programs your training — find it in My Coach.`,
+                      done: true,
+                    }
+                  : {
+                      title: 'Generate your plan',
+                      desc: isFF
+                        ? 'Your AI coach builds a custom 1-month program in ~2 minutes.'
+                        : 'Your AI coach builds a personalized program in ~2 minutes.',
+                      done: hasProgram,
+                    },
                 {
                   title: 'Start training',
                   desc: 'Follow daily workouts, log your sets, and track your progress.',
@@ -452,11 +473,11 @@ export default function TodayPage() {
             </div>
 
             <Link
-              href={profileReady ? '/plan' : '/profile'}
+              href={coached ? '/my-coach' : profileReady ? '/plan' : '/profile'}
               onClick={() => setShowWelcomeModal(false)}
               style={{ display: 'block', padding: '15px', borderRadius: 12, background: 'var(--accent)', color: '#fff', fontWeight: 800, fontSize: 15, textAlign: 'center', textDecoration: 'none', marginBottom: 10 }}
             >
-              {profileReady ? 'Generate My Plan →' : 'Set Up Profile →'}
+              {coached ? 'View My Program →' : profileReady ? 'Generate My Plan →' : 'Set Up Profile →'}
             </Link>
             <button
               onClick={() => setShowWelcomeModal(false)}

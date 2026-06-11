@@ -8,6 +8,7 @@ import RecoveryBanner from '@/components/ui/RecoveryBanner'
 import ImportedProgramBanner from '@/components/ui/ImportedProgramBanner'
 import ImpersonationBanner from '@/components/ui/ImpersonationBanner'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { CoachedProvider } from '@/contexts/CoachedContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { PlanGenerationProvider } from '@/components/PlanGenerationContext'
 import GenerationBanner from '@/components/GenerationBanner'
@@ -53,6 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${dmSans.variable} ${spaceMono.variable}`}>
       <body style={{ fontFamily: 'var(--font-dm-sans, DM Sans), sans-serif' }} suppressHydrationWarning>
         <AuthProvider>
+          <CoachedProvider>
           <ThemeProvider>
             <PlanGenerationProvider>
               <div className="grain" />
@@ -73,6 +75,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <ServiceWorkerRegistrar />
             </PlanGenerationProvider>
           </ThemeProvider>
+          </CoachedProvider>
         </AuthProvider>
       </body>
     </html>

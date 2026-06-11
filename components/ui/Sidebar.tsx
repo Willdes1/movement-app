@@ -2,6 +2,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { useCoached } from '@/contexts/CoachedContext'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import Logo from '@/components/ui/Logo'
@@ -21,9 +22,14 @@ const navItems = [
   { href: '/account',        label: 'Account',           emoji: '👤' },
 ]
 
+// Hidden while the user has an active coach assignment — these compete
+// with the coach's programming
+const COACHED_HIDDEN = ['/import-program', '/convert-plan']
+
 export default function Sidebar() {
   const pathname = usePathname()
   const { user, isAdmin, role, impersonating } = useAuth()
+  const { coached } = useCoached()
   const [profile, setProfile] = useState<{ name: string | null; sports: string[] | null } | null>(null)
 
   useEffect(() => {
@@ -60,7 +66,7 @@ export default function Sidebar() {
 
       {/* Nav items */}
       <div style={{ flex: 1, padding: '10px 0', overflowY: 'auto' }}>
-        {navItems.map(item => {
+        {navItems.filter(item => !(coached && COACHED_HIDDEN.includes(item.href))).map(item => {
           const active = pathname.startsWith(item.href)
             || (item.href === '/account' && pathname.startsWith('/profile'))
           return (

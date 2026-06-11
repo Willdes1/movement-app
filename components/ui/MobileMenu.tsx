@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { useCoached } from '@/contexts/CoachedContext'
 import { supabase } from '@/lib/supabase'
 import Logo from '@/components/ui/Logo'
 
@@ -19,9 +20,14 @@ const MENU_ITEMS = [
   { href: '/convert-plan',   label: 'Convert My Plan',   desc: 'Submit old plans for conversion',    emoji: '🔄' },
 ]
 
+// Hidden while the user has an active coach assignment — these compete
+// with the coach's programming
+const COACHED_HIDDEN = ['/import-program', '/convert-plan']
+
 export default function MobileMenu() {
   const pathname = usePathname()
   const { user, isAdmin, role, impersonating } = useAuth()
+  const { coached } = useCoached()
   const [open, setOpen] = useState(false)
   const [profile, setProfile] = useState<{ name: string | null; sports: string[] | null } | null>(null)
   // Portal target only exists in the browser — render drawer after mount
@@ -154,7 +160,7 @@ export default function MobileMenu() {
 
         {/* Nav items */}
         <div style={{ flex: 1, padding: '4px 12px' }}>
-          {MENU_ITEMS.map(item => {
+          {MENU_ITEMS.filter(item => !(coached && COACHED_HIDDEN.includes(item.href))).map(item => {
             const active = pathname.startsWith(item.href)
             return (
               <Link

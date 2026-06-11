@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { useCoached } from '@/contexts/CoachedContext'
 import { supabase } from '@/lib/supabase'
 
 type Program = {
@@ -42,6 +43,7 @@ function programRange(prog: Program) {
 
 export default function ProgramsPage() {
   const { user, loading: authLoading, effectiveUserId, role } = useAuth()
+  const { coached } = useCoached()
   const userId = effectiveUserId ?? user?.id ?? ''
   const router = useRouter()
   const [programs, setPrograms] = useState<Program[]>([])
@@ -140,8 +142,8 @@ export default function ProgramsPage() {
         </div>
       )}
 
-      {/* Featured / Shared programs */}
-      {sharedPrograms.length > 0 && (
+      {/* Featured / Shared programs — hidden while coached; programming comes from the coach */}
+      {!coached && sharedPrograms.length > 0 && (
         <div style={{ marginBottom: 28 }}>
           <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 12 }}>
             Featured Programs
