@@ -1,6 +1,6 @@
 # Agent Context — Atlas Prime
 > Full briefing for a new agent to continue this project without any prior conversation history.
-> Last updated: 2026-06-04 | Current branch: master | 268 commits
+> Last updated: 2026-06-11 | Current branch: master | 296 commits
 
 ---
 
@@ -99,7 +99,49 @@
 
 ---
 
-## 4. What Was Built This Session (2026-06-10)
+## 4. What Was Built This Session (2026-06-11)
+
+Massive session — 11 features shipped, all deployed green. The full coach-client product arc.
+
+### Mobile Nav Unification (Athlete App + Coach Portal)
+- **Coach Portal mobile:** fixed dark header bar with boxed ☰ hamburger top-left + Coach OS logo beside it; slide-out drawer (Programs, Builder, Library + quiet "Back to My Training"); bottom nav rebuilt as 4 SVG-icon tabs (Dashboard/Clients/Messages/Analytics) matching athlete BottomNav style. `components/coach/CoachMobileMenu.tsx`
+- **Critical CSS lesson:** `backdrop-filter` on a fixed header traps `position:fixed` descendants — drawers must `createPortal(document.body)`. Both drawers do this now.
+- **Athlete App mobile:** same fixed header treatment (hamburger + ATLAS PRIME logo, left-aligned); `.app-mobile-header` class; sticky video players get `.video-sticky` so they pin below the header; safe-area insets.
+- **Coach Portal menu item** in athlete drawer ("Coaching" section) for coach/admin roles, hidden during impersonation.
+- **Terminology (user-adopted):** Athlete App / Coach Portal / Admin Portal; tabs (bottom bar), menu items + drawer (hamburger).
+
+### Coach Self-Assignment + Replace Confirmation
+- "💪 Assign to myself" quick-pick in program assign modal; skips coach_clients roster (coach never appears in own client list). Program surfaces via My Coach.
+- Replace-program confirmation: assigning to anyone already on an active program shows amber warning naming current program; confirming retires old assignments (`status: replaced`) — exactly one active assignment per client guaranteed.
+
+### Coached Mode (Phases 1–3 of the coach-client vision)
+- **Phase 1 — coach program becomes the main program:** `contexts/CoachedContext.tsx` (app-wide coached state from /api/coach/my-program, follows effectiveUserId so Zoom In sees client experience). Today page shows coach workout as main card (`components/CoachedSessionCard.tsx`): "Programmed by Coach X" badge, per-exercise set logging → workout_logs (with last-session display), TTS read-aloud, Complete Day → new `coach_day_completions` table. Hidden while coached: AI Generate CTAs, Import a Program, Convert My Plan (both navs), Featured Programs.
+- **Phase 2 — win-back + modifications:** `components/CoachWinBackModal.tsx` — once per ended assignment, "Are you still working with a coach?" → Atlas Prime AI pitch → Generate CTA (localStorage-dismissed, skips coach role). "✈️ Need changes? Message coach" on coached Today card deep-links to /my-coach?tab=messages&draft=… (my-coach page wrapped in Suspense for useSearchParams).
+- **Phase 3 — vanity join links + pending clients:** `atlasprime.app/join/{slug}` — coach sets brand slug on Dashboard ("Your Join Link" card, auto-suggested from name, unique). Public branded landing page (`app/join/[slug]/page.tsx`); slug survives signup via localStorage + `components/JoinLinkRedeemer.tsx` (works with OAuth) → auto-connects roster + confirmation modal. "+ Add Client" on Clients page creates pending clients (name/email/private note) that auto-claim by email match on signup.
+
+### In-Person Session Logging (priority feature, built same day it was requested)
+- Coach logs the workout on the client's behalf: "📝 Log Session" section on client detail page — week/day/date pickers, per-exercise sets/reps/weight prefilled from programmed scheme, client's own logs preload with "edit or leave as is" badge, per-exercise + session notes → coach_client_notes, "Mark day complete" toggle.
+- API `/api/coach/log-session`: roster + assignment verification, workout_logs insert/update with `logged_by=coach`, completion upsert with `completed_by=coach`, web-push notification to client on completion.
+- Client side: push ("Good job! Looks like you crushed today's session with Coach X"), one-time 🎉 celebration banner on Today, button reads "✓ Completed with Coach X".
+
+### Layout Bug Fix — Coach Desktop Double Offset
+- Coach pages sat 460px from the left edge: athlete root layout's `.app-main` reserved 230px for the athlete sidebar even on coach routes (its sidebar hides; reservation stayed) + coach layout's own 230px. Fix: `components/AppMain.tsx` — applies `.app-main` only on athlete routes; coach/admin/auth/legal/join get bare `<main>`. Also fixed doubled 56px mobile header padding + /auth and /join desktop centering.
+
+### Ops Notes
+- **Vercel webhook dropped twice today** (push received by GitHub, no Vercel status ever posted). Fix: `git commit --allow-empty` + push re-fires it. Verify deploys via `gh api repos/Willdes1/movement-app/commits/<sha>/status`.
+- **`/api/notifications/send` has NO auth check** (pre-existing) — anyone can send pushes. Flagged for lockdown.
+
+### SQL Migrations — ALL CONFIRMED RUN (2026-06-11)
+1. `20260611_coach_day_completions.sql` ✅
+2. `20260611_coach_join_links.sql` (profiles.coach_slug + coach_pending_clients) ✅
+3. `20260611_coach_session_logging.sql` (workout_logs.logged_by + coach_day_completions.completed_by) ✅
+
+### TODO additions (see TODO.md "Added 2026-06-11")
+Occupation-based plans ("No sport? Tell us what you do for work"), program-style preference + PDF style transfer (ATHLEAN-X/KOT/Bamberger influences), Founder's Program (Will tests own plan through Kallen's wedding ~mid-July 2026), coach calculators toolkit (research TrueCoach/TrainHeroic, stay unique). In-person logging item already built + marked done.
+
+---
+
+## Previous Session (2026-06-10)
 
 ### Coach Portal — Full Mobile Responsiveness Pass
 Complete mobile overhaul of the coach portal across all 10 pages. Two commit batch.
@@ -444,12 +486,11 @@ File: `supabase/migrations/20260602_athlete_profile_enhancement.sql`
 
 ---
 
-## 5. PENDING: SQL Migrations to Run
+## 5. SQL Migrations Status
 
-**Run this in Supabase SQL Editor — user_imported_programs tables (2026-06-01):**
-See `supabase/migrations/20260601_user_imported_programs.sql` — creates `user_imported_programs`, `user_imported_program_weeks`, adds `active_imported_program_id` + `imported_program_current_week` to profiles.
+**No pending migrations as of 2026-06-11.** All three 2026-06-11 migrations confirmed run (coach_day_completions, coach_join_links, coach_session_logging). `20260601_user_imported_programs.sql` confirmed run 2026-06-09. `20260602_athlete_profile_enhancement.sql` uses IF NOT EXISTS — re-run anytime if profile columns ever look missing.
 
-**Already run:**
+**Reference — already run:**
 
 ### coach_client_notes (Get to Know Your Client)
 ```sql
@@ -629,17 +670,19 @@ return () => { supabase.removeChannel(channel) }
 
 ## 11. What to Work on Next (Priority Order)
 
-1. **Fund Mercury** — Mercury is approved (2026-06-10). Transfer a small amount from personal bank to activate the business account.
-2. **Point atlasprime.app domain to Vercel** — Log into Namecheap → Domain List → atlasprime.app → Manage DNS. In Vercel, add atlasprime.app as a custom domain. Add CNAME or A record pointing to Vercel.
-3. **Google Workspace business email** — Set up `will@atlasprime.app` after domain is pointed. Use Google Workspace ($6/mo). Needed for Apple Developer Program, Stripe, Mercury profile update.
-4. **Apple Developer Program** — Requires LLC docs + business email + $99/yr. Unblocks App Store submission.
-5. **F&F self-test account** — Create a brand-new account to experience full new-user flow as F&F member.
-6. **TTS backfill** — Run Generate daily in admin `/admin#tts` (~700 exercises remaining).
-7. **Muscle Beach Method video curation** — Use Program Library drill-down (`/admin#video`).
-8. **Real logo** — Swap `components/ui/Logo.tsx` when final asset is ready.
-9. **Stripe billing for coach tiers** — Gate voice dictation + other premium features behind paid tier.
-10. **RevenueCat integration** — Critical App Store blocker for iOS/Android subscriptions.
-11. **Capacitor wrapper** — Wrap PWA as native iOS + Android binary.
+**Next session focus (user-stated 2026-06-11): "the real work" — launch infrastructure, not features.**
+
+1. **Point atlasprime.app domain to Vercel** — Namecheap → Domain List → atlasprime.app → Manage DNS; Vercel → add custom domain. Give Will exact step-by-step instructions. Bonus: makes coach join links (`atlasprime.app/join/{slug}`) publicly shareable.
+2. **Mercury next steps** — Account is FUNDED ($100 deposited 2026-06-11). Next: order debit card, note account/routing for Stripe + Apple, consider moving Namecheap/Google Workspace billing onto it for clean business books.
+3. **Apple launch compliance — full review** — Everything needed to launch on the App Store: Apple Developer Program enrollment (needs LLC docs ✅ + business email + $99/yr + D-U-N-S for org account), App Store Review Guidelines compliance audit (health/fitness app rules, account deletion requirement, privacy nutrition labels, subscription rules → RevenueCat not Stripe on iOS), privacy policy/TOS review.
+4. **TestFlight research** — User heard TestFlight can run the app BEFORE App Store submission. True: TestFlight requires Apple Developer Program enrollment but NOT App Store approval (internal testers ~immediately, external testers need lightweight beta review). Requires the app wrapped natively first (Capacitor). Lay out all angles: enrollment → Capacitor wrapper → TestFlight internal → external beta → submission.
+5. **Google Workspace business email** — `will@atlasprime.app` after domain points. Needed for Apple Developer Program.
+6. **F&F self-test account** — brand-new account through the full new-user flow.
+7. **TTS backfill** — `/admin#tts` daily (~700 exercises remaining).
+8. **Muscle Beach Method video curation** — `/admin#video`.
+9. **Stripe billing for coach tiers** (web) + **RevenueCat** (iOS/Android) + **Capacitor wrapper**.
+10. **Lock down `/api/notifications/send`** — currently no auth check; anyone can send pushes.
+11. **Real logo** — swap `components/ui/Logo.tsx` when the final asset is ready.
 
 ---
 
