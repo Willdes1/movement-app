@@ -21,7 +21,7 @@ const MENU_ITEMS = [
 
 export default function MobileMenu() {
   const pathname = usePathname()
-  const { user } = useAuth()
+  const { user, isAdmin, role, impersonating } = useAuth()
   const [open, setOpen] = useState(false)
   const [profile, setProfile] = useState<{ name: string | null; sports: string[] | null } | null>(null)
   // Portal target only exists in the browser — render drawer after mount
@@ -194,6 +194,47 @@ export default function MobileMenu() {
             )
           })}
         </div>
+
+        {/* Coach portal — coaches and admins only; hidden during impersonation */}
+        {!impersonating && (isAdmin || role === 'coach') && (
+          <div style={{ padding: '4px 12px 8px', borderTop: '1px solid var(--border)' }}>
+            <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-dim)', letterSpacing: '0.1em', textTransform: 'uppercase', padding: '12px 8px 6px' }}>
+              Coaching
+            </p>
+            <Link
+              href="/coach/dashboard"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 14,
+                padding: '13px 12px',
+                borderRadius: 12,
+                textDecoration: 'none',
+                background: 'transparent',
+                border: '1px solid transparent',
+              }}
+            >
+              <span style={{
+                width: 38, height: 38,
+                borderRadius: 10,
+                background: 'var(--surface2)',
+                border: '1px solid var(--border)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 17, flexShrink: 0,
+              }}>
+                🏋️
+              </span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', lineHeight: 1.2 }}>
+                  Coach Portal
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
+                  Manage your clients & programs
+                </div>
+              </div>
+            </Link>
+          </div>
+        )}
 
         {/* Bottom — account link */}
         <div style={{ padding: '12px 12px 20px', borderTop: '1px solid var(--border)' }}>
