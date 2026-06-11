@@ -56,6 +56,9 @@ export default function CoachedSessionCard() {
 
   const [completed, setCompleted] = useState(false)
   const [completing, setCompleting] = useState(false)
+  // Set when the coach completed the day on the client's behalf
+  const [coachCompleted, setCoachCompleted] = useState(false)
+  const [celebrate, setCelebrate] = useState(false)
 
   const weekNum = assignment && program ? currentProgramWeek(assignment.start_date, program.weeks_total) : 1
   const week = weeks.find(w => w.week_number === weekNum)
@@ -84,13 +87,26 @@ export default function CoachedSessionCard() {
     if (!assignment || !userId || !todayDay) return
     supabase
       .from('coach_day_completions')
-      .select('id')
+      .select('id, completed_by')
       .eq('user_id', userId)
       .eq('assignment_id', assignment.id)
       .eq('week_number', weekNum)
       .eq('day_name', today)
       .limit(1)
-      .then(({ data }) => setCompleted(!!data?.length))
+      .then(({ data }) => {
+        const row = data?.[0] as { id: string; completed_by?: string | null } | undefined
+        setCompleted(!!row)
+        const byCoach = !!row?.completed_by && row.completed_by !== userId
+        setCoachCompleted(byCoach)
+        if (byCoach) {
+          // Celebrate once per completed day
+          const key = `coach_completed_seen_${assignment.id}_${weekNum}_${today}`
+          if (!localStorage.getItem(key)) {
+            setCelebrate(true)
+            localStorage.setItem(key, '1')
+          }
+        }
+      })
   }, [assignment, userId, weekNum, today, todayDay])
 
   async function speakExercise(rawName: string) {
@@ -163,6 +179,7 @@ export default function CoachedSessionCard() {
         .eq('week_number', weekNum)
         .eq('day_name', today)
       setCompleted(false)
+      setCoachCompleted(false)
     } else {
       const { error } = await supabase
         .from('coach_day_completions')
@@ -293,6 +310,21 @@ export default function CoachedSessionCard() {
         })}
       </div>
 
+      {celebrate && (
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.35)', borderRadius: 12, padding: '14px 16px', marginBottom: 12 }}>
+          <span style={{ fontSize: 24, flexShrink: 0 }}>🎉</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--green)', marginBottom: 2 }}>
+              Good job!
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-mid)', lineHeight: 1.5 }}>
+              Looks like you crushed today&apos;s session with Coach {coachFirst} — everything&apos;s logged for you. Check History for your numbers.
+            </div>
+          </div>
+          <button onClick={() => setCelebrate(false)} aria-label="Dismiss" style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 16, cursor: 'pointer', padding: 2, flexShrink: 0 }}>×</button>
+        </div>
+      )}
+
       <button
         onClick={completeDay}
         disabled={completing}
@@ -308,7 +340,9 @@ export default function CoachedSessionCard() {
           marginBottom: 10,
         }}
       >
-        {completed ? '✓ Day Completed — Tap to Undo' : '✓ Complete Day'}
+        {completed
+          ? coachCompleted ? `✓ Completed with Coach ${coachFirst}` : '✓ Day Completed — Tap to Undo'
+          : '✓ Complete Day'}
       </button>
       <div style={{ display: 'flex', gap: 8 }}>
         <Link href="/my-coach" style={{ flex: 1, display: 'block', padding: '12px', borderRadius: 12, background: 'transparent', color: 'var(--text-dim)', fontWeight: 700, fontSize: 13, textAlign: 'center', textDecoration: 'none' }}>

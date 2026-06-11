@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import ClientNotesSection from '@/components/coach/ClientNotesSection'
+import LogSessionSection from '@/components/coach/LogSessionSection'
 
 interface ClientProfile {
   id: string
@@ -289,6 +290,21 @@ export default function CoachClientDetailPage() {
         <div style={{ marginTop: 14, fontSize: 11, color: 'var(--text-dim)', textAlign: 'center' }}>
           Workout history visible once the client logs a session.
         </div>
+      )}
+
+      {/* In-person session logging — needs an active program assignment */}
+      {activeAssign && (
+        <LogSessionSection
+          clientId={clientId}
+          clientName={name}
+          assignment={{
+            id: activeAssign.id,
+            program_id: activeAssign.program_id,
+            start_date: activeAssign.start_date,
+            weeks_total: activeAssign.weeks_total,
+            program_name: activeAssign.program_name,
+          }}
+        />
       )}
 
       {/* Get to Know Your Client */}
