@@ -30,16 +30,25 @@ export default function CoachDashboardPage() {
   const [genLoading, setGenLoading]   = useState(false)
   const [copied, setCopied]           = useState(false)
 
+  // Vanity join link
+  const [slug, setSlug]               = useState<string | null>(null)
+  const [slugDraft, setSlugDraft]     = useState('')
+  const [slugEditing, setSlugEditing] = useState(false)
+  const [slugSaving, setSlugSaving]   = useState(false)
+  const [slugError, setSlugError]     = useState('')
+  const [linkCopied, setLinkCopied]   = useState(false)
+
   useEffect(() => { if (user) load() }, [user])  // eslint-disable-line react-hooks/exhaustive-deps
 
   async function load() {
     setLoading(true)
 
-    const [clientsRes, programsRes, assignRes, codesRes] = await Promise.all([
+    const [clientsRes, programsRes, assignRes, codesRes, profileRes] = await Promise.all([
       supabase.from('coach_clients').select('id', { count: 'exact', head: true }).eq('coach_id', user!.id).eq('status', 'active'),
       supabase.from('coach_programs').select('id', { count: 'exact', head: true }).eq('coach_id', user!.id),
       supabase.from('coach_program_assignments').select('id', { count: 'exact', head: true }).eq('coach_id', user!.id).eq('status', 'active'),
       supabase.from('coach_invite_codes').select('code').eq('coach_id', user!.id).eq('active', true).order('created_at', { ascending: false }).limit(1),
+      supabase.from('profiles').select('coach_slug, name').eq('id', user!.id).single(),
     ])
 
     setStats({
@@ -50,6 +59,15 @@ export default function CoachDashboardPage() {
 
     const codes = (codesRes.data ?? []) as { code: string }[]
     if (codes.length) setInviteCode(codes[0].code)
+
+    const existingSlug = (profileRes.data as { coach_slug: string | null; name: string | null } | null)?.coach_slug ?? null
+    setSlug(existingSlug)
+    if (!existingSlug) {
+      // Suggest a slug from the coach's name
+      const suggested = ((profileRes.data as { name: string | null } | null)?.name ?? '')
+        .toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-').slice(0, 40)
+      setSlugDraft(suggested)
+    }
 
     // Recent assignments with client names
     const { data: assignData } = await supabase
@@ -91,6 +109,31 @@ export default function CoachDashboardPage() {
     await navigator.clipboard.writeText(inviteCode)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  function joinUrl(s: string) {
+    return `${typeof window !== 'undefined' ? window.location.origin : ''}/join/${s}`
+  }
+
+  async function saveSlug() {
+    const cleaned = slugDraft.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/-{2,}/g, '-').replace(/^-|-$/g, '')
+    if (cleaned.length < 3) { setSlugError('At least 3 characters — letters, numbers, hyphens.'); return }
+    setSlugSaving(true); setSlugError('')
+    const { error } = await supabase.from('profiles').update({ coach_slug: cleaned }).eq('id', user!.id)
+    if (error) {
+      setSlugError(error.code === '23505' ? 'That link is taken — try another.' : error.message)
+    } else {
+      setSlug(cleaned)
+      setSlugEditing(false)
+    }
+    setSlugSaving(false)
+  }
+
+  async function copyLink() {
+    if (!slug) return
+    await navigator.clipboard.writeText(joinUrl(slug))
+    setLinkCopied(true)
+    setTimeout(() => setLinkCopied(false), 2000)
   }
 
   function fmtDate(iso: string) {
@@ -189,6 +232,67 @@ export default function CoachDashboardPage() {
               {genLoading ? 'Generating…' : '+ Generate Invite Code'}
             </button>
           )}
+
+          {/* Vanity join link */}
+          <div style={{ borderTop: '1px solid var(--border)', marginTop: 18, paddingTop: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>
+              Your Join Link
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12, lineHeight: 1.6 }}>
+              One tap for new clients: they sign up through your personal link and land connected to you automatically.
+            </p>
+
+            {slug && !slugEditing ? (
+              <>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
+                  <div style={{
+                    flex: 1, minWidth: 0, background: 'var(--surface)', border: '1px solid var(--border)',
+                    borderRadius: 10, padding: '11px 14px', fontFamily: 'monospace',
+                    fontSize: 13, fontWeight: 700, color: 'var(--accent)',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {joinUrl(slug)}
+                  </div>
+                  <button
+                    onClick={copyLink}
+                    style={{
+                      padding: '11px 18px', borderRadius: 10, border: 'none',
+                      background: linkCopied ? '#22c55e' : 'var(--accent)', color: '#fff',
+                      fontWeight: 700, fontSize: 13, cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit',
+                    }}
+                  >
+                    {linkCopied ? '✓' : 'Copy'}
+                  </button>
+                </div>
+                <button
+                  onClick={() => { setSlugDraft(slug); setSlugEditing(true); setSlugError('') }}
+                  style={{ fontSize: 11, color: 'var(--text-dim)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                >
+                  ✏️ Edit link
+                </button>
+              </>
+            ) : (
+              <>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-dim)', fontFamily: 'monospace', flexShrink: 0 }}>/join/</span>
+                  <input
+                    value={slugDraft}
+                    onChange={e => setSlugDraft(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                    placeholder="your-name-or-brand"
+                    style={{ flex: 1, minWidth: 0, padding: '10px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 13, fontFamily: 'monospace', boxSizing: 'border-box' }}
+                  />
+                  <button
+                    onClick={saveSlug}
+                    disabled={slugSaving}
+                    style={{ padding: '10px 16px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit', opacity: slugSaving ? 0.6 : 1 }}
+                  >
+                    {slugSaving ? '…' : 'Save'}
+                  </button>
+                </div>
+                {slugError && <p style={{ fontSize: 11, color: '#ff3b30', margin: 0 }}>{slugError}</p>}
+              </>
+            )}
+          </div>
         </div>
 
         {/* Quick actions */}

@@ -26,6 +26,14 @@ interface ClientRow {
 
 interface Program { id: string; name: string; weeks_total: number; status: string }
 
+interface PendingClient {
+  id: string
+  name: string
+  email: string | null
+  note: string | null
+  created_at: string
+}
+
 const ASSIGN_STATUS_COLOR: Record<string, string> = {
   active: '#22c55e', completed: '#3b82f6', paused: '#f59e0b', cancelled: '#6b7280',
 }
@@ -46,7 +54,47 @@ export default function CoachClientsPage() {
   const [assigning, setAssigning]       = useState(false)
   const [assignError, setAssignError]   = useState('')
 
-  useEffect(() => { if (user) fetchClients() }, [user])  // eslint-disable-line react-hooks/exhaustive-deps
+  // Pending clients (added by coach, waiting to sign up via join link)
+  const [pending, setPending]               = useState<PendingClient[]>([])
+  const [showAddPending, setShowAddPending] = useState(false)
+  const [pName, setPName]                   = useState('')
+  const [pEmail, setPEmail]                 = useState('')
+  const [pNote, setPNote]                   = useState('')
+  const [pSaving, setPSaving]               = useState(false)
+  const [pError, setPError]                 = useState('')
+
+  useEffect(() => { if (user) { fetchClients(); fetchPending() } }, [user])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function fetchPending() {
+    const { data } = await supabase
+      .from('coach_pending_clients')
+      .select('id, name, email, note, created_at')
+      .eq('coach_id', user!.id)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+    setPending((data ?? []) as PendingClient[])
+  }
+
+  async function addPending() {
+    if (!pName.trim() || pSaving) return
+    setPSaving(true); setPError('')
+    const { error } = await supabase.from('coach_pending_clients').insert({
+      coach_id: user!.id,
+      name: pName.trim(),
+      email: pEmail.trim() ? pEmail.trim().toLowerCase() : null,
+      note: pNote.trim() || null,
+    })
+    if (error) { setPError(error.message); setPSaving(false); return }
+    setPName(''); setPEmail(''); setPNote('')
+    setShowAddPending(false)
+    setPSaving(false)
+    fetchPending()
+  }
+
+  async function deletePending(id: string) {
+    await supabase.from('coach_pending_clients').delete().eq('id', id)
+    setPending(prev => prev.filter(p => p.id !== id))
+  }
 
   async function fetchClients() {
     setLoading(true)
@@ -155,10 +203,51 @@ export default function CoachClientsPage() {
           </div>
           <h1 style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.03em', margin: 0 }}>Clients</h1>
           <p style={{ fontSize: 14, color: 'var(--text-dim)', marginTop: 6 }}>
-            {clients.length} active client{clients.length !== 1 ? 's' : ''}
+            {clients.length} active client{clients.length !== 1 ? 's' : ''}{pending.length > 0 ? ` · ${pending.length} pending` : ''}
           </p>
         </div>
+        <button
+          onClick={() => { setShowAddPending(true); setPError('') }}
+          style={{ padding: '11px 20px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
+        >
+          + Add Client
+        </button>
       </div>
+
+      {/* Pending clients — waiting to sign up via join link */}
+      {pending.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 10 }}>
+            Pending — waiting to sign up
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {pending.map(p => (
+              <div key={p.id} style={{ background: 'rgba(245,158,11,0.05)', border: '1px dashed rgba(245,158,11,0.35)', borderRadius: 14, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(245,158,11,0.12)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, flexShrink: 0 }}>
+                  {initials(p.name)}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 800 }}>{p.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
+                    {p.email ?? 'No email — connects when they use your join link'}
+                    {p.note ? ` · ${p.note}` : ''}
+                  </div>
+                </div>
+                <span style={{ fontSize: 10, fontWeight: 800, color: '#f59e0b', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', padding: '3px 10px', borderRadius: 20, letterSpacing: '0.05em', textTransform: 'uppercase', flexShrink: 0 }}>
+                  Pending
+                </span>
+                <button
+                  onClick={() => deletePending(p.id)}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 15, cursor: 'pointer', padding: 4, flexShrink: 0 }}
+                  aria-label="Remove pending client"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {error && (
         <div style={{ background: '#ff3b3020', border: '1px solid #ff3b30', borderRadius: 10, padding: '12px 16px', color: '#ff3b30', fontSize: 13, marginBottom: 20 }}>
@@ -264,6 +353,52 @@ export default function CoachClientsPage() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Add Pending Client Modal */}
+      {showAddPending && (
+        <div
+          onClick={e => { if (e.target === e.currentTarget) setShowAddPending(false) }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+        >
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '28px 28px 24px', width: '100%', maxWidth: 440 }}>
+            <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 4 }}>Add Client</div>
+            <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 22, lineHeight: 1.5 }}>
+              Set them up before they sign up. When they join through your join link with a matching email, they connect automatically.
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Name *</label>
+              <input value={pName} onChange={e => setPName(e.target.value)} placeholder="Client's name" autoFocus
+                style={{ width: '100%', padding: '11px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, boxSizing: 'border-box' }} />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Email (for auto-connect)</label>
+              <input value={pEmail} onChange={e => setPEmail(e.target.value)} placeholder="client@email.com" type="email"
+                style={{ width: '100%', padding: '11px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, boxSizing: 'border-box' }} />
+            </div>
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Note (private)</label>
+              <textarea value={pNote} onChange={e => setPNote(e.target.value)} placeholder="Goals, injuries, context…" rows={3}
+                style={{ width: '100%', padding: '11px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }} />
+            </div>
+
+            {pError && (
+              <div style={{ background: '#ff3b3020', border: '1px solid #ff3b30', borderRadius: 8, padding: '10px 14px', color: '#ff3b30', fontSize: 13, marginBottom: 14 }}>{pError}</div>
+            )}
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={addPending} disabled={!pName.trim() || pSaving}
+                style={{ flex: 1, padding: '12px', background: pName.trim() ? 'var(--accent)' : 'var(--surface2)', color: pName.trim() ? '#fff' : 'var(--text-dim)', border: 'none', borderRadius: 10, fontWeight: 800, fontSize: 14, cursor: pName.trim() && !pSaving ? 'pointer' : 'not-allowed', fontFamily: 'inherit', opacity: pSaving ? 0.6 : 1 }}>
+                {pSaving ? 'Adding…' : 'Add Client'}
+              </button>
+              <button onClick={() => setShowAddPending(false)}
+                style={{ padding: '12px 20px', background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -15,6 +15,7 @@ import GenerationBanner from '@/components/GenerationBanner'
 import ReportBugButton from '@/components/ReportBugButton'
 import OnboardingModal from '@/components/OnboardingModal'
 import CoachWinBackModal from '@/components/CoachWinBackModal'
+import JoinLinkRedeemer from '@/components/JoinLinkRedeemer'
 import ServiceWorkerRegistrar from '@/components/ServiceWorkerRegistrar'
 
 const dmSans = DM_Sans({
@@ -74,6 +75,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <ReportBugButton />
               <OnboardingModal />
               <CoachWinBackModal />
+              <JoinLinkRedeemer />
               <ServiceWorkerRegistrar />
             </PlanGenerationProvider>
           </ThemeProvider>
