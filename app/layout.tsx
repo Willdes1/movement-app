@@ -16,6 +16,7 @@ import ReportBugButton from '@/components/ReportBugButton'
 import OnboardingModal from '@/components/OnboardingModal'
 import CoachWinBackModal from '@/components/CoachWinBackModal'
 import JoinLinkRedeemer from '@/components/JoinLinkRedeemer'
+import AppMain from '@/components/AppMain'
 import ServiceWorkerRegistrar from '@/components/ServiceWorkerRegistrar'
 
 const dmSans = DM_Sans({
@@ -62,13 +63,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <div className="grain" />
               <Sidebar />
               <MobileMenu />
-              <main className="app-main">
+              <AppMain>
                 <ImpersonationBanner />
                 <RecoveryBanner />
                 <ImportedProgramBanner />
                 <GenerationBanner />
                 {children}
-              </main>
+              </AppMain>
               <div className="mobile-nav-wrapper">
                 <BottomNav />
               </div>
