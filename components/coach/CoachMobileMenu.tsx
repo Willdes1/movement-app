@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import Logo from '@/components/ui/Logo'
@@ -13,6 +14,9 @@ const MENU_ITEMS = [
 export default function CoachMobileMenu() {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
+  // Portal target only exists in the browser — render drawer after mount
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
 
   // Close on route change
   useEffect(() => { setOpen(false) }, [pathname])
@@ -47,7 +51,9 @@ export default function CoachMobileMenu() {
         <span style={{ display: 'block', width: 16, height: 2, background: 'var(--text)', borderRadius: 2 }} />
       </button>
 
-      {/* Backdrop */}
+      {/* Backdrop + drawer rendered via portal at document.body — the blurred
+          fixed header would otherwise trap position:fixed descendants inside it */}
+      {mounted && createPortal(<>
       <div
         onClick={() => setOpen(false)}
         style={{
@@ -173,6 +179,7 @@ export default function CoachMobileMenu() {
           </Link>
         </div>
       </div>
+      </>, document.body)}
     </>
   )
 }
