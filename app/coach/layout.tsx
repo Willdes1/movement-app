@@ -4,6 +4,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 import Logo from '@/components/ui/Logo'
+import CoachMobileMenu from '@/components/coach/CoachMobileMenu'
 
 const coachNav = [
   { href: '/coach/dashboard',  label: 'Dashboard', emoji: '📊' },
@@ -13,6 +14,52 @@ const coachNav = [
   { href: '/coach/library',    label: 'Library',   emoji: '🎬' },
   { href: '/coach/analytics',  label: 'Analytics', emoji: '📈' },
   { href: '/coach/messages',   label: 'Messages',  emoji: '💬' },
+]
+
+// Mobile bottom tabs — SVG line icons matching the user app's BottomNav style
+const mobileTabs = [
+  {
+    href: '/coach/dashboard',
+    label: 'Dashboard',
+    icon: (active: boolean) => (
+      <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="7" height="7" rx="1.5" fill={active ? 'currentColor' : 'none'} fillOpacity={active ? 0.2 : 0}/>
+        <rect x="14" y="3" width="7" height="7" rx="1.5" fill={active ? 'currentColor' : 'none'} fillOpacity={active ? 0.2 : 0}/>
+        <rect x="3" y="14" width="7" height="7" rx="1.5" fill={active ? 'currentColor' : 'none'} fillOpacity={active ? 0.2 : 0}/>
+        <rect x="14" y="14" width="7" height="7" rx="1.5" fill={active ? 'currentColor' : 'none'} fillOpacity={active ? 0.2 : 0}/>
+      </svg>
+    ),
+  },
+  {
+    href: '/coach/clients',
+    label: 'Clients',
+    icon: (active: boolean) => (
+      <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+        <circle cx="9" cy="8" r="3.5" fill={active ? 'currentColor' : 'none'} fillOpacity={active ? 0.2 : 0}/>
+        <path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6" strokeLinecap="round"/>
+        <path d="M16 5a3.5 3.5 0 0 1 0 6.7M18.5 14.5c2 .8 3 2.6 3 5" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
+  {
+    href: '/coach/messages',
+    label: 'Messages',
+    icon: (active: boolean) => (
+      <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+        <path d="M21 11.5c0 4.1-4 7.5-9 7.5-1.1 0-2.2-.2-3.2-.5L3 20l1.6-3.8C3.6 14.9 3 13.3 3 11.5 3 7.4 7 4 12 4s9 3.4 9 7.5z" fill={active ? 'currentColor' : 'none'} fillOpacity={active ? 0.2 : 0} strokeLinejoin="round"/>
+      </svg>
+    ),
+  },
+  {
+    href: '/coach/analytics',
+    label: 'Analytics',
+    icon: (active: boolean) => (
+      <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth={active ? 2.4 : 1.8} viewBox="0 0 24 24">
+        <path d="M5 20v-6M11 20V8M17 20v-9" strokeLinecap="round"/>
+        <path d="M21 20H3" strokeWidth="1.8" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
 ]
 
 export default function CoachLayout({ children }: { children: React.ReactNode }) {
@@ -32,8 +79,9 @@ export default function CoachLayout({ children }: { children: React.ReactNode })
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
-      {/* Mobile header — shows Atlas Prime logo; hidden on desktop */}
-      <div className="coach-mobile-header">
+      {/* Mobile header — hamburger + logo, left-aligned; hidden on desktop */}
+      <div className="coach-mobile-header" style={{ gap: 12 }}>
+        <CoachMobileMenu />
         <Logo variant="coach" />
       </div>
 
@@ -107,20 +155,20 @@ export default function CoachLayout({ children }: { children: React.ReactNode })
         {children}
       </main>
 
-      {/* Mobile bottom nav — hidden on desktop via CSS class */}
+      {/* Mobile bottom nav — 4 tabs, hidden on desktop via CSS class */}
       <nav className="coach-mobile-nav">
-        {coachNav.map(item => {
-          const active = pathname === item.href || pathname.startsWith(item.href + '/')
+        {mobileTabs.map(tab => {
+          const active = pathname === tab.href || pathname.startsWith(tab.href + '/')
           return (
             <Link
-              key={item.href}
-              href={item.href}
+              key={tab.href}
+              href={tab.href}
               style={{
                 flex: 1,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: 3,
+                gap: 4,
                 padding: '4px 0',
                 color: active ? 'var(--accent)' : 'var(--text-dim)',
                 textDecoration: 'none',
@@ -128,33 +176,23 @@ export default function CoachLayout({ children }: { children: React.ReactNode })
                 fontWeight: 800,
                 letterSpacing: '0.06em',
                 textTransform: 'uppercase',
+                position: 'relative',
               }}
             >
-              <span style={{ fontSize: 18 }}>{item.emoji}</span>
-              <span className="coach-nav-label">{item.label}</span>
+              {tab.icon(active)}
+              {tab.label}
+              {active && (
+                <span style={{
+                  position: 'absolute',
+                  bottom: -8,
+                  width: 18, height: 3,
+                  borderRadius: '2px 2px 0 0',
+                  background: 'var(--accent)',
+                }} />
+              )}
             </Link>
           )
         })}
-        <Link
-          href="/today"
-          style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 3,
-            padding: '4px 0',
-            color: 'var(--text-dim)',
-            textDecoration: 'none',
-            fontSize: 8,
-            fontWeight: 800,
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase',
-          }}
-        >
-          <span style={{ fontSize: 18 }}>←</span>
-          <span className="coach-nav-label">My App</span>
-        </Link>
       </nav>
     </div>
   )

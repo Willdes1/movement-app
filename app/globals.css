@@ -256,7 +256,7 @@ input, textarea, select { transition: border-color 0.2s; }
   background: rgba(13,17,23,0.97);
   backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid rgba(48,54,61,0.8);
-  align-items: flex-start; padding-top: 8px;
+  align-items: flex-start; padding-top: 10px;
   padding-bottom: env(safe-area-inset-bottom);
   z-index: 100;
 }
@@ -273,7 +273,6 @@ input, textarea, select { transition: border-color 0.2s; }
 .coach-messages-layout { display: flex; overflow: hidden; height: calc(100vh - 56px - env(safe-area-inset-top, 0px)); }
 .coach-grid-2 { display: grid; grid-template-columns: 1fr; gap: 16px; }
 .coach-grid-3 { display: grid; grid-template-columns: 1fr; gap: 16px; }
-.coach-nav-label { display: none; }
 .coach-page-header { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; margin-bottom: 24px; }
 
 @media (min-width: 600px) {
