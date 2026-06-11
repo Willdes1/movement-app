@@ -89,6 +89,8 @@ export default function ProgramDetailPage() {
   const [assigning, setAssigning] = useState(false)
   const [assignSuccess, setAssignSuccess] = useState('')
   const [assignError, setAssignError] = useState('')
+  // Set when the selected client already has an active program — requires explicit confirm
+  const [replaceWarning, setReplaceWarning] = useState<{ programName: string; startDate: string } | null>(null)
   const assignSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Swap modal state
@@ -190,11 +192,11 @@ export default function ProgramDetailPage() {
   function openAssignModal() {
     setAssignSearch(''); setAssignResults([]); setSelectedClient(null)
     setAssignStartDate(new Date().toISOString().slice(0, 10))
-    setAssignSuccess(''); setAssignError(''); setShowAssign(true)
+    setAssignSuccess(''); setAssignError(''); setReplaceWarning(null); setShowAssign(true)
   }
 
   function handleAssignSearchChange(val: string) {
-    setAssignSearch(val); setSelectedClient(null)
+    setAssignSearch(val); setSelectedClient(null); setReplaceWarning(null)
     if (assignSearchTimer.current) clearTimeout(assignSearchTimer.current)
     if (!val.trim()) { setAssignResults([]); return }
     assignSearchTimer.current = setTimeout(() => searchProfiles(val.trim()), 350)
@@ -207,13 +209,42 @@ export default function ProgramDetailPage() {
     setAssignSearching(false)
   }
 
-  async function handleAssign() {
+  async function handleAssign(confirmedReplace = false) {
     if (!selectedClient || !program) return
     setAssigning(true); setAssignError('')
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { setAssignError('Session expired — please refresh.'); setAssigning(false); return }
 
     const isSelf = selectedClient.id === session.user.id
+
+    // Already on an active program? Require explicit confirmation before replacing.
+    const { data: existing } = await supabase
+      .from('coach_program_assignments')
+      .select('id, start_date, coach_programs(name)')
+      .eq('coach_id', session.user.id)
+      .eq('client_id', selectedClient.id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+
+    if (existing?.length && !confirmedReplace) {
+      const current = (existing[0].coach_programs as unknown as { name: string }[] | null)?.[0]?.name
+        ?? (existing[0].coach_programs as unknown as { name: string } | null)?.name
+        ?? 'another program'
+      setReplaceWarning({ programName: current, startDate: existing[0].start_date })
+      setAssigning(false)
+      return
+    }
+
+    // Replacing — retire every previously active assignment for this client.
+    // Their logged sets and day completions are kept; re-assigning the old
+    // program later (backdate the start date to resume mid-program) restores it.
+    if (existing?.length) {
+      const { error: retireErr } = await supabase
+        .from('coach_program_assignments')
+        .update({ status: 'replaced' })
+        .in('id', existing.map(e => e.id))
+      if (retireErr) { setAssignError(retireErr.message); setAssigning(false); return }
+    }
 
     // Self-assignments skip the roster — a coach shouldn't appear in their own client list
     if (!isSelf) {
@@ -227,6 +258,7 @@ export default function ProgramDetailPage() {
       client_id: selectedClient.id, start_date: assignStartDate, status: 'active',
     })
     if (assignErr) { setAssignError(assignErr.message); setAssigning(false); return }
+    setReplaceWarning(null)
     setAssignSuccess(isSelf
       ? `Assigned to yourself — find it under My Coach in your athlete app, starting ${assignStartDate}`
       : `Assigned to ${selectedClient.name ?? 'client'} — starting ${assignStartDate}`)
@@ -833,7 +865,7 @@ export default function ProgramDetailPage() {
                       <div style={{ fontSize: 13, fontWeight: 700 }}>{selectedClient.name ?? 'Unknown'}</div>
                       <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Selected</div>
                     </div>
-                    <button onClick={() => { setSelectedClient(null); setAssignSearch(''); setAssignResults([]) }}
+                    <button onClick={() => { setSelectedClient(null); setAssignSearch(''); setAssignResults([]); setReplaceWarning(null) }}
                       style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 16, cursor: 'pointer' }}>✕</button>
                   </div>
                 )}
@@ -845,10 +877,32 @@ export default function ProgramDetailPage() {
                 {assignError && (
                   <div style={{ background: '#ff3b3020', border: '1px solid #ff3b30', borderRadius: 8, padding: '10px 14px', color: '#ff3b30', fontSize: 13 }}>{assignError}</div>
                 )}
-                <button onClick={handleAssign} disabled={!selectedClient || assigning}
-                  style={{ padding: '12px 24px', background: selectedClient ? 'var(--accent)' : 'var(--surface2)', color: selectedClient ? '#fff' : 'var(--text-dim)', border: 'none', borderRadius: 10, fontWeight: 800, fontSize: 14, cursor: selectedClient && !assigning ? 'pointer' : 'not-allowed', opacity: assigning ? 0.6 : 1 }}>
-                  {assigning ? 'Assigning…' : selectedClient ? `Assign to ${selectedClient.name ?? 'client'}` : 'Select a client first'}
-                </button>
+                {replaceWarning ? (
+                  <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.35)', borderRadius: 12, padding: '14px 16px' }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: '#f59e0b', marginBottom: 4 }}>
+                      ⚠️ Already on a program
+                    </div>
+                    <p style={{ fontSize: 12, color: 'var(--text-mid)', lineHeight: 1.5, marginBottom: 12 }}>
+                      {selectedClient?.id === user?.id ? 'You are' : `${selectedClient?.name ?? 'This client'} is`} currently on <strong>{replaceWarning.programName}</strong> (started {new Date(replaceWarning.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}).
+                      Assigning <strong>{program.name}</strong> will replace it as the active program. All logged workouts and completed days are kept — to return to the old program later, just re-assign it (backdate the start date to pick up where it left off).
+                    </p>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => handleAssign(true)} disabled={assigning}
+                        style={{ flex: 1, padding: '11px 16px', background: '#f59e0b', color: '#000', border: 'none', borderRadius: 10, fontWeight: 800, fontSize: 13, cursor: 'pointer', opacity: assigning ? 0.6 : 1 }}>
+                        {assigning ? 'Replacing…' : 'Replace Program'}
+                      </button>
+                      <button onClick={() => setReplaceWarning(null)} disabled={assigning}
+                        style={{ flex: 1, padding: '11px 16px', background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => handleAssign()} disabled={!selectedClient || assigning}
+                    style={{ padding: '12px 24px', background: selectedClient ? 'var(--accent)' : 'var(--surface2)', color: selectedClient ? '#fff' : 'var(--text-dim)', border: 'none', borderRadius: 10, fontWeight: 800, fontSize: 14, cursor: selectedClient && !assigning ? 'pointer' : 'not-allowed', opacity: assigning ? 0.6 : 1 }}>
+                    {assigning ? 'Assigning…' : selectedClient ? `Assign to ${selectedClient.name ?? 'client'}` : 'Select a client first'}
+                  </button>
+                )}
               </>
             )}
           </div>
