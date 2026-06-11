@@ -213,16 +213,23 @@ export default function ProgramDetailPage() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { setAssignError('Session expired — please refresh.'); setAssigning(false); return }
 
-    const { error: rosterErr } = await supabase.from('coach_clients')
-      .upsert({ coach_id: session.user.id, client_id: selectedClient.id, status: 'active' }, { onConflict: 'coach_id,client_id' })
-    if (rosterErr) { setAssignError(rosterErr.message); setAssigning(false); return }
+    const isSelf = selectedClient.id === session.user.id
+
+    // Self-assignments skip the roster — a coach shouldn't appear in their own client list
+    if (!isSelf) {
+      const { error: rosterErr } = await supabase.from('coach_clients')
+        .upsert({ coach_id: session.user.id, client_id: selectedClient.id, status: 'active' }, { onConflict: 'coach_id,client_id' })
+      if (rosterErr) { setAssignError(rosterErr.message); setAssigning(false); return }
+    }
 
     const { error: assignErr } = await supabase.from('coach_program_assignments').insert({
       program_id: program.id, coach_id: session.user.id,
       client_id: selectedClient.id, start_date: assignStartDate, status: 'active',
     })
     if (assignErr) { setAssignError(assignErr.message); setAssigning(false); return }
-    setAssignSuccess(`Assigned to ${selectedClient.name ?? 'client'} — starting ${assignStartDate}`)
+    setAssignSuccess(isSelf
+      ? `Assigned to yourself — find it under My Coach in your athlete app, starting ${assignStartDate}`
+      : `Assigned to ${selectedClient.name ?? 'client'} — starting ${assignStartDate}`)
     setAssigning(false)
   }
 
@@ -774,6 +781,22 @@ export default function ProgramDetailPage() {
               </div>
             ) : (
               <>
+                {!selectedClient && (
+                  <button
+                    onClick={() => { setSelectedClient({ id: user!.id, name: 'Myself', role: 'coach' }); setAssignSearch(''); setAssignResults([]) }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'var(--surface2)', border: '1px dashed var(--border)', borderRadius: 10, cursor: 'pointer', textAlign: 'left', width: '100%' }}
+                    onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
+                    onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+                  >
+                    <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'var(--accent)22', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>
+                      💪
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Assign to myself</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Run this program as your own training</div>
+                    </div>
+                  </button>
+                )}
                 <div>
                   <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 6 }}>Search by name</label>
                   <input value={assignSearch} onChange={e => handleAssignSearchChange(e.target.value)} placeholder="Type a client's name…" autoFocus
