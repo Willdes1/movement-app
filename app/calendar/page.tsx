@@ -86,7 +86,7 @@ function VideoPlayer({ url, source, name, startSec, endSec }: { url: string | nu
         if (endSec != null) embedSrc += `&end=${endSec}`
       }
       return (
-        <div style={{ marginBottom: 14, borderRadius: 10, overflow: 'hidden', background: '#000', position: 'sticky', top: 0, zIndex: 10 }}>
+        <div className="video-sticky" style={{ marginBottom: 14, borderRadius: 10, overflow: 'hidden', background: '#000' }}>
           <div style={{ position: 'relative', paddingBottom: short ? '177.78%' : '56.25%', height: 0 }}>
             <iframe
               key={`${videoId}-${muted}`}

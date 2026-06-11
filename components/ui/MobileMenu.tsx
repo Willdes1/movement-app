@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
@@ -23,6 +24,9 @@ export default function MobileMenu() {
   const { user } = useAuth()
   const [open, setOpen] = useState(false)
   const [profile, setProfile] = useState<{ name: string | null; sports: string[] | null } | null>(null)
+  // Portal target only exists in the browser — render drawer after mount
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
 
   useEffect(() => {
     if (!user) return
@@ -51,18 +55,34 @@ export default function MobileMenu() {
 
   return (
     <>
-      {/* Hamburger button — hidden on desktop via CSS */}
-      <button
-        className="mobile-hamburger"
-        onClick={() => setOpen(true)}
-        aria-label="Open menu"
-      >
-        <span style={{ display: 'block', width: 20, height: 2, background: 'var(--text)', borderRadius: 2, marginBottom: 5 }} />
-        <span style={{ display: 'block', width: 14, height: 2, background: 'var(--text)', borderRadius: 2, marginBottom: 5 }} />
-        <span style={{ display: 'block', width: 17, height: 2, background: 'var(--text)', borderRadius: 2 }} />
-      </button>
+      {/* Mobile header — hamburger + logo, left-aligned; hidden on desktop via CSS */}
+      <div className="app-mobile-header" style={{ gap: 12 }}>
+        <button
+          onClick={() => setOpen(true)}
+          aria-label="Open menu"
+          style={{
+            width: 38, height: 38,
+            borderRadius: 10,
+            background: 'var(--surface2)',
+            border: '1px solid var(--border)',
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <span style={{ display: 'block', width: 18, height: 2, background: 'var(--text)', borderRadius: 2, marginBottom: 4 }} />
+          <span style={{ display: 'block', width: 13, height: 2, background: 'var(--text)', borderRadius: 2, marginBottom: 4 }} />
+          <span style={{ display: 'block', width: 16, height: 2, background: 'var(--text)', borderRadius: 2 }} />
+        </button>
+        <Logo />
+      </div>
 
-      {/* Backdrop */}
+      {/* Backdrop + drawer rendered via portal at document.body — the blurred
+          fixed header would otherwise trap position:fixed descendants inside it */}
+      {mounted && createPortal(<>
       <div
         onClick={() => setOpen(false)}
         style={{
@@ -202,6 +222,7 @@ export default function MobileMenu() {
           </Link>
         </div>
       </div>
+      </>, document.body)}
     </>
   )
 }
