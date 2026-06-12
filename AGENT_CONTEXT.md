@@ -1,6 +1,6 @@
 # Agent Context — Atlas Prime
 > Full briefing for a new agent to continue this project without any prior conversation history.
-> Last updated: 2026-06-11 | Current branch: master | 296 commits
+> Last updated: 2026-06-12 | Current branch: master | 298 commits
 
 ---
 
@@ -99,7 +99,34 @@
 
 ---
 
-## 4. What Was Built This Session (2026-06-11)
+## 4. What Was Built This Session (2026-06-12)
+
+**Launch infrastructure day — domain migration complete. No feature code; one Launchpad commit.**
+
+### Custom Domain Live — atlasprime.app → Vercel
+- **Vercel:** `atlasprime.app` added to movement-app project as primary (apex, connected to Production). `www.atlasprime.app`, `atlasprime.fit`, `atlasprime.health` (+ www variants) all added as **308 Permanent Redirects** → atlasprime.app. Old `movement-app-three.vercel.app` also 308-redirects now.
+- **DNS values (Vercel's NEW IP range — not the old 76.76.21.21):** A record `@` → `216.198.79.1`; CNAME `www` → per-project value shown in Vercel domains tab.
+- **Namecheap:** all three domains configured in Advanced DNS; deleted default parking URL Redirect Records on `@` (they conflict with the A record).
+- **Vercel dialog gotchas learned:** "Include apex and www variants" checkbox must be UNCHECKED when adding www as a redirect-to-apex (else "domain cannot redirect to itself"); checkbox stays CHECKED for .fit/.health so both variants are covered.
+- **Supabase auth:** Site URL → `https://atlasprime.app`; redirect URLs added for apex + www with `/**`; old vercel.app entries kept as transition backup. Google OAuth unaffected (flows through Supabase's own callback domain).
+- **Stripe webhook:** endpoint URL **edited in place** to `https://atlasprime.app/api/stripe/webhook` — same signing secret preserved. (Never create a new endpoint for a URL change; that rotates the secret and breaks `STRIPE_WEBHOOK_SECRET` in Vercel env.)
+- **Verified end-to-end:** incognito Google login at atlasprime.app stays on the new domain; .fit redirect works; all domains green in Vercel.
+- **Code check:** no hardcoded site URLs anywhere — join links + auth redirects all use `window.location.origin`, so no code changes were needed.
+- **Launchpad:** domain item ✅, LLC item ✅ (was stale-unchecked), BUILT entry added (commit `30d766a`).
+
+### YouTube API Quota Follow-Up
+- Original quota request submitted May 18, acknowledged May 20, silent since. Follow-up sent 2026-06-12 **in the same Gmail thread** (Google tracks the application there), referencing the new production domain + Google Cloud project ID `movement-app-495418`.
+- **Decision:** Google Cloud project display name stays "movement-app" until the review completes (don't touch anything mid-review; project ID is permanent and invisible to users anyway — same logic as repo/folder names).
+
+### Cleanup
+- Deleted untracked scratch files: `app/admin/mockup-b/` (style exploration, style already chosen) and `youtube-api-proof.html` (saved externally by Will).
+
+### User-stated next session focus
+Google Workspace email on @atlasprime.app, then Stripe + Apple payment method setup (Mercury debit card as preferred payment method).
+
+---
+
+## Previous Session (2026-06-11)
 
 Massive session — 11 features shipped, all deployed green. The full coach-client product arc.
 
@@ -670,19 +697,20 @@ return () => { supabase.removeChannel(channel) }
 
 ## 11. What to Work on Next (Priority Order)
 
-**Next session focus (user-stated 2026-06-11): "the real work" — launch infrastructure, not features.**
+**Next session focus (user-stated 2026-06-12): Google Workspace email @atlasprime.app + Stripe/Apple payment method setup.**
 
-1. **Point atlasprime.app domain to Vercel** — Namecheap → Domain List → atlasprime.app → Manage DNS; Vercel → add custom domain. Give Will exact step-by-step instructions. Bonus: makes coach join links (`atlasprime.app/join/{slug}`) publicly shareable.
-2. **Mercury next steps** — Account is FUNDED ($100 deposited 2026-06-11). Next: order debit card, note account/routing for Stripe + Apple, consider moving Namecheap/Google Workspace billing onto it for clean business books.
-3. **Apple launch compliance — full review** — Everything needed to launch on the App Store: Apple Developer Program enrollment (needs LLC docs ✅ + business email + $99/yr + D-U-N-S for org account), App Store Review Guidelines compliance audit (health/fitness app rules, account deletion requirement, privacy nutrition labels, subscription rules → RevenueCat not Stripe on iOS), privacy policy/TOS review.
-4. **TestFlight research** — User heard TestFlight can run the app BEFORE App Store submission. True: TestFlight requires Apple Developer Program enrollment but NOT App Store approval (internal testers ~immediately, external testers need lightweight beta review). Requires the app wrapped natively first (Capacitor). Lay out all angles: enrollment → Capacitor wrapper → TestFlight internal → external beta → submission.
-5. **Google Workspace business email** — `will@atlasprime.app` after domain points. Needed for Apple Developer Program.
-6. **F&F self-test account** — brand-new account through the full new-user flow.
+1. **Google Workspace business email** — `will@atlasprime.app`. Domain is live, so this is unblocked. MX records go in Namecheap Advanced DNS (alongside the Vercel A/CNAME records — don't touch those). Needed for Apple Developer Program enrollment. Give Will exact step-by-step instructions.
+2. **Stripe + Apple payment method (Mercury)** — Mercury is funded ($100, 2026-06-11). Order debit card, note account/routing numbers; set Mercury as the payment method for Stripe payouts and Apple Developer billing; consider moving Namecheap/Google Workspace billing onto it for clean business books.
+3. **Apple launch compliance — full review** — Apple Developer Program enrollment (LLC ✅, domain ✅, needs business email + $99/yr + D-U-N-S for org account), App Store Review Guidelines compliance audit (health/fitness app rules, account deletion requirement, privacy nutrition labels, subscription rules → RevenueCat not Stripe on iOS), privacy policy/TOS review.
+4. **TestFlight path** — requires Dev Program enrollment + Capacitor-wrapped binary, but NOT App Store approval (internal testers ~immediately, external = lightweight beta review). Path: enrollment → Capacitor wrapper → TestFlight internal → external beta → submission.
+5. **YouTube API quota** — follow-up sent 2026-06-12 in-thread (project `movement-app-495418`); watch for Google's response. After approval: optionally rename Cloud project display name to atlas-prime.
+6. **F&F self-test account** — brand-new account through the full new-user flow on atlasprime.app.
 7. **TTS backfill** — `/admin#tts` daily (~700 exercises remaining).
 8. **Muscle Beach Method video curation** — `/admin#video`.
 9. **Stripe billing for coach tiers** (web) + **RevenueCat** (iOS/Android) + **Capacitor wrapper**.
 10. **Lock down `/api/notifications/send`** — currently no auth check; anyone can send pushes.
 11. **Real logo** — swap `components/ui/Logo.tsx` when the final asset is ready.
+12. **Someday:** redirect cleanup — flip www.atlasprime.app redirect from 307 → 308 in Vercel (cosmetic; works fine as-is).
 
 ---
 
@@ -706,6 +734,7 @@ return () => { supabase.removeChannel(channel) }
 - **Vercel:** Hobby plan. `dentalseowill-5409` account.
 - **Supabase:** Free tier. `main` branch = production.
 - **GitHub:** `Willdes1/movement-app`, master branch.
-- **Current production commit:** `d6fcf6b`
+- **Current production commit:** `30d766a` (2026-06-12)
+- **Production domain:** `https://atlasprime.app` (live 2026-06-12). www + .fit + .health + old movement-app-three.vercel.app all 308-redirect to it.
 - **Credentials:** GitHub PAT (Willdes1) in user's 1Will Gonzalez Google Drive.
 - **Admin portal:** `/admin` — hash-based tab routing (e.g. `/admin#tts`, `/admin#video`, `/admin#launchpad`)
