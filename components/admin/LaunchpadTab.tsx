@@ -247,8 +247,8 @@ const READINESS_DATA = [
     items: [
       // Legal & Business
       { label: 'App name finalized + trademark search done', done: false },
-      { label: 'Domain secured for final brand name', done: false },
-      { label: 'LLC / business entity registered', done: false },
+      { label: 'Domain secured for final brand name', done: true },
+      { label: 'LLC / business entity registered', done: true },
       { label: 'Apple Developer Program enrolled ($99/yr — requires LLC)', done: false },
       { label: 'Google Play Developer account created ($25 one-time)', done: false },
       // App Identity & Store Assets
@@ -420,6 +420,7 @@ function OverviewSection() {
     'Coach vanity join links + pending clients (2026-06-11) — atlasprime.app/join/{slug}: coach sets brand slug on Dashboard (Your Join Link card, auto-suggested, unique); public branded landing page; slug survives signup via localStorage + JoinLinkRedeemer (works with OAuth) → auto-connects to roster with confirmation modal; + Add Client on Clients page creates pending clients (name/email/private note) that auto-claim by email match on signup; SQL: profiles.coach_slug + coach_pending_clients',
     'In-person session logging (2026-06-11) — coach logs the workout on the client behalf from client detail page: per-exercise sets/reps/weight prefilled from programmed scheme, client self-logs preload with edit-or-leave badge, per-exercise + session notes into coach_client_notes, Complete & Log writes workout_logs (logged_by) + coach_day_completions (completed_by); client gets push notification + Good job celebration banner + Completed with Coach X state; SQL: logged_by/completed_by columns',
     'Coach desktop layout fix (2026-06-11) — coach pages sat 460px from the left (athlete layout reserved 230px for its hidden sidebar + coach layout added 230px); AppMain route-aware wrapper applies athlete spacing only on athlete routes; also fixed doubled mobile header padding and off-center /auth + /join on desktop',
+    'Custom domain live (2026-06-12) — atlasprime.app pointed to Vercel (A @ 216.198.79.1 + CNAME www); www + atlasprime.fit + atlasprime.health 308-redirect to apex; old movement-app-three.vercel.app 308-redirects too; Supabase auth Site URL + redirect URLs updated; Stripe webhook endpoint URL moved to atlasprime.app/api/stripe/webhook (same signing secret); coach join links now publicly shareable',
     'Coach Portal mobile UX overhaul — fixed mobile layout across all 10 coach pages: Atlas Prime header bar on mobile, icons-only bottom nav (9 items), responsive padding (.coach-page 16px mobile/40px desktop), .coach-page-header stacks title+button on mobile, .coach-grid-2/.coach-grid-3 responsive grids, messages height fix, overflow-x: hidden safety net; all "Coach Portal" eyebrow text → "Atlas Prime"',
   ]
   const COMING = [
