@@ -378,7 +378,7 @@ export default function TodayPage() {
               <span style={{ fontSize: 14 }}>✨</span>
               <p style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.5, margin: 0 }}><strong style={{ color: 'var(--text-mid)' }}>For you:</strong> {tip}</p>
             </div>
-            <Link href={`/calendar?date=${new Date().toISOString().split('T')[0]}`} style={{ display: 'block', padding: '14px', borderRadius: 12, background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%)', color: '#fff', fontWeight: 900, fontSize: 14, textAlign: 'center', textDecoration: 'none', letterSpacing: '0.03em', textTransform: 'uppercase', boxShadow: '0 6px 24px var(--accent-shadow)' }}>
+            <Link href={`/calendar?date=${new Date().toISOString().split('T')[0]}&focus=1`} style={{ display: 'block', padding: '14px', borderRadius: 12, background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%)', color: '#fff', fontWeight: 900, fontSize: 14, textAlign: 'center', textDecoration: 'none', letterSpacing: '0.03em', textTransform: 'uppercase', boxShadow: '0 6px 24px var(--accent-shadow)' }}>
               ▶ Start Session
             </Link>
           </>

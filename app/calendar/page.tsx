@@ -182,6 +182,8 @@ function CalendarInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const dateParam = searchParams.get('date')
+  // Focus mode (from Start Session): show only today's focused day view, month grid hidden.
+  const [focusMode, setFocusMode] = useState(() => searchParams.get('focus') === '1')
 
   const [program, setProgram] = useState<Program | null>(null)
   const [recoveryPlan, setRecoveryPlan] = useState<RecoveryPlan | null>(null)
@@ -463,11 +465,20 @@ function CalendarInner() {
     <div style={{ padding: '24px 16px 120px', maxWidth: 480, margin: '0 auto' }}>
 
       {/* Header */}
-      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 2 }}>Calendar</h1>
-      <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 20 }}>
-        13-week program · tap any day for details
-      </p>
+      {focusMode ? (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+          <button onClick={() => setFocusMode(false)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 20, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-mid)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>📅 View Calendar</button>
+        </div>
+      ) : (
+        <>
+          <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 2 }}>Calendar</h1>
+          <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 20 }}>
+            13-week program · tap any day for details
+          </p>
+        </>
+      )}
 
+      {!focusMode && (<>
       {/* Month navigation */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, padding: '10px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12 }}>
         <button
@@ -563,6 +574,8 @@ function CalendarInner() {
         ))}
       </div>
 
+      </>)}
+
       {/* Selected day detail — recovery mode */}
       {selectedKey && isRecoveryDay(selectedKey) && recoveryPlan && (() => {
         const phase = recoveryPlan.phases.find(p => p.phase === recoveryPlan.current_phase)
@@ -577,7 +590,7 @@ function CalendarInner() {
                 <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--orange)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 2 }}>Recovery Mode · Phase {recoveryPlan.current_phase} of {recoveryPlan.phases.length}</div>
                 <p style={{ fontWeight: 800, fontSize: 17, marginBottom: 0 }}>{phase?.title ?? recoveryPlan.injury}</p>
               </div>
-              <button onClick={() => setSelectedKey(null)} style={{ background: 'none', border: 'none', fontSize: 20, color: 'var(--text-dim)', cursor: 'pointer', padding: '0 0 0 12px', lineHeight: 1 }}>×</button>
+              <button onClick={() => focusMode ? setFocusMode(false) : setSelectedKey(null)} style={{ background: 'none', border: 'none', fontSize: 20, color: 'var(--text-dim)', cursor: 'pointer', padding: '0 0 0 12px', lineHeight: 1 }}>×</button>
             </div>
             {session ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 14 }}>
@@ -645,7 +658,7 @@ function CalendarInner() {
               </span>
             </div>
             <button
-              onClick={() => setSelectedKey(null)}
+              onClick={() => focusMode ? setFocusMode(false) : setSelectedKey(null)}
               style={{ background: 'none', border: 'none', fontSize: 20, color: 'var(--text-dim)', cursor: 'pointer', padding: '0 0 0 12px', lineHeight: 1 }}
             >×</button>
           </div>
