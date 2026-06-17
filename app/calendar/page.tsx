@@ -187,6 +187,7 @@ function CalendarInner() {
   const [recoveryPlan, setRecoveryPlan] = useState<RecoveryPlan | null>(null)
   const [expandedRecovBlock, setExpandedRecovBlock] = useState<string | null>('morning')
   const [expandedTrainBlock, setExpandedTrainBlock] = useState<string | null>('warmup')
+  const [historyBump, setHistoryBump] = useState(0)
   const [weekPlans, setWeekPlans] = useState<Record<number, DayPlan[]>>({})
   const [loading, setLoading] = useState(true)
   const [viewMonth, setViewMonth] = useState(new Date())
@@ -847,8 +848,10 @@ function CalendarInner() {
           data={selectedExercise}
           lastLog={lastLog}
           generating={exerciseFetching}
+          userId={userId}
+          historyRefresh={historyBump}
           onClose={() => setSelectedExercise(null)}
-          footer={<TrackWorkout userId={userId} exerciseNormalized={selectedExercise.name_normalized} exerciseDisplay={selectedExercise.name_display} />}
+          footer={<TrackWorkout userId={userId} exerciseNormalized={selectedExercise.name_normalized} exerciseDisplay={selectedExercise.name_display} onSaved={() => setHistoryBump(n => n + 1)} />}
         />
       )}
     </div>

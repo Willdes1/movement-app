@@ -1,7 +1,8 @@
 'use client'
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import LoopPreview from '@/components/ui/LoopPreview'
 import { useTTS } from '@/hooks/useTTS'
+import { supabase } from '@/lib/supabase'
 
 // Reusable expanded-exercise popup, shared by the calendar day view, the coached
 // workout, and anywhere set tracking needs to live. Common Mistakes maps to the
@@ -32,16 +33,77 @@ export type LastLogSummary = {
   logged_at: string
 }
 
+type SetLogRow = { id: string; performed_at: string; set_number: number; reps: number | null; weight: number | null; weight_unit: string | null; side: string | null; notes: string | null; program_name: string | null }
+
+// Cluster a user's set rows into sessions (grouped by the hour they were logged).
+function groupSessions(rows: SetLogRow[]) {
+  const groups: Record<string, SetLogRow[]> = {}
+  for (const r of rows) {
+    const key = new Date(r.performed_at).toISOString().slice(0, 13)
+    ;(groups[key] ??= []).push(r)
+  }
+  return Object.entries(groups)
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+    .map(([key, sets]) => ({
+      key,
+      when: new Date(sets[0].performed_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }),
+      program: sets[0].program_name,
+      sets: [...sets].sort((a, b) => a.set_number - b.set_number),
+    }))
+}
+
+function SetHistoryView({ history }: { history: SetLogRow[] }) {
+  const sessions = groupSessions(history)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {sessions.map(s => (
+        <div key={s.key} style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--text)' }}>{s.when}</span>
+            {s.program && <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 600 }}>{s.program}</span>}
+          </div>
+          {s.sets.map(set => (
+            <div key={set.id} style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: '3px 0', fontSize: 12 }}>
+              <span style={{ color: 'var(--text-dim)', width: 50, flexShrink: 0 }}>Set {set.set_number}{set.side ? ` ${set.side[0].toUpperCase()}` : ''}</span>
+              <span style={{ color: 'var(--text)', fontWeight: 700 }}>
+                {set.reps == null && set.weight == null
+                  ? '—'
+                  : `${set.reps != null ? `${set.reps} reps` : ''}${set.reps != null && set.weight != null ? ' × ' : ''}${set.weight != null ? `${set.weight} ${set.weight_unit ?? 'lbs'}` : ''}`}
+              </span>
+              {set.notes && <span style={{ color: 'var(--text-dim)', fontSize: 11, marginLeft: 'auto', fontStyle: 'italic' }}>{set.notes}</span>}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function ExerciseDetailModal({
-  data, onClose, lastLog, generating, footer,
+  data, onClose, lastLog, generating, footer, userId, historyRefresh,
 }: {
   data: ExerciseDetailData
   onClose: () => void
   lastLog?: LastLogSummary | null
   generating?: boolean
   footer?: ReactNode
+  userId?: string
+  historyRefresh?: number
 }) {
   const { speak, stop, speaking, loading: ttsLoading, gender, toggleGender } = useTTS()
+  const [tab, setTab] = useState<'info' | 'history'>('info')
+  const [history, setHistory] = useState<SetLogRow[]>([])
+
+  useEffect(() => {
+    if (!userId) return
+    supabase.from('exercise_set_logs')
+      .select('id, performed_at, set_number, reps, weight, weight_unit, side, notes, program_name')
+      .eq('user_id', userId)
+      .eq('exercise_normalized', data.name_normalized)
+      .order('performed_at', { ascending: false })
+      .limit(80)
+      .then(({ data: rows }) => setHistory((rows as SetLogRow[]) ?? []))
+  }, [userId, data.name_normalized, historyRefresh])
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') { stop(); onClose() } }
@@ -95,6 +157,21 @@ export default function ExerciseDetailModal({
 
           {/* Body */}
           <div style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch' as never, padding: '0 24px 40px', flexGrow: 1 }}>
+            {/* History tab appears only once the user has logged sets */}
+            {history.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+                {(['info', 'history'] as const).map(t => (
+                  <button key={t} onClick={() => setTab(t)} style={{ flex: 1, padding: '8px', borderRadius: 8, border: '1px solid var(--border)', background: tab === t ? 'var(--accent)' : 'var(--surface2)', color: tab === t ? '#fff' : 'var(--text-mid)', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    {t === 'info' ? 'Instructions' : `History (${groupSessions(history).length})`}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {tab === 'history' ? (
+              <SetHistoryView history={history} />
+            ) : (
+            <>
             <LoopPreview url={data.video_url ?? null} source={data.video_source ?? null} name={data.name_display} loopStart={data.loop_start_sec} loopEnd={data.loop_end_sec} clipStart={data.youtube_start_sec} clipEnd={data.youtube_end_sec} />
 
             {lastLog !== undefined && (
@@ -126,6 +203,8 @@ export default function ExerciseDetailModal({
                 </div>
               ))}
             </div>
+            </>
+            )}
           </div>
         </div>
       </div>
