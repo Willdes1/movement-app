@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import LoopPreview from '@/components/ui/LoopPreview'
 import { inferEquipment, REST_GUIDANCE } from '@/lib/workout-display'
 import ExerciseDetailModal from '@/components/ui/ExerciseDetailModal'
+import TrackWorkout from '@/components/ui/TrackWorkout'
 
 type RecoveryDailyBlock = { label: string; duration: string; exercises: string[] }
 type RecoveryDailySession = {
@@ -847,6 +848,7 @@ function CalendarInner() {
           lastLog={lastLog}
           generating={exerciseFetching}
           onClose={() => setSelectedExercise(null)}
+          footer={<TrackWorkout userId={userId} exerciseNormalized={selectedExercise.name_normalized} exerciseDisplay={selectedExercise.name_display} />}
         />
       )}
     </div>
