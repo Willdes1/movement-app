@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import YouTubeLoopTrimmer from './YouTubeLoopTrimmer'
 
 const C = {
   bg: '#0d1117', surface: '#161b22', surface2: '#21262d', border: '#30363d',
@@ -24,6 +25,7 @@ type Candidate = {
 type Exercise = {
   id: string; name_display: string; name_normalized: string
   video_url: string | null; video_source: string | null
+  loop_start_sec?: number | null; loop_end_sec?: number | null
   candidates: Candidate[]
 }
 
@@ -143,10 +145,22 @@ export default function VideoCurationTab() {
   // ── Exercise helpers ───────────────────────────────────────────────────────
   async function loadExercises() {
     setLoading(true)
-    const { data: exList } = await supabase
+    // Loop columns (loop_start_sec/loop_end_sec) may not exist yet if the migration
+    // hasn't been run — fall back to a select without them so the tab still loads.
+    let exList: Omit<Exercise, 'candidates'>[] | null = null
+    const withLoop = await supabase
       .from('exercise_library')
-      .select('id, name_display, name_normalized, video_url, video_source')
+      .select('id, name_display, name_normalized, video_url, video_source, loop_start_sec, loop_end_sec')
       .order('name_display')
+    if (withLoop.error) {
+      const fallback = await supabase
+        .from('exercise_library')
+        .select('id, name_display, name_normalized, video_url, video_source')
+        .order('name_display')
+      exList = (fallback.data ?? []) as unknown as Omit<Exercise, 'candidates'>[]
+    } else {
+      exList = (withLoop.data ?? []) as unknown as Omit<Exercise, 'candidates'>[]
+    }
 
     // Collect ALL queued entries with source_label.
     // Try selecting source_label; if the column doesn't exist yet (migration not run),
@@ -356,6 +370,25 @@ export default function VideoCurationTab() {
       .in('status', ['proposed', 'queued'])
     setPasteUrls(prev => { const n = { ...prev }; delete n[exerciseId]; return n })
     setPasteTimes(prev => { const n = { ...prev }; delete n[exerciseId]; return n })
+    await loadExercises()
+    setActing(null)
+  }
+
+  async function saveLoop(exerciseId: string, startSec: number, endSec: number) {
+    setActing(exerciseId)
+    const { error } = await supabase.from('exercise_library')
+      .update({ loop_start_sec: startSec, loop_end_sec: endSec })
+      .eq('id', exerciseId)
+    if (error) alert(`Could not save loop — make sure the loop columns migration has been run in Supabase.\n\n${error.message}`)
+    await loadExercises()
+    setActing(null)
+  }
+
+  async function clearLoop(exerciseId: string) {
+    setActing(exerciseId)
+    await supabase.from('exercise_library')
+      .update({ loop_start_sec: null, loop_end_sec: null })
+      .eq('id', exerciseId)
     await loadExercises()
     setActing(null)
   }
@@ -851,6 +884,35 @@ export default function VideoCurationTab() {
                               />
                             </div>
                           </div>
+                        </div>
+                      )}
+
+                      {/* Movement loop trimmer — the GIF-style preview users see while browsing */}
+                      {!rawUrl && videoId && (
+                        <div style={{ padding: '14px', background: 'rgba(34,197,94,0.05)', border: `1px solid ${C.greenBorder}`, borderRadius: 10 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                            <span style={{ fontSize: 12, fontWeight: 800, color: C.green }}>🔁 Movement Loop</span>
+                            <span style={{ fontSize: 11, color: C.textDim }}>— the auto-looping muted preview users see while browsing</span>
+                          </div>
+                          <p style={{ fontSize: 11, color: C.textDim, lineHeight: 1.5, marginBottom: 12 }}>
+                            Drag the ⟮ ⟯ handles (or use the playhead buttons) to pick the exact movement execution to loop, then preview and save. The original video is never changed.
+                          </p>
+                          <YouTubeLoopTrimmer
+                            key={ex.video_url ?? videoId}
+                            videoId={videoId}
+                            isShort={isShort}
+                            initialStart={ex.loop_start_sec ?? null}
+                            initialEnd={ex.loop_end_sec ?? null}
+                            saving={acting === ex.id}
+                            hasSavedLoop={ex.loop_start_sec != null || ex.loop_end_sec != null}
+                            onSave={(s, e) => saveLoop(ex.id, s, e)}
+                            onClear={() => clearLoop(ex.id)}
+                          />
+                          {ex.loop_start_sec != null && ex.loop_end_sec != null && (
+                            <div style={{ marginTop: 10, fontSize: 11, color: C.green, fontWeight: 700 }}>
+                              ✓ Loop saved: {secondsToMMSS(Math.round(ex.loop_start_sec))} → {secondsToMMSS(Math.round(ex.loop_end_sec))} ({(ex.loop_end_sec - ex.loop_start_sec).toFixed(1)}s)
+                            </div>
+                          )}
                         </div>
                       )}
 
