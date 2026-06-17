@@ -10,6 +10,7 @@ export type CoachDay = {
   movements: string[]
   focus: string
   duration: string
+  walkthrough_url?: string | null
 }
 
 export type CoachWeek = {

@@ -25,6 +25,7 @@ interface ManualDay {
   label: string
   focus: string
   duration: string
+  walkthrough_url?: string
   exercises: Exercise[]
 }
 
@@ -66,6 +67,7 @@ function defaultDay(day: ManualDay['day'], isTraining: boolean): ManualDay {
     label: '',
     focus: '',
     duration: '60 min',
+    walkthrough_url: '',
     exercises: isTraining ? [{ id: makeId(), value: '' }] : [],
   }
 }
@@ -332,6 +334,16 @@ function DayEditor({
           Set rest
         </button>
       </div>
+      {day.type !== 'rest' && (
+        <div style={{ padding: '6px 12px', borderBottom: '1px solid var(--border)' }}>
+          <input
+            value={day.walkthrough_url ?? ''}
+            onChange={e => update({ walkthrough_url: e.target.value })}
+            placeholder="🎬 Walkthrough video URL (optional — whole-workout explainer for the client)"
+            style={{ width: '100%', padding: '4px 8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 12, fontFamily: 'inherit', boxSizing: 'border-box' }}
+          />
+        </div>
+      )}
 
       {/* Exercise list */}
       <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -497,6 +509,7 @@ export default function ManualProgramBuilder({
         movements: d.exercises.map(e => e.value).filter(Boolean),
         focus: d.focus,
         duration: d.duration,
+        walkthrough_url: d.walkthrough_url || null,
       })),
     }))
 

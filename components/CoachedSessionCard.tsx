@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useCoached } from '@/contexts/CoachedContext'
 import { useTTS } from '@/hooks/useTTS'
 import LoopPreview from '@/components/ui/LoopPreview'
+import { inferEquipment, REST_GUIDANCE } from '@/lib/workout-display'
 
 // Renders inside the Today page session card when the user has an active
 // coach assignment. Everything shown comes from the coach's program —
@@ -254,6 +255,38 @@ export default function CoachedSessionCard() {
         Week {weekNum} of {program.weeks_total} · {program.name}
         {todayDay.focus ? ` · ${todayDay.focus}` : ''}
       </div>
+
+      {/* Read-before-you-start overview (coached) + optional coach walkthrough */}
+      {(() => {
+        const equip = inferEquipment(todayDay.movements)
+        const wt = todayDay.walkthrough_url
+        const isYT = !!wt && /youtu\.?be/.test(wt)
+        return (
+          <div style={{ marginBottom: 14, padding: '12px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 12 }}>
+            {wt && (
+              <div style={{ marginBottom: 12 }}>
+                <p style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Coach walkthrough</p>
+                {isYT
+                  ? <LoopPreview url={wt} source="youtube" name="Workout walkthrough" />
+                  : <video src={wt} controls playsInline style={{ width: '100%', borderRadius: 10, background: '#000', display: 'block' }} />}
+              </div>
+            )}
+            <p style={{ fontSize: 12, color: 'var(--text-mid)', lineHeight: 1.55, marginBottom: 12 }}>
+              {todayDay.focus ? `Today's focus is ${todayDay.focus.toLowerCase()}. ` : ''}Move with control — quality reps over speed — and rest as guided below.
+            </p>
+            <p style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Equipment needed</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+              {equip.map(eq => <span key={eq} style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 20, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-mid)' }}>{eq}</span>)}
+            </div>
+            <p style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Rest guidance</p>
+            {REST_GUIDANCE.map(r => (
+              <p key={r.label} style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5, marginBottom: 3 }}>
+                <span style={{ fontWeight: 700, color: 'var(--text-mid)' }}>{r.label}:</span> {r.detail}
+              </p>
+            ))}
+          </div>
+        )
+      })()}
 
       <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', marginBottom: 14 }}>
         {todayDay.movements.map((mv, i) => {
