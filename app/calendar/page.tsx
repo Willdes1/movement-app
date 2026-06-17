@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback, Suspense } from 'react'
+import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -133,6 +133,67 @@ function buildMainInstructions(day: DayPlan): string {
   return `${day.label}. Move with control — quality reps over speed — and rest as guided below between efforts.`
 }
 
+// Friendly invitation copy + effort preview for an optional section.
+function effortInvite(bk: string, block: TrainDailyBlock): string {
+  const n = block.exercises.length
+  const moves = `${n} move${n === 1 ? '' : 's'}`
+  const got = block.duration && block.duration !== '—' ? `Got ${block.duration}? ` : ''
+  switch (bk) {
+    case 'morning':  return `${got}Start with a morning warm-up to feel good today — ${moves}`
+    case 'abs':      return `${got}Still feeling good? Quick core finisher — ${moves}`
+    case 'cooldown': return `${got}Cool down to recover better — ${moves}`
+    case 'evening':  return `${got}Wind down tonight with some mobility — ${moves}`
+    default:         return `${block.label} — ${moves}`
+  }
+}
+
+function BlockExercises({ block, exLib, onOpen }: { block: TrainDailyBlock; exLib: Record<string, ExerciseDetail>; onOpen: (raw: string) => void }) {
+  return (
+    <>
+      {block.tip && <p style={{ fontSize: 11, color: '#3b82f6', fontStyle: 'italic', margin: '4px 0 6px', lineHeight: 1.5 }}>💡 {block.tip}</p>}
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {block.exercises.map((ex, ei) => (
+          <ExerciseRow key={ei} raw={ex} detail={exLib[normalizeExerciseName(parseExerciseName(ex))]} onOpen={() => onOpen(ex)} />
+        ))}
+      </div>
+    </>
+  )
+}
+
+// Always-shown section (warm-up + the workout hero).
+function ShownSection({ bk, block, hero, exLib, onOpen }: { bk: string; block: TrainDailyBlock; hero?: boolean; exLib: Record<string, ExerciseDetail>; onOpen: (raw: string) => void }) {
+  const meta = REC_BLOCK_META[bk]
+  return (
+    <div style={hero ? { padding: '12px 12px 6px', borderRadius: 12, border: `1.5px solid ${meta.color}55`, background: 'var(--surface)' } : undefined}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        <span style={{ fontSize: hero ? 17 : 15 }}>{meta.icon}</span>
+        <span style={{ fontSize: hero ? 12 : 10, fontWeight: 800, color: meta.color, letterSpacing: '0.07em', textTransform: 'uppercase' }}>{hero ? 'The Workout' : meta.label}</span>
+        {block.duration && block.duration !== '—' && <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 'auto' }}>{block.duration}</span>}
+      </div>
+      <BlockExercises block={block} exLib={exLib} onOpen={onOpen} />
+    </div>
+  )
+}
+
+// Collapsed invitation bracket (morning / abs / cooldown / evening) — expand on tap.
+function OptionalBracket({ bk, block, expanded, onToggle, exLib, onOpen }: { bk: string; block: TrainDailyBlock; expanded: boolean; onToggle: () => void; exLib: Record<string, ExerciseDetail>; onOpen: (raw: string) => void }) {
+  const meta = REC_BLOCK_META[bk]
+  return (
+    <div style={{ borderRadius: 10, overflow: 'hidden', border: `1px solid ${expanded ? meta.color + '55' : 'var(--border)'}` }}>
+      <button onClick={onToggle} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px', background: 'var(--surface)', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+        <span style={{ fontSize: 18, flexShrink: 0 }}>{meta.icon}</span>
+        <span style={{ flex: 1, fontSize: 12.5, fontWeight: 700, color: 'var(--text-mid)', lineHeight: 1.4 }}>{effortInvite(bk, block)}</span>
+        <span style={{ color: meta.color, fontWeight: 800, fontSize: 14, flexShrink: 0, transform: expanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', display: 'inline-block' }}>→</span>
+      </button>
+      {expanded && (
+        <div style={{ background: 'var(--surface2)', borderTop: '1px solid var(--border)', padding: '10px 12px' }}>
+          <BlockExercises block={block} exLib={exLib} onOpen={onOpen} />
+        </div>
+      )}
+    </div>
+  )
+}
+
 function fallbackDetail(m: string, _day: DayPlan): ExerciseDetail {
   const name = parseExerciseName(m)
   return {
@@ -196,12 +257,25 @@ function CalendarInner() {
   const [program, setProgram] = useState<Program | null>(null)
   const [recoveryPlan, setRecoveryPlan] = useState<RecoveryPlan | null>(null)
   const [expandedRecovBlock, setExpandedRecovBlock] = useState<string | null>('morning')
-  const [expandedTrainBlock, setExpandedTrainBlock] = useState<string | null>('warmup')
+  const [expandedOpt, setExpandedOpt] = useState<Set<string>>(new Set())
+  const [revealed, setRevealed] = useState(0)
+  const revealSentinelRef = useRef<HTMLDivElement | null>(null)
+  const toggleOpt = (bk: string) => setExpandedOpt(prev => { const n = new Set(prev); if (n.has(bk)) n.delete(bk); else n.add(bk); return n })
   const [historyBump, setHistoryBump] = useState(0)
   const [weekPlans, setWeekPlans] = useState<Record<number, DayPlan[]>>({})
   const [loading, setLoading] = useState(true)
   const [viewMonth, setViewMonth] = useState(new Date())
   const [selectedKey, setSelectedKey] = useState<string | null>(() => new Date().toISOString().split('T')[0])
+  // Reset progressive reveal when the selected day changes.
+  useEffect(() => { setRevealed(0); setExpandedOpt(new Set()) }, [selectedKey])
+  // Surface the next optional section as the user scrolls past the current bottom.
+  useEffect(() => {
+    const el = revealSentinelRef.current
+    if (!el) return
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) setRevealed(r => r + 1) }, { rootMargin: '0px 0px -8% 0px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [revealed, selectedKey])
   const [exerciseLibrary, setExerciseLibrary] = useState<Record<string, ExerciseDetail>>({})
   const [selectedExercise, setSelectedExercise] = useState<ExerciseDetail | null>(null)
   const [exerciseFetching, setExerciseFetching] = useState(false)
@@ -695,43 +769,21 @@ function CalendarInner() {
             )
           })()}
 
-          {selectedEntry.day.daily_session ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
-              {REC_BLOCK_ORDER.map(bk => {
-                const block = selectedEntry.day.daily_session![bk]
-                if (!block) return null
-                const meta = REC_BLOCK_META[bk]
-                const isExpanded = expandedTrainBlock === bk
-                return (
-                  <div key={bk} style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)' }}>
-                    <button onClick={() => setExpandedTrainBlock(isExpanded ? null : bk)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--surface)', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-                      <div style={{ width: 38, height: 38, borderRadius: 8, background: meta.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, flexShrink: 0 }}>{meta.icon}</div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 9, fontWeight: 800, color: meta.color, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 1 }}>{meta.label}</div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{block.label}</div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                        <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{block.duration}</span>
-                        <span style={{ fontSize: 12, color: 'var(--text-dim)', transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', display: 'inline-block' }}>▶</span>
-                      </div>
-                    </button>
-                    {isExpanded && (
-                      <div style={{ background: 'var(--surface2)', borderTop: '1px solid var(--border)', padding: '10px 12px' }}>
-                        {block.tip && (
-                          <p style={{ fontSize: 11, color: '#3b82f6', fontStyle: 'italic', marginBottom: 8, lineHeight: 1.5 }}>💡 {block.tip}</p>
-                        )}
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          {block.exercises.map((ex, ei) => (
-                            <ExerciseRow key={ei} raw={ex} detail={exerciseLibrary[normalizeExerciseName(parseExerciseName(ex))]} onOpen={() => openExercise(ex)} />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
+          {selectedEntry.day.daily_session ? (() => {
+            const ds = selectedEntry.day.daily_session!
+            const postOrder = (['abs', 'cooldown', 'evening'] as const).filter(k => ds[k])
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12 }}>
+                {ds.morning && <OptionalBracket bk="morning" block={ds.morning} expanded={expandedOpt.has('morning')} onToggle={() => toggleOpt('morning')} exLib={exerciseLibrary} onOpen={openExercise} />}
+                {ds.warmup && <ShownSection bk="warmup" block={ds.warmup} exLib={exerciseLibrary} onOpen={openExercise} />}
+                {ds.workout && <ShownSection bk="workout" block={ds.workout} hero exLib={exerciseLibrary} onOpen={openExercise} />}
+                {postOrder.slice(0, revealed).map(bk => (
+                  <OptionalBracket key={bk} bk={bk} block={ds[bk]!} expanded={expandedOpt.has(bk)} onToggle={() => toggleOpt(bk)} exLib={exerciseLibrary} onOpen={openExercise} />
+                ))}
+                {revealed < postOrder.length && <div ref={revealSentinelRef} style={{ height: 1 }} />}
+              </div>
+            )
+          })() : (
             <div style={{ display: 'flex', flexDirection: 'column', marginBottom: selectedEntry.day.type !== 'rest' ? 12 : 0 }}>
               {selectedEntry.day.movements.map((m, i) => (
                 <ExerciseRow key={i} raw={m} detail={exerciseLibrary[normalizeExerciseName(parseExerciseName(m))]} onOpen={() => openExercise(m)} />
