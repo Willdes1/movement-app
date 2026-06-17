@@ -10,12 +10,12 @@ import PushNotificationBanner from '@/components/PushNotificationBanner'
 import CoachedSessionCard from '@/components/CoachedSessionCard'
 import { useStreak } from '@/lib/useStreak'
 import { useTTS } from '@/hooks/useTTS'
+import LoopPreview from '@/components/ui/LoopPreview'
 
 type DailyBlock = { label: string; duration: string; exercises: string[]; tip?: string }
 type DailySession = { morning?: DailyBlock; warmup?: DailyBlock; workout?: DailyBlock; abs?: DailyBlock; cooldown?: DailyBlock; evening?: DailyBlock }
 type DayPlan = { day: string; label: string; type: string; movements: string[]; duration: string; focus?: string; rest?: { between_sets: string; between_rounds: string }; coaching?: string; daily_session?: DailySession }
 
-const BLOCK_ORDER = ['morning', 'warmup', 'workout', 'abs', 'cooldown', 'evening'] as const
 const REST_BLOCK_ORDER = ['morning', 'abs', 'evening'] as const
 const BLOCK_CONFIG: Record<string, { color: string; icon: string }> = {
   morning:  { color: 'var(--green)',    icon: '🌅' },
@@ -62,6 +62,39 @@ function getGreeting() {
   return 'Good evening'
 }
 
+// Infer equipment from exercise names — no AI tokens, display-only.
+const EQUIPMENT_KEYWORDS: { kw: RegExp; label: string }[] = [
+  { kw: /barbell|deadlift|bench press|back squat|front squat|overhead press|\bclean\b|snatch|romanian|\brdl\b/i, label: 'Barbell' },
+  { kw: /dumbbell|\bdb\b|goblet/i, label: 'Dumbbells' },
+  { kw: /kettlebell|\bkb\b|\bswing/i, label: 'Kettlebell' },
+  { kw: /\bband\b|banded|resistance band/i, label: 'Resistance band' },
+  { kw: /cable|pulldown|lat pull|face pull|pushdown/i, label: 'Cable' },
+  { kw: /pull[- ]?up|chin[- ]?up|dead hang|\bhang\b/i, label: 'Pull-up bar' },
+  { kw: /bench|incline|decline/i, label: 'Bench' },
+  { kw: /box jump|step[- ]?up|\bbox\b/i, label: 'Box / step' },
+  { kw: /medicine ball|med ball|wall ball|slam ball/i, label: 'Medicine ball' },
+  { kw: /\btrx\b|suspension/i, label: 'TRX' },
+  { kw: /machine|leg press|hack squat|leg curl|leg extension/i, label: 'Machine' },
+  { kw: /jump rope|skip rope|skipping/i, label: 'Jump rope' },
+  { kw: /foam roll/i, label: 'Foam roller' },
+  { kw: /\bmat\b|plank|crunch|sit[- ]?up|stretch/i, label: 'Mat' },
+]
+function inferEquipment(names: string[]): string[] {
+  const found: string[] = []
+  for (const { kw, label } of EQUIPMENT_KEYWORDS) {
+    if (found.includes(label)) continue
+    if (names.some(n => kw.test(n))) found.push(label)
+  }
+  return found.length ? found.slice(0, 5) : ['Bodyweight']
+}
+function timeCommitment(duration: string | undefined): string {
+  const nums = (duration ?? '').match(/\d+/g)
+  if (!nums || nums.length === 0) return 'Dedicate 30–45 minutes'
+  if (nums.length >= 2) return `Dedicate ${nums[0]}–${nums[1]} minutes`
+  const n = parseInt(nums[0], 10)
+  return `Dedicate ${n}–${n + 15} minutes`
+}
+
 export default function TodayPage() {
   const { user, loading: authLoading, effectiveUserId, role, isAdmin } = useAuth()
   const { coached, loading: coachedLoading, coachName, assignment: coachAssignment, program: coachProgram } = useCoached()
@@ -73,7 +106,7 @@ export default function TodayPage() {
 
   const { speak, stop, speaking, loading: ttsLoading, gender } = useTTS()
   const [speakingKey, setSpeakingKey] = useState<string | null>(null)
-  const [exerciseLib, setExerciseLib] = useState<Record<string, { how: string | null; tip: string | null; tts_url_male: string | null; tts_url_female: string | null }>>({})
+  const [exerciseLib, setExerciseLib] = useState<Record<string, { how: string | null; tip: string | null; tts_url_male: string | null; tts_url_female: string | null; video_url: string | null; video_source: string | null; youtube_start_sec: number | null; youtube_end_sec: number | null; loop_start_sec: number | null; loop_end_sec: number | null }>>({})
 
   const [firstName, setFirstName] = useState<string | null>(null)
   const [currentWeek, setCurrentWeek] = useState<number | null>(null)
@@ -132,7 +165,7 @@ export default function TodayPage() {
     if (!normalized.length) return
     supabase
       .from('exercise_library')
-      .select('name_normalized, how, tip, tts_url_male, tts_url_female')
+      .select('name_normalized, how, tip, tts_url_male, tts_url_female, video_url, video_source, youtube_start_sec, youtube_end_sec, loop_start_sec, loop_end_sec')
       .in('name_normalized', normalized)
       .then(({ data }) => {
         const map: typeof exerciseLib = {}
@@ -179,6 +212,17 @@ export default function TodayPage() {
   const phase = currentWeek ? getPhaseInfo(currentWeek) : null
   const typeColor = todayPlan ? (TYPE_COLOR[todayPlan.type] ?? 'var(--accent)') : 'var(--accent)'
   const tip = TIPS[new Date().getDate() % TIPS.length]
+
+  // Phase 1 dashboard summary — derived from existing plan data, no new tokens.
+  const sessionExNames: string[] = todayPlan
+    ? (todayPlan.daily_session ? (Object.values(todayPlan.daily_session).flatMap(b => b?.exercises ?? []) as string[]) : todayPlan.movements)
+    : []
+  const equipment = inferEquipment(sessionExNames)
+  const sessionSummary = todayPlan
+    ? (todayPlan.coaching || (todayPlan.focus ? `${todayPlan.label} — ${todayPlan.focus}.` : `Today's focus: ${todayPlan.label}.`))
+    : ''
+  const previewName = (todayPlan?.daily_session?.workout?.exercises ?? todayPlan?.movements ?? []).find(n => exerciseLib[normalizeExName(n)]?.video_url) ?? null
+  const previewEntry = previewName ? exerciseLib[normalizeExName(previewName)] : null
 
   // Coached mode — active coach assignment replaces the AI program as the main program
   const coachWeekNum = coached && coachAssignment && coachProgram
@@ -345,48 +389,37 @@ export default function TodayPage() {
             <div style={{ fontSize: 11, color: typeColor, fontWeight: 700, marginBottom: 14 }}>
               Week {currentWeek} · {phase?.label} Phase
             </div>
-            {todayPlan.daily_session ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-                {BLOCK_ORDER
-                  .filter(key => todayPlan.daily_session![key])
-                  .map(key => {
-                    const block = todayPlan.daily_session![key]!
-                    const cfg = BLOCK_CONFIG[key]
-                    return (
-                      <div key={key} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
-                          <span style={{ fontSize: 15 }}>{cfg.icon}</span>
-                          <span style={{ fontSize: 12, fontWeight: 800, color: cfg.color, flex: 1 }}>{block.label}</span>
-                          {block.duration && <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 600 }}>{block.duration}</span>}
-                        </div>
-                        <div style={{ padding: '8px 12px' }}>
-                          {block.exercises.map((ex, ei) => {
-                            const exKey = normalizeExName(ex)
-                            const isSpeaking = speakingKey === exKey && (speaking || ttsLoading)
-                            return (
-                              <div key={ei} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', borderBottom: ei < block.exercises.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                                <div style={{ width: 4, height: 4, borderRadius: '50%', background: cfg.color, flexShrink: 0 }} />
-                                <span style={{ flex: 1, fontSize: 12, color: 'var(--text-mid)', textTransform: 'capitalize' }}>{ex}</span>
-                                <button onClick={() => speakExercise(ex)} style={{ background: 'none', border: 'none', padding: '2px 4px', cursor: 'pointer', fontSize: 13, lineHeight: 1, color: isSpeaking ? cfg.color : 'var(--text-dim)', flexShrink: 0 }}>
-                                  {isSpeaking ? '🔊' : '🔈'}
-                                </button>
-                              </div>
-                            )
-                          })}
-                          {block.tip && <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6, fontStyle: 'italic', paddingTop: 6, borderTop: '1px solid var(--border)' }}>💡 {block.tip}</p>}
-                        </div>
-                      </div>
-                    )
-                  })
-                }
+            {/* Clean summary (replaces the long block breakdown) */}
+            <p style={{ fontSize: 13, color: 'var(--text-mid)', lineHeight: 1.6, marginBottom: 14 }}>{sessionSummary}</p>
+
+            {/* Time commitment + equipment */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-mid)' }}>
+                <span style={{ fontSize: 14 }}>⏱️</span>
+                <span style={{ fontWeight: 700 }}>{timeCommitment(todayPlan.duration)}</span>
               </div>
-            ) : (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
-                {todayPlan.movements.map((m, i) => (
-                  <span key={i} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-mid)' }}>{m}</span>
-                ))}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: 'var(--text-mid)' }}>
+                <span style={{ fontSize: 14 }}>🎒</span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {equipment.map(eq => (
+                    <span key={eq} style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 20, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-mid)' }}>{eq}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Small workout preview window */}
+            {previewEntry?.video_url && (
+              <div style={{ marginBottom: 14 }}>
+                <LoopPreview url={previewEntry.video_url} source={previewEntry.video_source} name={previewName ?? ''} loopStart={previewEntry.loop_start_sec} loopEnd={previewEntry.loop_end_sec} clipStart={previewEntry.youtube_start_sec} clipEnd={previewEntry.youtube_end_sec} />
               </div>
             )}
+
+            {/* For You note */}
+            <div style={{ display: 'flex', gap: 8, padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, marginBottom: 16 }}>
+              <span style={{ fontSize: 14 }}>✨</span>
+              <p style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.5, margin: 0 }}><strong style={{ color: 'var(--text-mid)' }}>For you:</strong> {tip}</p>
+            </div>
             <Link href={`/calendar?date=${new Date().toISOString().split('T')[0]}`} style={{ display: 'block', padding: '14px', borderRadius: 12, background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%)', color: '#fff', fontWeight: 900, fontSize: 14, textAlign: 'center', textDecoration: 'none', letterSpacing: '0.03em', textTransform: 'uppercase', boxShadow: '0 6px 24px var(--accent-shadow)' }}>
               ▶ Start Session
             </Link>
