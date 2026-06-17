@@ -1,12 +1,12 @@
 'use client'
 import { useEffect, useState, useCallback, Suspense } from 'react'
-import { useTTS } from '@/hooks/useTTS'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { supabase } from '@/lib/supabase'
 import LoopPreview from '@/components/ui/LoopPreview'
 import { inferEquipment, REST_GUIDANCE } from '@/lib/workout-display'
+import ExerciseDetailModal from '@/components/ui/ExerciseDetailModal'
 
 type RecoveryDailyBlock = { label: string; duration: string; exercises: string[] }
 type RecoveryDailySession = {
@@ -193,7 +193,6 @@ function CalendarInner() {
   const [exerciseLibrary, setExerciseLibrary] = useState<Record<string, ExerciseDetail>>({})
   const [selectedExercise, setSelectedExercise] = useState<ExerciseDetail | null>(null)
   const [exerciseFetching, setExerciseFetching] = useState(false)
-  const { speak, stop, speaking, loading: ttsLoading, gender, toggleGender } = useTTS()
   const [lastLog, setLastLog] = useState<WorkoutLog | null>(null)
   const [completions, setCompletions] = useState<Set<string>>(new Set())
   const [completing, setCompleting] = useState(false)
@@ -841,105 +840,14 @@ function CalendarInner() {
         </div>
       )}
 
-      {/* Exercise detail modal */}
-      <style>{`@keyframes tts-pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }`}</style>
+      {/* Exercise detail modal (reusable component — Common Mistakes = tip) */}
       {selectedExercise && (
-        <div
-          onClick={() => { stop(); setSelectedExercise(null) }}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000 }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{ background: 'var(--surface)', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, border: '1px solid var(--border)', borderBottom: 'none', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}
-          >
-            <div style={{ padding: '20px 24px 0', flexShrink: 0 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-                <div style={{ flex: 1, paddingRight: 12 }}>
-                  <p style={{ fontWeight: 800, fontSize: 17, lineHeight: 1.3 }}>{selectedExercise.name_display}</p>
-                  {exerciseFetching && <p style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4, fontWeight: 600 }}>Generating coaching details…</p>}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                  {/* Voice gender toggle */}
-                  <button
-                    onClick={toggleGender}
-                    title={`Voice: ${gender}. Tap to switch.`}
-                    style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 8px', fontSize: 11, color: 'var(--text-dim)', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}
-                  >
-                    {gender === 'male' ? '♂' : '♀'}
-                  </button>
-                  {/* TTS speak/stop button */}
-                  <button
-                    onClick={() => {
-                      if (speaking || ttsLoading) { stop(); return }
-                      const ex = selectedExercise
-                      const preUrl = gender === 'male' ? ex.tts_url_male : ex.tts_url_female
-                      const parts = [ex.name_display]
-                      if (ex.how) parts.push(ex.how)
-                      if (ex.breathing) parts.push('Breathing: ' + ex.breathing)
-                      if (ex.core) parts.push('Core engagement: ' + ex.core)
-                      if (ex.tip) parts.push('Coaching tip: ' + ex.tip)
-                      speak(parts.join('. '), {
-                        preGeneratedUrl: preUrl ?? undefined,
-                        nameNormalized: preUrl ? undefined : ex.name_normalized,
-                      })
-                    }}
-                    title={speaking ? 'Stop' : ttsLoading ? 'Loading…' : 'Read aloud'}
-                    style={{
-                      background: speaking ? 'var(--accent)' : 'var(--surface2)',
-                      border: `1px solid ${speaking ? 'var(--accent)' : 'var(--border)'}`,
-                      borderRadius: 8, padding: '5px 10px', fontSize: 16,
-                      cursor: ttsLoading ? 'wait' : 'pointer', lineHeight: 1,
-                      animation: speaking ? 'tts-pulse 1.2s ease-in-out infinite' : 'none',
-                      opacity: ttsLoading ? 0.6 : 1,
-                    }}
-                  >
-                    {ttsLoading ? '⏳' : speaking ? '🔊' : '🔈'}
-                  </button>
-                  <button onClick={() => { stop(); setSelectedExercise(null) }} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--text-dim)', cursor: 'pointer', lineHeight: 1 }}>×</button>
-                </div>
-              </div>
-            </div>
-            <div style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch' as never, padding: '0 24px 40px', flexGrow: 1 }}>
-              {/* Video player — YouTube embed now, hosted video in future */}
-              <LoopPreview url={selectedExercise.video_url ?? null} source={selectedExercise.video_source ?? null} name={selectedExercise.name_display} loopStart={selectedExercise.loop_start_sec} loopEnd={selectedExercise.loop_end_sec} clipStart={selectedExercise.youtube_start_sec} clipEnd={selectedExercise.youtube_end_sec} />
-              {/* Last session (read-only) */}
-              <div style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)', marginBottom: 14 }}>
-                <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--text-dim)', marginBottom: 6, textTransform: 'uppercase' }}>Last Session</p>
-                {lastLog ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    {lastLog.weight != null && (
-                      <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>{lastLog.weight} {lastLog.weight_unit}</span>
-                    )}
-                    {(lastLog.sets != null || lastLog.reps != null) && (
-                      <span style={{ fontSize: 13, color: 'var(--text-mid)' }}>
-                        {[lastLog.sets != null && `${lastLog.sets} sets`, lastLog.reps != null && `${lastLog.reps} reps`].filter(Boolean).join(' · ')}
-                      </span>
-                    )}
-                    <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 'auto' }}>
-                      {new Date(lastLog.logged_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </span>
-                  </div>
-                ) : (
-                  <p style={{ fontSize: 13, color: 'var(--text-dim)' }}>No sessions logged yet</p>
-                )}
-              </div>
-              {/* Technique cards */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {[
-                  { label: 'HOW TO DO IT', text: selectedExercise.how, color: 'var(--text)' },
-                  { label: 'BREATHING', text: selectedExercise.breathing, color: 'var(--text-mid)' },
-                  { label: 'CORE ENGAGEMENT', text: selectedExercise.core, color: 'var(--text-mid)' },
-                  { label: 'COACHING TIP', text: selectedExercise.tip, color: 'var(--accent)' },
-                ].filter(({ text }) => !!text).map(({ label, text, color }) => (
-                  <div key={label} style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)' }}>
-                    <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--text-dim)', marginBottom: 5, textTransform: 'uppercase' }}>{label}</p>
-                    <p style={{ fontSize: 13, color, lineHeight: 1.65 }}>{text}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <ExerciseDetailModal
+          data={selectedExercise}
+          lastLog={lastLog}
+          generating={exerciseFetching}
+          onClose={() => setSelectedExercise(null)}
+        />
       )}
     </div>
   )
