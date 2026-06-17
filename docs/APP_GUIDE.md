@@ -79,6 +79,19 @@ a full exercise popup, and per-set tracking with history.
   weight up or down. (Powered by the `exercise_set_logs` table.)
 - **Tips:** small dismissible hints (Dismiss / Not for this workout / Don't remind me).
 
+### Focused session flow (start to finish)
+- **Start Session** opens a **focused single-day view** — just today, with the month
+  grid hidden and a small **"📅 View Calendar"** to look ahead one tap away.
+- The day leads with a **read-before-you-start overview** (main instructions,
+  equipment, rest-by-type) under a **"Week X · Day Y"** header.
+- **Progressive disclosure:** the **Workout is the hero** (always open). The
+  warm-up sits just above it. Optional **morning / abs / cool-down / evening**
+  sections are friendly **collapsed invitation cards** ("Got 6 min? Quick core
+  finisher — 3 moves →") that **surface one at a time as you scroll** — never a
+  stacked wall of options.
+- **Coached clients** get the same overview plus an optional **coach walkthrough
+  video** (a whole-workout explainer the coach sets per day in the builder).
+
 ### Notes
 - Shared via `/calendar`, so coached clients get the same experience.
 - Equipment is inferred from exercise names (no AI); Common Mistakes reuses the
