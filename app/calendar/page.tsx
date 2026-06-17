@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { supabase } from '@/lib/supabase'
+import LoopPreview from '@/components/ui/LoopPreview'
 
 type RecoveryDailyBlock = { label: string; duration: string; exercises: string[] }
 type RecoveryDailySession = {
@@ -64,64 +65,13 @@ type ExerciseDetail = {
   video_source: string | null
   youtube_start_sec: number | null
   youtube_end_sec: number | null
+  loop_start_sec?: number | null
+  loop_end_sec?: number | null
   tts_url_male: string | null
   tts_url_female: string | null
 }
 
-function extractYouTubeId(url: string): string | null {
-  return url.match(/(?:v=|youtu\.be\/|shorts\/)([A-Za-z0-9_-]{11})/)?.[1] ?? null
-}
-
-function VideoPlayer({ url, source, name, startSec, endSec }: { url: string | null; source: string | null; name: string; startSec?: number | null; endSec?: number | null }) {
-  const [muted, setMuted] = useState(true)
-  if (url && (source === 'youtube' || source === 'custom')) {
-    const videoId = extractYouTubeId(url)
-    const short = url.includes('/shorts/')
-    if (videoId) {
-      let embedSrc = short
-        ? `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&autoplay=1&loop=1&playlist=${videoId}&mute=${muted ? 1 : 0}&controls=1`
-        : `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`
-      if (!short) {
-        if (startSec != null && startSec > 0) embedSrc += `&start=${startSec}`
-        if (endSec != null) embedSrc += `&end=${endSec}`
-      }
-      return (
-        <div className="video-sticky" style={{ marginBottom: 14, borderRadius: 10, overflow: 'hidden', background: '#000' }}>
-          <div style={{ position: 'relative', paddingBottom: short ? '177.78%' : '56.25%', height: 0 }}>
-            <iframe
-              key={`${videoId}-${muted}`}
-              src={embedSrc}
-              title={name}
-              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 10px', background: 'var(--surface2)' }}>
-            <p style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>
-              Video · Coach Approved
-            </p>
-            {short && (
-              <button
-                onClick={() => setMuted(m => !m)}
-                style={{ fontSize: 11, color: muted ? 'var(--text-dim)' : '#22c55e', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, padding: 0 }}
-              >
-                {muted ? '🔇 Muted Loop' : '🔊 Audio On'}
-              </button>
-            )}
-          </div>
-        </div>
-      )
-    }
-  }
-  // "hosted" source handled here in future (replace YouTube with <video> tag)
-  return (
-    <div style={{ marginBottom: 14, padding: '14px 16px', background: 'rgba(59,130,246,0.05)', border: '1px dashed rgba(59,130,246,0.2)', borderRadius: 10, textAlign: 'center' }}>
-      <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-mid)', marginBottom: 4 }}>🎬 Video Coming Soon</p>
-      <p style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>Your coach is reviewing the best demonstration for this exercise.</p>
-    </div>
-  )
-}
+// VideoPlayer + extractYouTubeId moved to components/ui/LoopPreview.tsx + lib/youtube-iframe.ts
 
 type WorkoutLog = {
   id: string
@@ -282,7 +232,7 @@ function CalendarInner() {
       if (normalizedNames.length > 0) {
         const { data: libData } = await supabase
           .from('exercise_library')
-          .select('name_normalized, name_display, how, breathing, core, tip, video_url, video_source, youtube_start_sec, youtube_end_sec, tts_url_male, tts_url_female')
+          .select('name_normalized, name_display, how, breathing, core, tip, video_url, video_source, youtube_start_sec, youtube_end_sec, loop_start_sec, loop_end_sec, tts_url_male, tts_url_female')
           .in('name_normalized', normalizedNames)
         if (libData) {
           const libMap: Record<string, ExerciseDetail> = {}
@@ -307,7 +257,7 @@ function CalendarInner() {
     setExerciseFetching(true)
     try {
       // Check DB before calling AI — avoids charges on every tap
-      const { data: dbEntry } = await supabase.from('exercise_library').select('name_normalized, name_display, how, breathing, core, tip, video_url, video_source, youtube_start_sec, youtube_end_sec, tts_url_male, tts_url_female').eq('name_normalized', key).single()
+      const { data: dbEntry } = await supabase.from('exercise_library').select('name_normalized, name_display, how, breathing, core, tip, video_url, video_source, youtube_start_sec, youtube_end_sec, loop_start_sec, loop_end_sec, tts_url_male, tts_url_female').eq('name_normalized', key).single()
       if (dbEntry) {
         setExerciseLibrary(prev => ({ ...prev, [key]: dbEntry as ExerciseDetail }))
         setSelectedExercise(dbEntry as ExerciseDetail)
@@ -898,7 +848,7 @@ function CalendarInner() {
             </div>
             <div style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch' as never, padding: '0 24px 40px', flexGrow: 1 }}>
               {/* Video player — YouTube embed now, hosted video in future */}
-              <VideoPlayer url={selectedExercise.video_url ?? null} source={selectedExercise.video_source ?? null} name={selectedExercise.name_display} startSec={selectedExercise.youtube_start_sec} endSec={selectedExercise.youtube_end_sec} />
+              <LoopPreview url={selectedExercise.video_url ?? null} source={selectedExercise.video_source ?? null} name={selectedExercise.name_display} loopStart={selectedExercise.loop_start_sec} loopEnd={selectedExercise.loop_end_sec} clipStart={selectedExercise.youtube_start_sec} clipEnd={selectedExercise.youtube_end_sec} />
               {/* Last session (read-only) */}
               <div style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)', marginBottom: 14 }}>
                 <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--text-dim)', marginBottom: 6, textTransform: 'uppercase' }}>Last Session</p>

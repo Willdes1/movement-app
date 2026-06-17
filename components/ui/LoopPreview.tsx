@@ -1,18 +1,24 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { loadYouTubeAPI, extractYouTubeId, type YTPlayer } from '@/lib/youtube-iframe'
+import {
+  loadYouTubeAPI, extractYouTubeId, youtubeThumbnail,
+  acquirePlayerSlot, releasePlayerSlot, onPlayerSlotAvailable,
+  type YTPlayer,
+} from '@/lib/youtube-iframe'
 
 /**
  * User-facing exercise video. When the admin has defined a loop window
  * (loop_start_sec/loop_end_sec) it shows a muted, auto-looping "movement preview"
- * (GIF-like, but the real approved video) with a one-tap toggle to the full video.
- * Falls back to the standard full player when no loop is defined.
+ * (GIF-like, but the real approved video).
  *
- * Resilience baked in for Phase 3 reuse on the workout grid:
- *  - IntersectionObserver pauses off-screen previews, resumes on-screen
- *  - visibilitychange resumes playback when the tab/app returns to the foreground
- * exercise_library is YouTube-only today; the native <video> branch is for future
- * self-hosted uploads.
+ *  - full mode: large player with a one-tap toggle to the full original video.
+ *  - compact mode: small fixed-width thumbnail for grids/lists (the coached
+ *    workout). Lazy-mounts the live player only when on-screen AND a player slot
+ *    is free; shows a static YouTube poster otherwise. Tap fires onClick.
+ *
+ * Resilience: each live player pauses off-screen / resumes on-screen, and resumes
+ * when the tab/app returns to the foreground. The native <video> branch is reserved
+ * for future self-hosted uploads; exercise_library is YouTube-only today.
  */
 
 // ── Auto-looping muted YouTube preview of [loopStart, loopEnd] ────────────────
@@ -26,7 +32,6 @@ function YouTubeLoopPlayer({ videoId, loopStart, loopEnd }: { videoId: string; l
   const endRef = useRef(loopEnd); endRef.current = loopEnd
   const [ready, setReady] = useState(false)
 
-  // Create / destroy the player.
   useEffect(() => {
     let cancelled = false
     loadYouTubeAPI().then(() => {
@@ -43,16 +48,10 @@ function YouTubeLoopPlayer({ videoId, loopStart, loopEnd }: { videoId: string; l
         },
         events: {
           onReady: (e) => {
-            e.target.mute()
-            e.target.seekTo(startRef.current, true)
-            e.target.playVideo()
-            setReady(true)
+            e.target.mute(); e.target.seekTo(startRef.current, true); e.target.playVideo(); setReady(true)
           },
           onStateChange: (e) => {
-            if (e.data === window.YT?.PlayerState.ENDED) {
-              e.target.seekTo(startRef.current, true)
-              e.target.playVideo()
-            }
+            if (e.data === window.YT?.PlayerState.ENDED) { e.target.seekTo(startRef.current, true); e.target.playVideo() }
           },
         },
       })
@@ -66,7 +65,6 @@ function YouTubeLoopPlayer({ videoId, loopStart, loopEnd }: { videoId: string; l
     }
   }, [videoId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Enforce the loop window (only while on-screen).
   useEffect(() => {
     if (!ready) return
     pollRef.current = window.setInterval(() => {
@@ -78,7 +76,6 @@ function YouTubeLoopPlayer({ videoId, loopStart, loopEnd }: { videoId: string; l
     return () => { if (pollRef.current) window.clearInterval(pollRef.current) }
   }, [ready])
 
-  // Pause off-screen, resume on-screen.
   useEffect(() => {
     const el = wrapRef.current
     if (!el || !ready) return
@@ -87,14 +84,12 @@ function YouTubeLoopPlayer({ videoId, loopStart, loopEnd }: { videoId: string; l
       visibleRef.current = entry.isIntersecting
       const p = playerRef.current
       if (!p) return
-      if (entry.isIntersecting) { p.seekTo(startRef.current, true); p.playVideo() }
-      else p.pauseVideo()
+      if (entry.isIntersecting) { p.seekTo(startRef.current, true); p.playVideo() } else p.pauseVideo()
     }, { threshold: 0.25 })
     io.observe(el)
     return () => io.disconnect()
   }, [ready])
 
-  // Resume when the tab/app returns to the foreground.
   useEffect(() => {
     function onVis() {
       const p = playerRef.current
@@ -115,7 +110,7 @@ function YouTubeLoopPlayer({ videoId, loopStart, loopEnd }: { videoId: string; l
 }
 
 export default function LoopPreview({
-  url, source, name, loopStart, loopEnd, clipStart, clipEnd,
+  url, source, name, loopStart, loopEnd, clipStart, clipEnd, compact, lazy, onClick,
 }: {
   url: string | null
   source: string | null
@@ -124,6 +119,9 @@ export default function LoopPreview({
   loopEnd?: number | null
   clipStart?: number | null
   clipEnd?: number | null
+  compact?: boolean
+  lazy?: boolean
+  onClick?: () => void
 }) {
   const [muted, setMuted] = useState(true)
   const [showFull, setShowFull] = useState(false)
@@ -132,6 +130,64 @@ export default function LoopPreview({
   const videoId = url && isYouTube ? extractYouTubeId(url) : null
   const isShort = !!url && url.includes('/shorts/')
   const hasLoop = loopStart != null && loopEnd != null && loopEnd > loopStart && !!videoId && !isShort
+
+  // Lazy mount + slot budget — only for compact grid previews.
+  const useLazy = !!compact && !!lazy && hasLoop
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const inViewRef = useRef(!useLazy)
+  const slotRef = useRef(false)
+  const [mountLoop, setMountLoop] = useState(!useLazy)
+
+  useEffect(() => {
+    if (!useLazy) { setMountLoop(true); return }
+    setMountLoop(false)
+    const el = wrapRef.current
+    if (!el) return
+    let unsub: (() => void) | null = null
+    const dropUnsub = () => { if (unsub) { unsub(); unsub = null } }
+    const tryAcquire = () => {
+      if (!inViewRef.current || slotRef.current) return
+      if (acquirePlayerSlot()) { slotRef.current = true; setMountLoop(true); dropUnsub() }
+      else if (!unsub) { unsub = onPlayerSlotAvailable(tryAcquire) }
+    }
+    const release = () => {
+      if (slotRef.current) { releasePlayerSlot(); slotRef.current = false }
+      setMountLoop(false)
+      dropUnsub()
+    }
+    const io = new IntersectionObserver((entries) => {
+      inViewRef.current = entries[0].isIntersecting
+      if (entries[0].isIntersecting) tryAcquire(); else release()
+    }, { rootMargin: '150px', threshold: 0.1 })
+    io.observe(el)
+    return () => { io.disconnect(); release() }
+  }, [useLazy, videoId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Compact thumbnail (grids/lists) ─────────────────────────────────────────
+  if (compact) {
+    const w = isShort ? 60 : 104
+    if (!isYouTube || !videoId) {
+      return (
+        <div onClick={onClick} style={{ width: w, flexShrink: 0, borderRadius: 8, background: 'var(--surface2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', aspectRatio: isShort ? '2 / 3' : '16 / 9', fontSize: 16, color: 'var(--text-dim)', cursor: onClick ? 'pointer' : 'default' }}>🎬</div>
+      )
+    }
+    const showLoopPlayer = hasLoop && mountLoop
+    return (
+      <div ref={wrapRef} onClick={onClick} title={name} style={{ position: 'relative', width: w, flexShrink: 0, borderRadius: 8, overflow: 'hidden', background: '#000', cursor: onClick ? 'pointer' : 'default' }}>
+        <div style={{ position: 'relative', paddingBottom: isShort ? '150%' : '56.25%', height: 0 }}>
+          {showLoopPlayer ? (
+            <YouTubeLoopPlayer videoId={videoId} loopStart={loopStart!} loopEnd={loopEnd!} />
+          ) : (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={youtubeThumbnail(videoId)} alt={name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14, textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>▶</div>
+            </>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   // No usable video → existing "coming soon" placeholder.
   if (!isYouTube || !videoId) {

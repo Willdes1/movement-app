@@ -5,12 +5,18 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCoached } from '@/contexts/CoachedContext'
 import { useTTS } from '@/hooks/useTTS'
+import LoopPreview from '@/components/ui/LoopPreview'
 
 // Renders inside the Today page session card when the user has an active
 // coach assignment. Everything shown comes from the coach's program —
 // no AI substitution.
 
-type LibEntry = { how: string | null; tip: string | null; tts_url_male: string | null; tts_url_female: string | null }
+type LibEntry = {
+  how: string | null; tip: string | null; tts_url_male: string | null; tts_url_female: string | null
+  video_url: string | null; video_source: string | null
+  youtube_start_sec: number | null; youtube_end_sec: number | null
+  loop_start_sec: number | null; loop_end_sec: number | null
+}
 type LastLog = { sets: number | null; reps: number | null; weight: number | null; logged_at: string }
 
 const DOW_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -73,7 +79,7 @@ export default function CoachedSessionCard() {
     if (!normalized.length) return
     supabase
       .from('exercise_library')
-      .select('name_normalized, how, tip, tts_url_male, tts_url_female')
+      .select('name_normalized, how, tip, tts_url_male, tts_url_female, video_url, video_source, youtube_start_sec, youtube_end_sec, loop_start_sec, loop_end_sec')
       .in('name_normalized', normalized)
       .then(({ data }) => {
         const map: Record<string, LibEntry> = {}
@@ -256,10 +262,14 @@ export default function CoachedSessionCard() {
           const isSpeaking = speakingKey === key && (speaking || ttsLoading)
           const last = lastLogs[key]
           const isOpen = openLog === i
+          const entry = lib[key]
           return (
             <div key={i} style={{ borderBottom: i < todayDay.movements.length - 1 ? '1px solid var(--border)' : 'none' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px' }}>
                 <div style={{ width: 4, height: 4, borderRadius: '50%', background: loggedIdx.has(i) ? 'var(--green)' : 'var(--accent)', flexShrink: 0 }} />
+                {!isOpen && entry?.video_url && (
+                  <LoopPreview compact lazy url={entry.video_url} source={entry.video_source} name={name} loopStart={entry.loop_start_sec} loopEnd={entry.loop_end_sec} clipStart={entry.youtube_start_sec} clipEnd={entry.youtube_end_sec} onClick={() => toggleLog(i, mv)} />
+                )}
                 <button
                   onClick={() => toggleLog(i, mv)}
                   style={{ flex: 1, display: 'flex', alignItems: 'baseline', gap: 8, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', minWidth: 0 }}
@@ -275,6 +285,11 @@ export default function CoachedSessionCard() {
 
               {isOpen && (
                 <div style={{ padding: '0 12px 12px' }}>
+                  {entry?.video_url && (
+                    <div style={{ marginBottom: 10 }}>
+                      <LoopPreview url={entry.video_url} source={entry.video_source} name={name} loopStart={entry.loop_start_sec} loopEnd={entry.loop_end_sec} clipStart={entry.youtube_start_sec} clipEnd={entry.youtube_end_sec} />
+                    </div>
+                  )}
                   {lib[key]?.tip && (
                     <p style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic', marginBottom: 8 }}>💡 {lib[key].tip}</p>
                   )}

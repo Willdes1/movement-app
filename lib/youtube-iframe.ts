@@ -52,3 +52,31 @@ export function loadYouTubeAPI(): Promise<void> {
 export function extractYouTubeId(url: string): string | null {
   return url.match(/(?:v=|youtu\.be\/|shorts\/)([A-Za-z0-9_-]{11})/)?.[1] ?? null
 }
+
+// ── Concurrent-player budget ──────────────────────────────────────────────────
+// Each live YouTube IFrame player is heavy on mobile. Cap how many auto-loop
+// previews play at once; off-screen/over-budget previews show a static poster
+// until a slot frees. Lazy mounting (IntersectionObserver) keeps it to the
+// viewport; this is the hard ceiling on top of that.
+const MAX_ACTIVE_PLAYERS = 4
+let activePlayers = 0
+const slotWaiters = new Set<() => void>()
+
+export function acquirePlayerSlot(): boolean {
+  if (activePlayers < MAX_ACTIVE_PLAYERS) { activePlayers++; return true }
+  return false
+}
+export function releasePlayerSlot() {
+  if (activePlayers > 0) activePlayers--
+  const next = slotWaiters.values().next().value
+  if (next) { slotWaiters.delete(next); next() }
+}
+// Register to be notified when a slot frees up. Returns an unsubscribe fn.
+export function onPlayerSlotAvailable(cb: () => void): () => void {
+  slotWaiters.add(cb)
+  return () => slotWaiters.delete(cb)
+}
+
+export function youtubeThumbnail(videoId: string): string {
+  return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
+}

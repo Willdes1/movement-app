@@ -155,6 +155,7 @@
     - Quality gate: if a movement looks strange, creates compliance concerns, or doesn't make sense — exclude it
     - Token strategy: research and curate once, save internally; token cost paid once per exercise
     - Video roadmap: YouTube links now → replace with owned video or paid filming later
+- [x] **Movement Preview loops (built 2026-06-17)** — admin loop trimmer in Video Curation (drag in/out handles over the approved video, save loop window as metadata — original untouched) + GIF-style muted auto-looping previews for users on the exercises page, Today/calendar exercise modal, and coached workout rows; IntersectionObserver lazy-mount + concurrent-player cap for mobile; tap opens the full video. Docs: `docs/APP_GUIDE.md`. SQL: `20260617_exercise_library_loop.sql`. Future: native-video filmstrip trimmer when self-hosted uploads exist.
 
 ## 🗂️ Admin Tools (added 2026-04-23)
 - [ ] **PDF workout plan upload (admin only)** — Admin can upload a PDF of any existing workout program (e.g. Athlean-X Dragon). AI reads and analyzes the plan, then offers to: (1) replace the user's current generated plan with it, or (2) blend it in. If replacing, AI intelligently reschedules any missed days and adjusts the remaining weeks to fit the user's timeline.

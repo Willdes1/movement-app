@@ -342,6 +342,7 @@ function ReadinessPanel() {
 // ─── OVERVIEW SECTION ────────────────────────────────────────────────────────
 function OverviewSection() {
   const BUILT = [
+    'Movement Preview (GIF-style loops) — admin loop trimmer in Video Curation (YouTube IFrame scrubber, draggable in/out handles, live loop preview, saved as loop_start/end metadata) + user-facing muted auto-looping previews on the exercises page, Today/calendar exercise modal, and coached workout rows (inline GIF thumbnails); IntersectionObserver lazy-mount + concurrent-player cap for mobile; tap → full original video',
     'AI plan generator — 1/2/3-month bulk generation, all weeks built at once with live progress screen',
     'Phase-based training: Foundation → Build → Peak → Maintenance with per-phase intensity + rest times',
     'Rest times baked into every plan (between_sets + between_rounds, scaled by phase and load type)',
