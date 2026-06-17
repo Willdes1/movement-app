@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { supabase } from '@/lib/supabase'
 import LoopPreview from '@/components/ui/LoopPreview'
+import { inferEquipment, REST_GUIDANCE } from '@/lib/workout-display'
 
 type RecoveryDailyBlock = { label: string; duration: string; exercises: string[] }
 type RecoveryDailySession = {
@@ -94,6 +95,35 @@ function normalizeExerciseName(name: string): string {
   return name.toLowerCase().replace(/[-–—]/g, ' ').replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '_')
 }
 
+// Day-view exercise row: inline looping preview (reuses LoopPreview) + name + a
+// short Coaching Cue (the `how` field). Tapping anything opens the full popup.
+function ExerciseRow({ raw, detail, onOpen }: { raw: string; detail?: ExerciseDetail; onOpen: () => void }) {
+  const name = parseExerciseName(raw)
+  const scheme = raw.slice(name.length).trim()
+  const fullCue = detail?.how ?? ''
+  const cue = fullCue.length > 140 ? fullCue.slice(0, 140).trim() + '…' : fullCue
+  return (
+    <div style={{ display: 'flex', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border)', alignItems: 'flex-start' }}>
+      {detail?.video_url ? (
+        <LoopPreview compact lazy url={detail.video_url} source={detail.video_source} name={name} loopStart={detail.loop_start_sec} loopEnd={detail.loop_end_sec} clipStart={detail.youtube_start_sec} clipEnd={detail.youtube_end_sec} onClick={onOpen} />
+      ) : (
+        <div onClick={onOpen} style={{ width: 104, flexShrink: 0, aspectRatio: '16 / 9', borderRadius: 8, background: 'var(--surface)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: 'var(--text-dim)', cursor: 'pointer' }}>🎬</div>
+      )}
+      <button onClick={onOpen} style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', textTransform: 'capitalize' }}>{name}</span>
+          {scheme && <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)' }}>{scheme}</span>}
+        </div>
+        {cue && (
+          <p style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.45, marginTop: 3 }}>
+            <span style={{ fontWeight: 700, color: 'var(--text-mid)' }}>Cue:</span> {cue}
+          </p>
+        )}
+      </button>
+    </div>
+  )
+}
+
 function fallbackDetail(m: string, _day: DayPlan): ExerciseDetail {
   const name = parseExerciseName(m)
   return {
@@ -155,7 +185,7 @@ function CalendarInner() {
   const [program, setProgram] = useState<Program | null>(null)
   const [recoveryPlan, setRecoveryPlan] = useState<RecoveryPlan | null>(null)
   const [expandedRecovBlock, setExpandedRecovBlock] = useState<string | null>('morning')
-  const [expandedTrainBlock, setExpandedTrainBlock] = useState<string | null>(null)
+  const [expandedTrainBlock, setExpandedTrainBlock] = useState<string | null>('warmup')
   const [weekPlans, setWeekPlans] = useState<Record<number, DayPlan[]>>({})
   const [loading, setLoading] = useState(true)
   const [viewMonth, setViewMonth] = useState(new Date())
@@ -601,7 +631,7 @@ function CalendarInner() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
             <div>
               <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 3 }}>
-                {new Date(selectedKey + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                {new Date(selectedKey + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} · Day {(selectedEntry.weekNum - 1) * 7 + selectedEntry.dayIdx + 1}
               </p>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
                 <p style={{ fontWeight: 800, fontSize: 17 }}>{selectedEntry.day.label}</p>
@@ -643,9 +673,9 @@ function CalendarInner() {
                         {block.tip && (
                           <p style={{ fontSize: 11, color: '#3b82f6', fontStyle: 'italic', marginBottom: 8, lineHeight: 1.5 }}>💡 {block.tip}</p>
                         )}
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
                           {block.exercises.map((ex, ei) => (
-                            <button key={ei} onClick={() => openExercise(ex)} style={{ fontSize: 10, padding: '3px 9px', borderRadius: 20, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-mid)', cursor: 'pointer', fontFamily: 'inherit' }}>{ex}</button>
+                            <ExerciseRow key={ei} raw={ex} detail={exerciseLibrary[normalizeExerciseName(parseExerciseName(ex))]} onOpen={() => openExercise(ex)} />
                           ))}
                         </div>
                       </div>
@@ -655,18 +685,41 @@ function CalendarInner() {
               })}
             </div>
           ) : (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: selectedEntry.day.type !== 'rest' ? 12 : 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', marginBottom: selectedEntry.day.type !== 'rest' ? 12 : 0 }}>
               {selectedEntry.day.movements.map((m, i) => (
-                <button
-                  key={i}
-                  onClick={() => openExercise(m)}
-                  style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-mid)', cursor: 'pointer', fontFamily: 'inherit' }}
-                >
-                  {m}
-                </button>
+                <ExerciseRow key={i} raw={m} detail={exerciseLibrary[normalizeExerciseName(parseExerciseName(m))]} onOpen={() => openExercise(m)} />
               ))}
             </div>
           )}
+
+          {/* Gentle recommendation + equipment + rest guidance */}
+          {selectedEntry.day.type !== 'rest' && (() => {
+            const allNames = selectedEntry.day.daily_session
+              ? (Object.values(selectedEntry.day.daily_session).flatMap(b => b?.exercises ?? []) as string[])
+              : selectedEntry.day.movements
+            const equip = inferEquipment(allNames)
+            const hasAbs = !!selectedEntry.day.daily_session?.abs
+            const hasCooldown = !!selectedEntry.day.daily_session?.cooldown
+            return (
+              <div style={{ marginBottom: 12, padding: '12px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12 }}>
+                {(hasAbs || hasCooldown) && (
+                  <p style={{ fontSize: 12, color: 'var(--text-mid)', lineHeight: 1.5, marginBottom: 10 }}>
+                    💡 {hasAbs ? 'We recommend abs today. ' : ''}{hasCooldown ? 'If you have extra time, add a cool down for best results.' : ''}
+                  </p>
+                )}
+                <p style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Equipment needed</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                  {equip.map(eq => <span key={eq} style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 20, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-mid)' }}>{eq}</span>)}
+                </div>
+                <p style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Rest guidance</p>
+                {REST_GUIDANCE.map(r => (
+                  <p key={r.label} style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5, marginBottom: 3 }}>
+                    <span style={{ fontWeight: 700, color: 'var(--text-mid)' }}>{r.label}:</span> {r.detail}
+                  </p>
+                ))}
+              </div>
+            )
+          })()}
           {/* Travel Adjustment — show on any workout day */}
           {selectedEntry.day.type !== 'rest' && (
             <div style={{ marginBottom: 10 }}>

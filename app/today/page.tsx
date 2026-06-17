@@ -11,6 +11,7 @@ import CoachedSessionCard from '@/components/CoachedSessionCard'
 import { useStreak } from '@/lib/useStreak'
 import { useTTS } from '@/hooks/useTTS'
 import LoopPreview from '@/components/ui/LoopPreview'
+import { inferEquipment, timeCommitment } from '@/lib/workout-display'
 
 type DailyBlock = { label: string; duration: string; exercises: string[]; tip?: string }
 type DailySession = { morning?: DailyBlock; warmup?: DailyBlock; workout?: DailyBlock; abs?: DailyBlock; cooldown?: DailyBlock; evening?: DailyBlock }
@@ -60,39 +61,6 @@ function getGreeting() {
   if (h < 12) return "Let's get to work"
   if (h < 17) return 'Good afternoon'
   return 'Good evening'
-}
-
-// Infer equipment from exercise names — no AI tokens, display-only.
-const EQUIPMENT_KEYWORDS: { kw: RegExp; label: string }[] = [
-  { kw: /barbell|deadlift|bench press|back squat|front squat|overhead press|\bclean\b|snatch|romanian|\brdl\b/i, label: 'Barbell' },
-  { kw: /dumbbell|\bdb\b|goblet/i, label: 'Dumbbells' },
-  { kw: /kettlebell|\bkb\b|\bswing/i, label: 'Kettlebell' },
-  { kw: /\bband\b|banded|resistance band/i, label: 'Resistance band' },
-  { kw: /cable|pulldown|lat pull|face pull|pushdown/i, label: 'Cable' },
-  { kw: /pull[- ]?up|chin[- ]?up|dead hang|\bhang\b/i, label: 'Pull-up bar' },
-  { kw: /bench|incline|decline/i, label: 'Bench' },
-  { kw: /box jump|step[- ]?up|\bbox\b/i, label: 'Box / step' },
-  { kw: /medicine ball|med ball|wall ball|slam ball/i, label: 'Medicine ball' },
-  { kw: /\btrx\b|suspension/i, label: 'TRX' },
-  { kw: /machine|leg press|hack squat|leg curl|leg extension/i, label: 'Machine' },
-  { kw: /jump rope|skip rope|skipping/i, label: 'Jump rope' },
-  { kw: /foam roll/i, label: 'Foam roller' },
-  { kw: /\bmat\b|plank|crunch|sit[- ]?up|stretch/i, label: 'Mat' },
-]
-function inferEquipment(names: string[]): string[] {
-  const found: string[] = []
-  for (const { kw, label } of EQUIPMENT_KEYWORDS) {
-    if (found.includes(label)) continue
-    if (names.some(n => kw.test(n))) found.push(label)
-  }
-  return found.length ? found.slice(0, 5) : ['Bodyweight']
-}
-function timeCommitment(duration: string | undefined): string {
-  const nums = (duration ?? '').match(/\d+/g)
-  if (!nums || nums.length === 0) return 'Dedicate 30–45 minutes'
-  if (nums.length >= 2) return `Dedicate ${nums[0]}–${nums[1]} minutes`
-  const n = parseInt(nums[0], 10)
-  return `Dedicate ${n}–${n + 15} minutes`
 }
 
 export default function TodayPage() {
