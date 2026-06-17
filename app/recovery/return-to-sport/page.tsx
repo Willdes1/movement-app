@@ -362,7 +362,7 @@ export default function ReturnToSportPage() {
       {/* ─── INTAKE FORM ─── */}
       {showingIntake && !generating && (
         <div style={{ padding: '0 16px 24px', animation: 'slideUp 0.2s ease' }}>
-          {!plan && <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, marginBottom: 20 }}>Tell us about your injury. Movement AI will build a phase-by-phase 6-block daily recovery protocol and get you back to full training.</div>}
+          {!plan && <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, marginBottom: 20 }}>Tell us about your injury. Atlas Prime AI will build a phase-by-phase 6-block daily recovery protocol and get you back to full training.</div>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
               <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 6 }}>What did you hurt? *</label>
@@ -403,7 +403,7 @@ export default function ReturnToSportPage() {
       {generating && (
         <div style={{ padding: '48px 32px', textAlign: 'center' }}>
           <div style={{ fontSize: 40, marginBottom: 16, animation: 'pulse 1.5s ease-in-out infinite' }}>🩺</div>
-          <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 6 }}>Movement AI is building your plan</div>
+          <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 6 }}>Atlas Prime AI is building your plan</div>
           <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6 }}>Building a 6-block daily session for each phase, tailored to your injury...</div>
         </div>
       )}
@@ -578,7 +578,7 @@ export default function ReturnToSportPage() {
       {showConfirm && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 80, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 16 }} onClick={() => setShowConfirm(false)}>
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 20, padding: '24px', width: '100%', maxWidth: 440, animation: 'slideUp 0.25s ease' }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: O, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 8 }}>Movement AI</div>
+            <div style={{ fontSize: 11, fontWeight: 800, color: O, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 8 }}>Atlas Prime AI</div>
             <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 8 }}>Build recovery plan?</div>
             <p style={{ fontSize: 13, color: 'var(--text-mid)', lineHeight: 1.6, marginBottom: 20 }}>
               AI will generate morning mobility, warm-up, main workout, core, cool-down, and evening mobility for each phase — custom to <strong style={{ color: 'var(--text)' }}>{intake.injury}</strong>.

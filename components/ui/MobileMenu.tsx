@@ -58,7 +58,7 @@ export default function MobileMenu() {
   ) return null
 
   const firstName = profile?.name?.split(' ')[0] ?? 'Athlete'
-  const sport = profile?.sports?.[0] ?? 'Movement'
+  const sport = profile?.sports?.[0] ?? 'Athlete'
 
   return (
     <>

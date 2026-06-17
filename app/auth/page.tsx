@@ -187,7 +187,7 @@ export default function AuthPage() {
           {mode === 'login' ? 'Welcome back' : 'Create account'}
         </h1>
         <p style={{ color: 'var(--text-dim)', fontSize: 14 }}>
-          {mode === 'login' ? 'Sign in to your Movement account' : 'Start your personalized movement journey'}
+          {mode === 'login' ? 'Sign in to your Atlas Prime account' : 'Start your personalized movement journey'}
         </p>
       </div>
 

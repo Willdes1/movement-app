@@ -102,7 +102,7 @@ export default function PushTab() {
       <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20, marginBottom: 24 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 16 }}>Compose Notification</div>
 
-        {row('Title', <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Movement — Today's workout is ready" style={inputStyle} />)}
+        {row('Title', <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Atlas Prime — Today's workout is ready" style={inputStyle} />)}
         {row('Body', <textarea value={body} onChange={e => setBody(e.target.value)} placeholder="Your AI coach has planned today's session. Tap to see it." rows={2} style={{ ...inputStyle, resize: 'none', lineHeight: 1.5 }} />)}
         {row('URL', <input value={url} onChange={e => setUrl(e.target.value)} placeholder="/today" style={inputStyle} />)}
         {row('Send to', (

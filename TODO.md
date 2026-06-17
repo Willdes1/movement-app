@@ -183,7 +183,7 @@
 - [ ] **Marketing control panel** — SEO recommendations, Facebook/Meta ads, LinkedIn ads, PPC, LLM visibility (how the app appears in AI-generated search results), Reddit content strategy, educational fitness/nutrition content calendar.
 - [ ] **Partner management** — Physical therapists, nutritionists, personal trainers, fitness influencers, fitness enthusiasts with large followings. Track: audience size, performance, revenue contribution, referral clients, promotion activity. Revenue-sharing model: partners earn a cut when they bring in paying clients.
 - [ ] **Partner portal (future)** — Partners get their own login: analytics, expected pay, revenue generated, CTR on their content, ad ideas, marketing suggestions.
-- [ ] **Scout agent** — Actively searches the web for reviews mentioning the app and competing apps. Flags if someone says "X is better than Movement" or similar. Builds its own ideas/todo list of app improvement suggestions based on what people say online.
+- [ ] **Scout agent** — Actively searches the web for reviews mentioning the app and competing apps. Flags if someone says "X is better than Atlas Prime" or similar. Builds its own ideas/todo list of app improvement suggestions based on what people say online.
 - [ ] **Bug monitoring agent** — Scans for bugs, estimates fix time, notifies affected users when issue is under investigation, updates them when resolved. Triggers app update or refresh prompts when needed.
 - [ ] **Replaced existing item**: Supersedes "Admin analytics dashboard (user activity, completion rates)" from Infrastructure.
 
@@ -200,7 +200,7 @@
   - Reddit discussions: r/fitness, r/personaltraining, r/physicaltherapy, r/skateboarding — what users wish existed
   - Facebook groups for personal trainers and physical therapists — pain points and feature requests
   - App Store reviews for competitor apps — common complaints and requests
-- [ ] Output: auto-populates a "AI Suggestions" folder in admin with entries showing: what was found, direct links to discussions, relevance to Move., and a proposed feature response
+- [ ] Output: auto-populates a "AI Suggestions" folder in admin with entries showing: what was found, direct links to discussions, relevance to Atlas Prime, and a proposed feature response
 - [ ] Configurable refresh interval: 3 days → 5 days → weekly → biweekly → monthly. Setting lives in the tab header. Reduce frequency if output becomes redundant.
 - [ ] Goal: stay ahead of competitors and build features the market is actively asking for but nobody has shipped
 
@@ -221,7 +221,7 @@
 - [ ] Update automatically as new agents are added
 
 ## 🧠 Admin Portal v2 — Modular Architecture + AI Search Layer (added 2026-05-07)
-> Strategic reframe: treat the admin portal as a potential standalone SaaS product (Movement is the first app running on it). Architectural decisions now must not paint us into a corner. Does NOT mean over-engineering V1.
+> Strategic reframe: treat the admin portal as a potential standalone SaaS product (Atlas Prime is the first app running on it). Architectural decisions now must not paint us into a corner. Does NOT mean over-engineering V1.
 
 ### ⛔ Trigger Gates — Do NOT start until ALL THREE are met
 - [ ] Impersonation (Zoom In) smoke-tested and fully verified
@@ -230,7 +230,7 @@
 
 ### Architectural Principles (non-negotiable)
 - **Module pattern, not feature pattern** — each major area is a self-contained module with its own route, table(s), and UI. Shared shell: top nav, AI search bar, breadcrumbs, consistent design tokens.
-- **org_id on every new table from day one** — default to a single hardcoded Movement org UUID. No org-switching UI yet. One column now prevents weeks of migration later.
+- **org_id on every new table from day one** — default to a single hardcoded Atlas Prime org UUID. No org-switching UI yet. One column now prevents weeks of migration later.
 - **AI search bar lives in the shell, not a tab** — searches across ALL modules. RAG only (retrieves real records, never invents). Pluggable source registry: new module = register table + columns, no search engine rewrite.
 
 ### Modules — existing (refactor into shell) + new (build fresh)
@@ -310,7 +310,7 @@ All three feed the same search index. Different shapes, one search surface.
 
 ## ⚠️ Launch Blockers — DO NOT ship to non-admin users until resolved
 
-- [ ] **TOS / Privacy Policy disclosure (BLOCKS impersonation rollout)** — No TOS or Privacy Policy page exists. Required before any non-admin user can be subject to admin impersonation. Add this exact language to the Privacy Policy at signup: *"Authorized administrators of the Movement platform may access your account for purposes of customer support, technical debugging, and platform integrity. All such access is logged and subject to internal audit."* Do not enable Zoom In on real user accounts until this disclosure is live and agreed to at signup. Admin-only testing (Will's account) is fine to proceed without it.
+- [ ] **TOS / Privacy Policy disclosure (BLOCKS impersonation rollout)** — No TOS or Privacy Policy page exists. Required before any non-admin user can be subject to admin impersonation. Add this exact language to the Privacy Policy at signup: *"Authorized administrators of the Atlas Prime platform may access your account for purposes of customer support, technical debugging, and platform integrity. All such access is logged and subject to internal audit."* Do not enable Zoom In on real user accounts until this disclosure is live and agreed to at signup. Admin-only testing (Will's account) is fine to proceed without it.
 
 ## 🏗️ Infrastructure
 - [ ] Stripe billing integration (freemium → paid tier)

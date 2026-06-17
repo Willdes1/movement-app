@@ -181,7 +181,7 @@ export default function RecoveryPage() {
             <span style={{ marginLeft: 'auto', fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 4, background: 'rgba(255,140,0,0.12)', color: 'var(--orange)', border: '1px solid rgba(255,140,0,0.22)' }}>AI</span>
           </div>
           <p style={{ fontSize: 13, color: 'var(--text-mid)', lineHeight: 1.5, marginBottom: 12 }}>
-            Tell us what you hurt and what your doctor said. Movement AI builds a custom phase-by-phase recovery protocol.
+            Tell us what you hurt and what your doctor said. Atlas Prime AI builds a custom phase-by-phase recovery protocol.
           </p>
           <div style={{ display: 'flex', gap: 8 }}>
             <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'rgba(255,140,0,0.08)', border: '1px solid rgba(255,140,0,0.18)', color: 'var(--orange)' }}>Injury intake</span>

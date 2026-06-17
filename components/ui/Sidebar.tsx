@@ -45,7 +45,7 @@ export default function Sidebar() {
   if (pathname.startsWith('/admin') || pathname.startsWith('/auth') || pathname.startsWith('/coach') || pathname.startsWith('/legal') || pathname.startsWith('/join')) return null
 
   const firstName = profile?.name?.split(' ')[0] ?? 'Athlete'
-  const sport = profile?.sports?.[0] ?? 'Movement'
+  const sport = profile?.sports?.[0] ?? 'Athlete'
 
   return (
     <nav className="app-sidebar" style={{
