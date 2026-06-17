@@ -10,7 +10,6 @@ import PushNotificationBanner from '@/components/PushNotificationBanner'
 import CoachedSessionCard from '@/components/CoachedSessionCard'
 import { useStreak } from '@/lib/useStreak'
 import { useTTS } from '@/hooks/useTTS'
-import LoopPreview from '@/components/ui/LoopPreview'
 import { inferEquipment, timeCommitment } from '@/lib/workout-display'
 
 type DailyBlock = { label: string; duration: string; exercises: string[]; tip?: string }
@@ -189,8 +188,6 @@ export default function TodayPage() {
   const sessionSummary = todayPlan
     ? (todayPlan.coaching || (todayPlan.focus ? `${todayPlan.label} — ${todayPlan.focus}.` : `Today's focus: ${todayPlan.label}.`))
     : ''
-  const previewName = (todayPlan?.daily_session?.workout?.exercises ?? todayPlan?.movements ?? []).find(n => exerciseLib[normalizeExName(n)]?.video_url) ?? null
-  const previewEntry = previewName ? exerciseLib[normalizeExName(previewName)] : null
 
   // Coached mode — active coach assignment replaces the AI program as the main program
   const coachWeekNum = coached && coachAssignment && coachProgram
@@ -375,13 +372,6 @@ export default function TodayPage() {
                 </div>
               </div>
             </div>
-
-            {/* Small workout preview window */}
-            {previewEntry?.video_url && (
-              <div style={{ marginBottom: 14 }}>
-                <LoopPreview url={previewEntry.video_url} source={previewEntry.video_source} name={previewName ?? ''} loopStart={previewEntry.loop_start_sec} loopEnd={previewEntry.loop_end_sec} clipStart={previewEntry.youtube_start_sec} clipEnd={previewEntry.youtube_end_sec} />
-              </div>
-            )}
 
             {/* For You note */}
             <div style={{ display: 'flex', gap: 8, padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, marginBottom: 16 }}>
