@@ -1,6 +1,7 @@
 'use client'
 import { useState, type CSSProperties } from 'react'
 import { supabase } from '@/lib/supabase'
+import TrackingTip from '@/components/ui/TrackingTip'
 
 // Set tracking that lives inside the ExerciseDetailModal footer. Writes per-set
 // rows to exercise_set_logs (granular history) + one summary row to workout_logs
@@ -65,9 +66,14 @@ export default function TrackWorkout({
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 14 }}>
-        📋 Track Workout
-      </button>
+      <>
+        <TrackingTip id="track-workout" scopeKey={exerciseNormalized}>
+          Log your sets here to track progress over time. Open History to see past sessions and adjust your weight up or down.
+        </TrackingTip>
+        <button onClick={() => setOpen(true)} style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 14 }}>
+          📋 Track Workout
+        </button>
+      </>
     )
   }
 
