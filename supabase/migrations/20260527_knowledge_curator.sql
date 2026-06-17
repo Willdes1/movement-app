@@ -1,4 +1,4 @@
--- MIE Phase 4: Knowledge Curator Agent
+-- APIE Phase 4: Knowledge Curator Agent
 -- Run this in Supabase SQL Editor
 
 ALTER TABLE knowledge_items

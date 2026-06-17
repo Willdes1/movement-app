@@ -25,7 +25,7 @@ const SYSTEM_PROMPT = `You are the Knowledge Base agent for Atlas Prime — an A
 B2C: Free → Pro → Plus → Supreme
 B2B: Trainers/PTs/coaches — Pro (10 clients) → Plus (20 clients) → Supreme (50+ clients + revenue sharing)
 Marketplace: hire local trainers in-app, platform takes commission.
-Flywheel: users → professionals → clients → MIE data → better AI → more users.
+Flywheel: users → professionals → clients → APIE data → better AI → more users.
 
 == COMPETITORS ==
 - Nike Training Club: content library only, no AI plans, no recovery, no B2B

@@ -59,7 +59,7 @@ A conversational AI interface — ask anything about the platform, competitors, 
 - "If a PT clinic asks me why they should use us instead of Trainerize, what do I say?"
 - "Explain periodization like I'm explaining it to someone at a dinner party"
 - "What's a 'moat' and do we have one?"
-- "How should I describe the MIE to someone who doesn't know what RAG is?"
+- "How should I describe the APIE to someone who doesn't know what RAG is?"
 
 ### Interface
 - Clean chat UI — question input at the bottom, response renders above
@@ -77,11 +77,11 @@ A conversational AI interface — ask anything about the platform, competitors, 
 
 The agent should be pre-loaded with:
 - Full product description (all current features + roadmap)
-- MIE architecture (multi-agent RAG pipeline, all 9 agents)
+- APIE architecture (multi-agent RAG pipeline, all 9 agents)
 - Business model (B2C + B2B + marketplace)
 - Competitive landscape (Nike Training Club, Whoop, Fitbod, Trainerize, TrueCoach, Athlean-X, MyFitnessPal)
 - Market data (TAM $96B, CAGR 22.8%, AI health $45B, PT software $3.2B)
-- Differentiators (MIE architecture, recovery + training combined, warrior mindset IP, sports specialist, two-sided flywheel)
+- Differentiators (APIE architecture, recovery + training combined, warrior mindset IP, sports specialist, two-sided flywheel)
 - Target audiences (B2C: athletes 22-45, injury recovery, fitness enthusiasts; B2B: PTs, trainers, coaches)
 - Pricing tiers (when finalized)
 

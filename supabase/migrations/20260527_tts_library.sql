@@ -1,4 +1,4 @@
--- MIE TTS: pre-generated audio URLs for exercise library
+-- APIE TTS: pre-generated audio URLs for exercise library
 ALTER TABLE exercise_library
   ADD COLUMN IF NOT EXISTS tts_url_male   text,
   ADD COLUMN IF NOT EXISTS tts_url_female text;

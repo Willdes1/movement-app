@@ -556,7 +556,7 @@ function AskMeAnythingTab({ userId }: { userId?: string }) {
     "If a PT clinic asks why they should use us instead of Trainerize, what do I say?",
     'What is periodization, and how does ours work?',
     "What's a \"moat\" and do we have one?",
-    'How do I explain the MIE to someone who has never heard of RAG?',
+    'How do I explain the APIE to someone who has never heard of RAG?',
   ]
 
   return (

@@ -1,4 +1,4 @@
--- Enhanced athlete profile fields for MIE input completeness
+-- Enhanced athlete profile fields for APIE input completeness
 -- All use IF NOT EXISTS — safe to re-run if some columns were added in a prior session
 
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS age              integer;

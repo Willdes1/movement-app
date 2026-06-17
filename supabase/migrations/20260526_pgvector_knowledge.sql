@@ -1,4 +1,4 @@
--- MIE Phase 1: Domain Knowledge Store
+-- APIE Phase 1: Domain Knowledge Store
 -- Run this in Supabase SQL Editor
 
 -- 1. Enable pgvector extension

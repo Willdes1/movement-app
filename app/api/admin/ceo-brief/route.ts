@@ -30,7 +30,7 @@ AI-powered fitness, recovery, and performance platform. Built and live. Solo fou
 - For You feed: sport-specific training tips + Japanese warrior mindset system (Mushin, Kaizen, Shokunin, Zanshin, Fudoshin). From founder's published book — proprietary IP.
 - Anatomy Explorer: Jarvis HUD with clickable skeleton, joint matrix, recovery protocol lookup.
 - Multi-sport profile: equipment constraints, injury restrictions, training background (beginner → pro).
-- MIE Phase 0: training_level + workout_background + sport activities injected into every plan prompt. Plan quality scales with user experience.
+- APIE Phase 0: training_level + workout_background + sport activities injected into every plan prompt. Plan quality scales with user experience.
 - Coach Portal (full build): programs library, program detail view with inline editing, assign-to-client modal with debounced search, exercise swap modal (sets/reps preserved), AI generate with brief form (periodized Sonnet 4.6), template library for zero-cost program reuse, real clients roster with assignment history.
 - Admin Portal V2: retention dashboard (5 user segments), notes system (platform + user-attached), billing overview (tier breakdown, KPIs).
 - Auth system, promo codes, F&F beta role, Zoom In (admin impersonation with logging), Terms of Service, Privacy Policy.
@@ -47,13 +47,13 @@ Multi-Agent Agentic RAG Pipeline. A council of specialized AI agents grounded in
 - Mindset Agent: Japanese warrior philosophy from founder's book. Owns For You feed and coaching cues
 - Critic/Verification Agent: validates assembled output, flags specific blocks for re-run (not full regeneration)
 - Knowledge Curator Agent: async background agent, monitors research, keeps Domain Knowledge Store current
-MIE Status: Phase 0 complete (training context injection). Phase 1 next (Domain Knowledge Store + pgvector).
+APIE Status: Phase 0 complete (training context injection). Phase 1 next (Domain Knowledge Store + pgvector).
 
 == BUSINESS MODEL ==
 B2C: Free (basic workouts) → Pro (full AI plan) → Plus (plan + nutrition) → Supreme (everything + marketplace)
 B2B: Trainers/PTs/coaches — Pro (10 clients) → Plus (20 clients) → Supreme (50+ clients + marketing tools + revenue sharing)
 Marketplace: Users hire local trainers in-app. Platform takes commission.
-Flywheel: users attract professionals → professionals bring clients → client data improves MIE → better AI attracts more users.
+Flywheel: users attract professionals → professionals bring clients → client data improves APIE → better AI attracts more users.
 
 == MARKET DATA ==
 - Global fitness app market: $15.6B (2023) → $96B by 2032 (22.8% CAGR)
@@ -74,7 +74,7 @@ Flywheel: users attract professionals → professionals bring clients → client
 We beat all of them on breadth of AI, training + recovery unification, and B2B + consumer in one platform.
 
 == 6 HARD-TO-COPY ADVANTAGES ==
-1. MIE — not a feature, an architecture. Multi-agent RAG. Cannot be copied without years of build time.
+1. APIE — not a feature, an architecture. Multi-agent RAG. Cannot be copied without years of build time.
 2. Training + Recovery unified — users don't stop training when injured. Parallel systems with intelligent handoffs.
 3. Mindset IP — Japanese warrior philosophy from founder's published book. Proprietary. Cannot be licensed or copied.
 4. Sports Specialist at every sport — skateboarding to pickleball to MMA. No generic templates.
@@ -87,7 +87,7 @@ B2B: Personal trainers ($40-150/hr), physical therapists ($80-250/hr), occupatio
 
 == ROADMAP ==
 Phase 1 (COMPLETE): Core consumer app — all live features above.
-Phase 2 (IN PROGRESS): MIE Domain Knowledge Store, Stripe billing, nutrition AI, wearables.
+Phase 2 (IN PROGRESS): APIE Domain Knowledge Store, Stripe billing, nutrition AI, wearables.
 Phase 3 (ACTIVE): Coach portal ✓, Admin V2 ✓. Next: Stripe, training style intelligence, bug reports system.
 Phase 4 (UPCOMING): Marketplace — hire local trainers, professional marketplace, marketing automation.
 Phase 5 (FUTURE): Enterprise — white-label, insurance partnerships, university athletics.

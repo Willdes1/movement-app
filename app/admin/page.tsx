@@ -1515,7 +1515,7 @@ const NAV_GROUPS = [
       { id: 'launchpad' as Tab, label: 'Launchpad' },
       { id: 'ceo' as Tab, label: 'CEO Briefing' },
       { id: 'kb' as Tab, label: 'Knowledge Base' },
-      { id: 'mie' as Tab, label: '🤖 MIE' },
+      { id: 'mie' as Tab, label: '🤖 APIE' },
     ],
   },
   {

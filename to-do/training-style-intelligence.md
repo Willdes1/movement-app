@@ -1,5 +1,5 @@
 # Training Style Intelligence — AI Generation Engine
-**Priority: HIGH — Core MIE differentiator**
+**Priority: HIGH — Core APIE differentiator**
 
 ## Goal
 The AI plan generator should understand named training philosophies and legendary coaching styles — not just generic parameters like "hypertrophy" or "strength." When a user says they've trained like Mike Mentzer or love ATHLEAN-X programming, the system should know exactly what that means, adapt to it, and filter it through safety and sport-specificity constraints.
@@ -51,7 +51,7 @@ In the account/profile setup, add a question:
 - Free text option: "Something else — describe it"
 - Multi-select: "I mix a few styles"
 
-### 2. MIE Integration
+### 2. APIE Integration
 When a user selects a training style, the **Strength & Conditioning Agent** and **Sports Specialist Agent** receive it as context:
 
 ```
@@ -83,7 +83,7 @@ Training styles should also appear in the **Knowledge Base tab** so the founder 
 ## Build Phases
 1. Add training style field to user profile (dropdown + free text)
 2. Build style knowledge library (internal JSON/DB — all styles above with their interpretation rules)
-3. Inject style context into MIE plan generation prompt (S&C Agent + Sports Specialist)
+3. Inject style context into APIE plan generation prompt (S&C Agent + Sports Specialist)
 4. PT/Rehab Agent safety filter for style conflicts
 5. Output vocabulary adaptation (plans "speak" the user's style language)
 6. Knowledge Base entries for all styles (founder education)

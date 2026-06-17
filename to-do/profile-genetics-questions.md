@@ -14,7 +14,7 @@ Add ethnicity and sex assigned at birth to the user profile to improve plan gene
 - Female
 - Prefer not to say
 
-**Why it matters:** Biological sex affects hormone profiles (testosterone, estrogen, relaxin), injury risk patterns (ACL risk is significantly higher in females), muscle fiber type distribution, and recovery rates. The MIE uses this to adjust volume recommendations, recovery windows, and injury-risk weighting.
+**Why it matters:** Biological sex affects hormone profiles (testosterone, estrogen, relaxin), injury risk patterns (ACL risk is significantly higher in females), muscle fiber type distribution, and recovery rates. The APIE uses this to adjust volume recommendations, recovery windows, and injury-risk weighting.
 
 ---
 
@@ -38,7 +38,7 @@ Add ethnicity and sex assigned at birth to the user profile to improve plan gene
 - ACE gene variants (aerobic vs power predisposition)
 - ACTN3 gene frequency (sprinter vs endurance predisposition)
 
-The MIE doesn't stereotype — it uses this as one signal among many to fine-tune exercise selection, rep range emphasis, and recovery recommendations.
+The APIE doesn't stereotype — it uses this as one signal among many to fine-tune exercise selection, rep range emphasis, and recovery recommendations.
 
 ---
 
@@ -60,7 +60,7 @@ This explanation must appear directly above the questions — not buried in sett
 
 ---
 
-## MIE Integration
+## APIE Integration
 
 ### Sex-Based Adjustments (S&C Agent + PT/Rehab Agent)
 - **Female profiles:** flag higher ACL and shoulder instability risk; adjust plyometric volume; add hip/glute stability emphasis; note relaxin effects if relevant (postpartum flag option)
@@ -92,6 +92,6 @@ No new table needed — these are profile fields.
 1. Schema migration (ALTER TABLE profiles)
 2. Add questions to profile setup flow with inline privacy explanation
 3. Add to Settings → Profile (editable)
-4. Inject sex + ethnicity into MIE plan generation prompt
+4. Inject sex + ethnicity into APIE plan generation prompt
 5. PT/Rehab Agent adjustments for sex-based injury risk
 6. S&C Agent soft adjustments for ethnicity-based fiber type signals

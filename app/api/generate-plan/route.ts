@@ -286,7 +286,7 @@ export async function POST(request: Request) {
 
     if (!profile) return Response.json({ error: 'Profile is required' }, { status: 400 })
 
-    // ── MIE Phase 1: Retrieve relevant domain knowledge ──────────────────────
+    // ── APIE Phase 1: Retrieve relevant domain knowledge ──────────────────────
     let knowledgeContext = ''
     let rehabKnowledge = ''
     try {
@@ -315,7 +315,7 @@ export async function POST(request: Request) {
 
     const prompt = buildPrompt(profile, weekNumber, phaseLabel, intensity, instructions, knowledgeContext)
 
-    // ── MIE Phase 2 — Agent 1: S&C Agent drafts the plan ────────────────────
+    // ── APIE Phase 2 — Agent 1: S&C Agent drafts the plan ────────────────────
     const scMessage = await client.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 8192,
@@ -338,7 +338,7 @@ export async function POST(request: Request) {
     let totalInput = scMessage.usage.input_tokens
     let totalOutput = scMessage.usage.output_tokens
 
-    // ── MIE Phase 2 — Agent 2: PT/Rehab Agent reviews for safety ────────────
+    // ── APIE Phase 2 — Agent 2: PT/Rehab Agent reviews for safety ────────────
     // Only runs when athlete has documented injury restrictions
     if (profile.has_restrictions && Array.isArray(profile.restriction_areas) && profile.restriction_areas.length > 0) {
       try {
@@ -362,7 +362,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // ── MIE Phase 3 — Full Agent Council ─────────────────────────────────────
+    // ── APIE Phase 3 — Full Agent Council ─────────────────────────────────────
     const athleteContext = [
       `Sport: ${profile.sport ?? 'General fitness'}`,
       `Goal: ${profile.goal ?? 'General fitness'}`,

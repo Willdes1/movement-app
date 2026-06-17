@@ -150,7 +150,7 @@
 - [x] **Targeted exercise library tied to anatomy** — Anatomy page restructured: iframe takes top 55vh, "Targeted Exercises" section below. 12 muscle group chips (Chest, Back, Shoulders, Arms, Core, Hips, Quads, Hamstrings, Calves, Knees, Ankles). Filters exercise_library by keywords. Expandable coaching cards. (Chest, Back, Biceps, Triceps, Shoulders, Hips, Knees, Ankles, Core):
     - Entry point: "Targeted Exercises" menu option in anatomy area
     - Uses internal library with depth — 5 best mobility drills per target area based on research, usefulness, and safety
-    - MIE guides video curation toward trusted channels: ATHLEAN-X, Knees Over Toes Guy, Vanja, and preferred recovery chiropractor
+    - APIE guides video curation toward trusted channels: ATHLEAN-X, Knees Over Toes Guy, Vanja, and preferred recovery chiropractor
     - Manual batch URL upload: admin sits down, pastes a batch of links, library builds quickly
     - Quality gate: if a movement looks strange, creates compliance concerns, or doesn't make sense — exclude it
     - Token strategy: research and curate once, save internally; token cost paid once per exercise

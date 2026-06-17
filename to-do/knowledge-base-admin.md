@@ -19,7 +19,7 @@ Every feature in the platform named, defined, and framed in industry terminology
 | Our Feature | Industry Term | What It Means |
 |---|---|---|
 | AI plan generator | Personalized Program Generation Engine | AI that produces individualized periodized training plans |
-| MIE | Multi-Agent Agentic RAG Pipeline | A council of specialized AI agents grounded in a curated Domain Knowledge Store |
+| APIE | Multi-Agent Agentic RAG Pipeline | A council of specialized AI agents grounded in a curated Domain Knowledge Store |
 | Exercise swap modal | Dynamic Exercise Substitution | Real-time replacement of exercises while preserving volume prescription |
 | Coach portal | B2B SaaS Professional Portal | Software-as-a-Service tooling for fitness professionals to manage clients |
 | Zoom In | Admin Impersonation | Authenticated session escalation for support and QA |
@@ -51,7 +51,7 @@ At the top of the tab — always visible. Ask anything about the platform or bus
 - "What's the billing structure for the Coach OS?"
 - "What's the difference between our program generator and Fitbod's?"
 - "What does periodization mean and how does ours work?"
-- "How do I explain the MIE to someone who's never heard of RAG?"
+- "How do I explain the APIE to someone who's never heard of RAG?"
 
 **Response format:**
 - Plain language answer (no jargon dumps)

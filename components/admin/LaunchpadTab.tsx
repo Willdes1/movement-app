@@ -120,7 +120,7 @@ Unique assets:
 - Founder's published book on Japanese warrior philosophy is the IP behind the Mindset Agent (Mushin, Kaizen, Shokunin, Zanshin, Fudoshin)
 - Sports Specialist Agent: trained on the movement demands, injury patterns, and periodization requirements of every major sport worldwide
 - Platform data at scale becomes a sales tool for professionals (demographics, location, injury patterns)
-- Two-sided marketplace flywheel: more users → attracts professionals → professionals bring clients → client data improves MIE → better plans attract more users
+- Two-sided marketplace flywheel: more users → attracts professionals → professionals bring clients → client data improves APIE → better plans attract more users
 
 Please help me:
 1. Write a compelling executive summary (200 words) for a pitch deck cover slide
@@ -375,7 +375,7 @@ function OverviewSection() {
     'Training Background profile — training level (beginner→pro), workout history, sport/activity background with skill levels; all fields stored in profiles and fed to AI at plan generation',
     'RLS security hardening — privilege escalation guards on profiles INSERT + UPDATE; impersonation table policies upgraded to is_admin_user() SECURITY DEFINER pattern',
     'Terms of Service + Privacy Policy — admin impersonation disclosure, health/AI disclaimer, user rights, TOS consent gate on signup (email + Google OAuth)',
-    'MIE Phase 0 — training_level, workout_background, sport activities injected into plan generator prompt with per-level guidance; plan quality now scales with user experience',
+    'APIE Phase 0 — training_level, workout_background, sport activities injected into plan generator prompt with per-level guidance; plan quality now scales with user experience',
     'Exercise Video Curation system — AI auto-discovers fitness YouTube channels (channels.list), scores quality via Claude Haiku, stores approved list; curation pipeline searches 2 channels per exercise (search.list + videos.list), scores 3 candidates per exercise, admin reviews + approves 1; approved video embeds inline in client calendar via YouTube iframe; exercises from real client plans bubble to top of curation queue; 752-exercise library populating at ~50/day within free API quota',
     'YouTube Shorts support — vertical 9:16 player, autoplay muted loop (no tap needed), 🔇/🔊 audio toggle for voiced Shorts, sticky player stays visible while scrolling coaching cues; Shorts URLs now accepted in admin video paste input',
     '"Get to Know Your Client" — coach client notes system: session-dated notes, last-session reminder card, voice dictation via Web Speech API (Chrome/Edge), notes history with show more/less, per-note delete',
@@ -383,10 +383,10 @@ function OverviewSection() {
     'PDF/DOCX import on Builder page — coaches upload existing programs; mammoth extracts DOCX text, pdf-parse extracts PDF text; Claude Haiku normalizes to structured JSON; preview step before saving to coach_program_weeks; handles image-based PDF gracefully with error message',
     'Manual program builder — setup form (name/weeks/days-per-week/client), week accordion with label+phase, per-day exercise list with @dnd-kit drag-to-reorder, autocomplete from exercise_library, client notes reminders surfaced inline as you type exercises, copy-week-to-all, saves to same schema as AI/import paths',
     'User PDF program import — hamburger menu entry at /import-program; upload PDF/DOCX (text or scanned via Claude vision); PT/Rehab safety pass checks exercises against user injury profile and shows diff of changes; activate immediately or save for later; ImportedProgramBanner with Leave Plan flow (save progress or exit) mirrors RecoveryBanner pattern',
-    'MIE Phase 1 — Domain Knowledge Store: pgvector + OpenAI embeddings + 784 items seeded (15 training principles, 10 sport protocols, 7 rehab protocols, 752 exercises); RAG retrieval wired into plan generation; ivfflat index (lists=30)',
-    'MIE Phase 2 — Agent Council v1: S&C Agent drafts full 7-day plan using retrieved knowledge; PT/Rehab Agent runs safety review pass for restricted athletes with veto logic; token usage tracked across both agents',
-    'MIE Phase 3 — Full Agent Council: Sports Specialist Agent (sport-specific warmups + coaching cues), Mobility Agent (morning/cooldown/evening blocks), Mindset Agent (Mushin/Kaizen/Shokunin/Zanshin/Fudoshin layer on coaching + warmup tips), Recovery Agent (evidence-based rest day programming); all 4 agents sequential, non-fatal fallback',
-    'MIE Phase 4 — Knowledge Curator Agent: weekly Vercel cron reviews 60 items/pass (least-recently-reviewed first); Claude flags outdated/inaccurate items with suggested replacements; admin accepts (re-embeds + increments version) or dismisses; full review UI in admin MIE tab',
+    'APIE Phase 1 — Domain Knowledge Store: pgvector + OpenAI embeddings + 784 items seeded (15 training principles, 10 sport protocols, 7 rehab protocols, 752 exercises); RAG retrieval wired into plan generation; ivfflat index (lists=30)',
+    'APIE Phase 2 — Agent Council v1: S&C Agent drafts full 7-day plan using retrieved knowledge; PT/Rehab Agent runs safety review pass for restricted athletes with veto logic; token usage tracked across both agents',
+    'APIE Phase 3 — Full Agent Council: Sports Specialist Agent (sport-specific warmups + coaching cues), Mobility Agent (morning/cooldown/evening blocks), Mindset Agent (Mushin/Kaizen/Shokunin/Zanshin/Fudoshin layer on coaching + warmup tips), Recovery Agent (evidence-based rest day programming); all 4 agents sequential, non-fatal fallback',
+    'APIE Phase 4 — Knowledge Curator Agent: weekly Vercel cron reviews 60 items/pass (least-recently-reviewed first); Claude flags outdated/inaccurate items with suggested replacements; admin accepts (re-embeds + increments version) or dismisses; full review UI in admin APIE tab',
     'Push notifications — VAPID keys configured, service worker live, PushNotificationBanner on Today page, admin send UI; web push delivery to subscribed devices',
     'Travel adjustment — ✈️ "Need modifications?" button on any workout day in Calendar; user describes situation (hotel gym, no equipment, park); Claude Haiku patches warmup/workout/abs blocks or movements array; saves back to DB; resets on day change',
     'Ask AI Recovery — 🤖 "Ask AI" collapsible card at top of Recovery page; user describes pain/soreness/tightness; two-step AI pipeline recommends 5 exercises (library lookup first, AI-generated cues as fallback); inline expandable cards with how-to + coaching tip + breathing; Refresh button for new set',
@@ -403,7 +403,7 @@ function OverviewSection() {
     'Video Curation Priority Lanes — replaced blind batch with 3 lanes (User Plans / Program / Backlog); each shows pending count + Run 10/25; manual URL bug fixed (supersedes candidates on save); Approve All skips already-approved exercises',
     'Coach Exercise Library — /coach/library tab; YouTube URL with ✂️ clip trimming (M:SS start/end, live preview); own video upload (MP4/MOV/WebM to Supabase storage, with format guidelines); instructions + sets/reps + rest time; expandable list view',
     'YouTube clip trimming in Video Curation — paste URL section expanded with start/end time inputs + live preview + usage guide; clips saved as youtube_start_sec/youtube_end_sec on exercise_library; VideoPlayer in calendar + exercises pages applies ?start=N&end=N embed params',
-    'MIE questionnaire enhancement — 7 new profile fields: sex assigned at birth (Oura-style "Why we ask" explanation), age, height/weight, training level (5-tier Beginner→Pro), training history, sport-specific improvement focus ("What do you want to get better at?"), per-sport skill level chips; all fields wired into MIE buildPrompt + Phase 3 athleteContext',
+    'APIE questionnaire enhancement — 7 new profile fields: sex assigned at birth (Oura-style "Why we ask" explanation), age, height/weight, training level (5-tier Beginner→Pro), training history, sport-specific improvement focus ("What do you want to get better at?"), per-sport skill level chips; all fields wired into APIE buildPrompt + Phase 3 athleteContext',
     'Video curation approved-exercise edit panel — ✏ Edit button on every approved row opens inline panel: current video preview, Replace URL with ✂️ clip trimming (regular + Shorts 9:16), Regenerate button clears approval + reruns fresh AI search',
     'Video Library — Programs drill-down — collapsible per-program section shows ✓/○/✗ per exercise with progress bar; ✗ rows get inline Run + paste URL; ○ rows jump search to proposals; programs disappear from Priority Lanes at 100%; plan generation queue shown separately',
     'TTS batch 504 fix — BATCH reduced 20→10, per-call 10s timeout via Promise.race; per-row 🎙 Generate button in Library tab generates both voices for a specific exercise on demand without a full-batch run',
@@ -428,7 +428,7 @@ function OverviewSection() {
     'Nutrition AI: 3-month meal plan synced to training phases + macro targets',
     'Stripe billing: Free → Pro → Plus → Supreme consumer tiers',
     'Coach portal affiliate system — referral tracking, revenue-sharing per referral, coach analytics dashboard',
-    'Wearable integration: Oura Ring, Apple Watch, Samsung Health — feeds MIE Recovery Agent',
+    'Wearable integration: Oura Ring, Apple Watch, Samsung Health — feeds APIE Recovery Agent',
     'Native iOS + Android via Capacitor wrapper',
     'Streak system + accountability nudges',
   ]
@@ -593,7 +593,7 @@ function OverviewSection() {
         </div>
       </Panel>
 
-      {/* MIE Architecture Panel */}
+      {/* APIE Architecture Panel */}
       <Panel style={{ padding: 20, marginBottom: 24, border: `1px solid ${C.accentBorder}`, background: `linear-gradient(135deg, rgba(59,130,246,0.04) 0%, rgba(167,139,250,0.04) 100%)` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.accent, boxShadow: `0 0 8px ${C.accent}` }} />
@@ -601,7 +601,7 @@ function OverviewSection() {
         </div>
         <h3 style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 6 }}>Multi-Agent Agentic RAG Pipeline</h3>
         <p style={{ fontSize: 12, color: C.textMid, lineHeight: 1.7, marginBottom: 18 }}>
-          The MIE is the architectural backbone that makes every plan feel like it was built by a council of credentialed experts — because it is. Instead of a single AI call generating everything from scratch, the MIE uses Retrieval-Augmented Generation (RAG) to pull from a curated Domain Knowledge Store, then routes context through specialized agents before assembling the final output.
+          The APIE is the architectural backbone that makes every plan feel like it was built by a council of credentialed experts — because it is. Instead of a single AI call generating everything from scratch, the APIE uses Retrieval-Augmented Generation (RAG) to pull from a curated Domain Knowledge Store, then routes context through specialized agents before assembling the final output.
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10, marginBottom: 18 }}>
           {[
@@ -644,7 +644,7 @@ function OverviewSection() {
             { emoji: '🩹', title: 'Training + Recovery in One System', desc: 'Users don\'t stop training when injured. Recovery and training run in parallel with intelligent handoffs between states.' },
             { emoji: '⚔️', title: 'Mindset System — Published IP', desc: 'Japanese warrior philosophy from the founder\'s book powers the Mindset Agent. Proprietary. Cannot be copied without the source.' },
             { emoji: '📊', title: 'Platform Data as a Business Asset', desc: 'At scale, user demographics + injury patterns + location = B2B sales intelligence professionals will pay for.' },
-            { emoji: '🌐', title: 'Two-Sided Marketplace Flywheel', desc: 'More users → attracts professionals → professionals bring clients → client data improves MIE → better plans attract more users.' },
+            { emoji: '🌐', title: 'Two-Sided Marketplace Flywheel', desc: 'More users → attracts professionals → professionals bring clients → client data improves APIE → better plans attract more users.' },
             { emoji: '🏋️', title: 'Sports Specialist at Every Sport', desc: 'The Sports Specialist Agent covers every sport worldwide — skateboarding to pickleball to combat sports. Programming adjusts to real sport demands, not generic templates.' },
           ].map(w => (
             <div key={w.title} style={{ background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14 }}>
