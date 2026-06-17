@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import LoopPreview from '@/components/ui/LoopPreview'
 
 type ExerciseRow = {
   name_normalized: string
@@ -10,6 +11,8 @@ type ExerciseRow = {
   video_source: string | null
   youtube_start_sec?: number | null
   youtube_end_sec?: number | null
+  loop_start_sec?: number | null
+  loop_end_sec?: number | null
 }
 
 type ExerciseDetail = ExerciseRow & {
@@ -21,59 +24,7 @@ type ExerciseDetail = ExerciseRow & {
   youtube_end_sec?: number | null
 }
 
-function extractYouTubeId(url: string): string | null {
-  return url.match(/(?:v=|youtu\.be\/|shorts\/)([A-Za-z0-9_-]{11})/)?.[1] ?? null
-}
-
-function VideoPlayer({ url, source, name, startSec, endSec }: { url: string | null; source: string | null; name: string; startSec?: number | null; endSec?: number | null }) {
-  const [muted, setMuted] = useState(true)
-  if (url && (source === 'youtube' || source === 'custom')) {
-    const videoId = extractYouTubeId(url)
-    const short = url.includes('/shorts/')
-    if (videoId) {
-      let embedSrc = short
-        ? `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&autoplay=1&loop=1&playlist=${videoId}&mute=${muted ? 1 : 0}&controls=1`
-        : `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`
-      if (!short) {
-        if (startSec != null && startSec > 0) embedSrc += `&start=${startSec}`
-        if (endSec != null) embedSrc += `&end=${endSec}`
-      }
-      return (
-        <div className="video-sticky" style={{ marginBottom: 14, borderRadius: 10, overflow: 'hidden', background: '#000' }}>
-          <div style={{ position: 'relative', paddingBottom: short ? '177.78%' : '56.25%', height: 0 }}>
-            <iframe
-              key={`${videoId}-${muted}`}
-              src={embedSrc}
-              title={name}
-              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 10px', background: 'var(--surface2)' }}>
-            <p style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>
-              Video · Coach Approved
-            </p>
-            {short && (
-              <button
-                onClick={() => setMuted(m => !m)}
-                style={{ fontSize: 11, color: muted ? 'var(--text-dim)' : '#22c55e', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, padding: 0 }}
-              >
-                {muted ? '🔇 Muted Loop' : '🔊 Audio On'}
-              </button>
-            )}
-          </div>
-        </div>
-      )
-    }
-  }
-  return (
-    <div style={{ marginBottom: 14, padding: '14px 16px', background: 'rgba(59,130,246,0.05)', border: '1px dashed rgba(59,130,246,0.2)', borderRadius: 10, textAlign: 'center' }}>
-      <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-mid)', marginBottom: 4 }}>🎬 Video Coming Soon</p>
-      <p style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>Your coach is reviewing the best demonstration for this exercise.</p>
-    </div>
-  )
-}
+// VideoPlayer + extractYouTubeId moved to components/ui/LoopPreview.tsx + lib/youtube-iframe.ts
 
 function CueRow({ label, value }: { label: string; value: string | null }) {
   if (!value) return null
@@ -99,24 +50,26 @@ export default function ExercisesPage() {
   const searchRef               = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    supabase
-      .from('exercise_library')
-      .select('name_normalized, name_display, video_url, video_source, youtube_start_sec, youtube_end_sec')
-      .order('name_display')
-      .then(({ data }) => {
-        setAll(data ?? [])
-        setLoading(false)
-      })
+    (async () => {
+      // loop_start_sec/loop_end_sec may not exist yet (migration not run) — fall back gracefully.
+      const cols = 'name_normalized, name_display, video_url, video_source, youtube_start_sec, youtube_end_sec'
+      const withLoop = await supabase.from('exercise_library').select(`${cols}, loop_start_sec, loop_end_sec`).order('name_display')
+      const { data } = withLoop.error
+        ? await supabase.from('exercise_library').select(cols).order('name_display')
+        : withLoop
+      setAll((data ?? []) as ExerciseRow[])
+      setLoading(false)
+    })()
   }, [])
 
   async function loadDetail(ex: ExerciseRow) {
     if (details[ex.name_normalized]) return
     setFetching(ex.name_normalized)
-    const { data } = await supabase
-      .from('exercise_library')
-      .select('name_normalized, name_display, how, breathing, core, tip, video_url, video_source, youtube_start_sec, youtube_end_sec')
-      .eq('name_normalized', ex.name_normalized)
-      .single()
+    const cols = 'name_normalized, name_display, how, breathing, core, tip, video_url, video_source, youtube_start_sec, youtube_end_sec'
+    const withLoop = await supabase.from('exercise_library').select(`${cols}, loop_start_sec, loop_end_sec`).eq('name_normalized', ex.name_normalized).single()
+    const { data } = withLoop.error
+      ? await supabase.from('exercise_library').select(cols).eq('name_normalized', ex.name_normalized).single()
+      : withLoop
     if (data) setDetails(prev => ({ ...prev, [ex.name_normalized]: data as ExerciseDetail }))
     setFetching(null)
   }
@@ -322,12 +275,14 @@ export default function ExercisesPage() {
                         <p style={{ fontSize: 13, color: 'var(--text-dim)', textAlign: 'center', padding: '20px 0' }}>Loading…</p>
                       ) : (
                         <div style={{ paddingTop: 16 }}>
-                          <VideoPlayer
+                          <LoopPreview
                             url={detail?.video_url ?? ex.video_url ?? null}
                             source={detail?.video_source ?? ex.video_source ?? null}
                             name={ex.name_display}
-                            startSec={detail?.youtube_start_sec ?? ex.youtube_start_sec}
-                            endSec={detail?.youtube_end_sec ?? ex.youtube_end_sec}
+                            loopStart={detail?.loop_start_sec ?? ex.loop_start_sec}
+                            loopEnd={detail?.loop_end_sec ?? ex.loop_end_sec}
+                            clipStart={detail?.youtube_start_sec ?? ex.youtube_start_sec}
+                            clipEnd={detail?.youtube_end_sec ?? ex.youtube_end_sec}
                           />
                           <CueRow label="How to perform" value={detail?.how ?? null} />
                           <CueRow label="Breathing"      value={detail?.breathing ?? null} />

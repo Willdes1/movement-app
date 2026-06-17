@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
+import { loadYouTubeAPI, type YTPlayer } from '@/lib/youtube-iframe'
 
 /**
  * Admin loop trimmer for YouTube-hosted exercise videos.
@@ -8,53 +9,6 @@ import { useEffect, useRef, useState } from 'react'
  * the original video is never altered. Self-hosted (native <video>) videos will get a
  * thumbnail-filmstrip variant in a later phase; exercise_library is YouTube-only today.
  */
-
-// ── Minimal YouTube IFrame API types ─────────────────────────────────────────
-interface YTPlayer {
-  getDuration(): number
-  getCurrentTime(): number
-  seekTo(seconds: number, allowSeekAhead?: boolean): void
-  playVideo(): void
-  pauseVideo(): void
-  mute(): void
-  destroy(): void
-}
-interface YTPlayerCtorOptions {
-  videoId: string
-  width?: string | number
-  height?: string | number
-  playerVars?: Record<string, string | number>
-  events?: {
-    onReady?: (e: { target: YTPlayer }) => void
-    onStateChange?: (e: { data: number; target: YTPlayer }) => void
-  }
-}
-interface YTNamespace {
-  Player: new (el: HTMLElement | string, opts: YTPlayerCtorOptions) => YTPlayer
-  PlayerState: { ENDED: number }
-}
-declare global {
-  interface Window {
-    YT?: YTNamespace
-    onYouTubeIframeAPIReady?: () => void
-  }
-}
-
-// Load the IFrame API exactly once, even with multiple trimmers on the page.
-let apiPromise: Promise<void> | null = null
-function loadYouTubeAPI(): Promise<void> {
-  if (typeof window === 'undefined') return Promise.resolve()
-  if (window.YT?.Player) return Promise.resolve()
-  if (apiPromise) return apiPromise
-  apiPromise = new Promise<void>((resolve) => {
-    const prev = window.onYouTubeIframeAPIReady
-    window.onYouTubeIframeAPIReady = () => { prev?.(); resolve() }
-    const tag = document.createElement('script')
-    tag.src = 'https://www.youtube.com/iframe_api'
-    document.head.appendChild(tag)
-  })
-  return apiPromise
-}
 
 function mmss(sec: number): string {
   if (!isFinite(sec) || sec < 0) sec = 0
