@@ -57,6 +57,33 @@ a concurrent-player cap keeps a screen full of loops smooth on phones.
 
 ---
 
+## 🏋️ Workout flow, set tracking & history
+
+**What it is:** A streamlined train-from-home flow — a clean dashboard summary,
+a focused calendar day view with looping previews + coaching cues per exercise,
+a full exercise popup, and per-set tracking with history.
+
+### Athlete experience
+- **Dashboard (Today):** a one-line session summary, suggested time commitment,
+  equipment needed, a looping preview, a "For You" note, and Start Session — all
+  visible without scrolling.
+- **Calendar day view:** warm-up shown first; each exercise is a row with an
+  auto-looping preview + a short **Coaching Cue**; a bottom box lists equipment +
+  rest guidance (warm-ups ~30s, strength 2–3 min, conditioning ~45s).
+- **Exercise popup:** full video, How to Perform, Breathing, Core Engagement, and
+  **Common Mistakes**; read-aloud; a **📋 Track Workout** button.
+- **Track Workout:** per-set Reps / Weight / Notes, **Duplicate Set**, **Add Set**,
+  and an opt-in **Track L/R** toggle. Saves to history.
+- **History tab:** appears on an exercise once you've logged it — shows each past
+  session's date/time, program, and every set's reps × weight, so you can adjust
+  weight up or down. (Powered by the `exercise_set_logs` table.)
+- **Tips:** small dismissible hints (Dismiss / Not for this workout / Don't remind me).
+
+### Notes
+- Shared via `/calendar`, so coached clients get the same experience.
+- Equipment is inferred from exercise names (no AI); Common Mistakes reuses the
+  existing `tip` field (no new data).
+
 ## 📋 Feature sections to add next
 <!-- Append a new ## section per shipped feature, same three-part shape. -->
 - Plan generation (APIE multi-agent) — onboarding walkthrough

@@ -342,6 +342,7 @@ function ReadinessPanel() {
 // ─── OVERVIEW SECTION ────────────────────────────────────────────────────────
 function OverviewSection() {
   const BUILT = [
+    'Workout UX restructure + set tracking — clean dashboard summary (time/equipment/preview/For-You note); calendar day view with inline looping previews + per-exercise Coaching Cues, Day-N header, equipment + rest-by-type guidance box; reusable ExerciseDetailModal (Common Mistakes mapped to the tip field) with per-set Track Workout (reps/weight/notes, duplicate/add set, opt-in left/right → exercise_set_logs table) + a per-exercise History tab; dismissible tracking tips (Dismiss / not-for-this-workout / never)',
     'Movement Preview (GIF-style loops) — admin loop trimmer in Video Curation (YouTube IFrame scrubber, draggable in/out handles, live loop preview, saved as loop_start/end metadata) + user-facing muted auto-looping previews on the exercises page, Today/calendar exercise modal, and coached workout rows (inline GIF thumbnails); IntersectionObserver lazy-mount + concurrent-player cap for mobile; tap → full original video',
     'AI plan generator — 1/2/3-month bulk generation, all weeks built at once with live progress screen',
     'Phase-based training: Foundation → Build → Peak → Maintenance with per-phase intensity + rest times',
