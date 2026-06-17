@@ -99,7 +99,38 @@
 
 ---
 
-## 4. What Was Built This Session (2026-06-12)
+## 4. What Was Built This Session (2026-06-17)
+
+**Huge build day — brand cleanup + 3 large feature arcs (16 feature commits). Google Workspace email went live. Two SQL migrations run.**
+
+### Brand cleanup
+- Full-sweep **MIE → APIE** rename across admin portal, AI prompts, docs (`cdb323c`). MIE = the engine (now APIE); kept the lowercase `'mie'` admin route id + historical log entries.
+- Remaining **Movement/Move. → Atlas Prime** leftovers (`3b625fc`): old `Move.` logo in `public/anatomy-explorer.html`, "Movement AI" → "Atlas Prime AI" (recovery pages), auth sign-in line, push placeholder, no-sport nav fallback ('Movement' → 'Athlete'), 5 TODO lines. Fitness-term "movement" left untouched.
+
+### Google Workspace email — LIVE (non-code)
+- `will@atlasprime.app` works. Namecheap Advanced DNS: MX `@` → `smtp.google.com` (priority 1, via Custom MX), SPF TXT `v=spf1 include:_spf.google.com ~all` (added **alongside** the google-site-verification TXT, not overwriting it). Website A `@` → 216.198.79.1 + www CNAME untouched. **DKIM not yet added** (optional: Google Admin → Apps → Gmail → Authenticate email → paste the TXT into Namecheap).
+
+### Feature 1 — Movement Preview (GIF-style looping video), Phases 1-3 (`dba9eb1`, `a493945`, `6947a76`)
+- Admin loop trimmer in Video Curation (YouTube IFrame API scrubber + draggable in/out handles + live preview); saves `loop_start_sec`/`loop_end_sec` (migration `20260617_exercise_library_loop.sql`, **RUN**). Metadata only.
+- `components/ui/LoopPreview.tsx` + `lib/youtube-iframe.ts` (shared IFrame loader + concurrent-player cap). Muted auto-looping previews on exercises page, calendar modal, coached rows (compact lazy thumbnails). Killed 3 duplicated VideoPlayer copies.
+- **KEY FACT:** exercise_library videos are **YouTube embeds, not files** — no iPhone filmstrip; native-filmstrip trimmer reserved for future self-hosted uploads.
+
+### Feature 2 — Workout UX restructure + set tracking, Phases 1-6 (`ee1e754`→`877ee8a`)
+- Dashboard summary; calendar day view with inline previews + **Coaching Cues**; reusable **`ExerciseDetailModal`** (Common Mistakes = the `tip` field); **set tracking** (`exercise_set_logs` table, migration `20260617_exercise_set_logs.sql`, **RUN**) via `TrackWorkout` (reps/weight/notes, duplicate/add set, opt-in L/R) — writes granular rows + a summary to workout_logs; per-exercise **History tab**; dismissible tracking tips.
+
+### Feature 3 — Workout flow UX pass, Phases 1-5 (`6ed3476`→`cc5d8dd`)
+- Dashboard video removed; **Start Session → focused single-day view** (`/calendar?focus=1`, month grid hidden, "View Calendar" one tap away); **overview block at the TOP** (assembled instructions + equipment + rest-by-type) + durable "Week X · Day Y" header; **progressive disclosure** (workout = hero; morning/abs/cooldown/evening = friendly collapsed invitation cards revealed one-at-a-time on scroll via IntersectionObserver sentinel); coached card got the overview + optional per-day **coach walkthrough video** (ManualProgramBuilder field → day JSON, no migration).
+- Note: `d5030e0` briefly broke the build (redundant `day.type` TS guard); fixed in `cc5d8dd` (green).
+
+### Locked terminology / decisions
+- **"Coaching Cue"** = the per-exercise short instruction (the `how` field). NOT "MIE" (that's the engine).
+- **Common Mistakes** display = the existing `tip` field (the generator fills `tip` with the most common mistake). No new column / no generation.
+- **Equipment** = keyword-inferred from exercise names (`lib/workout-display.ts`), no tokens. `REST_GUIDANCE` + `timeCommitment` also live there.
+- New features must work on **both surfaces** (Athlete App + Coach Portal) — the calendar/today client UI is shared; coached path = CoachedSessionCard.
+
+---
+
+## Previous Session (2026-06-12)
 
 **Launch infrastructure day — domain migration complete. No feature code; one Launchpad commit.**
 
@@ -697,10 +728,11 @@ return () => { supabase.removeChannel(channel) }
 
 ## 11. What to Work on Next (Priority Order)
 
-**Next session focus (user-stated 2026-06-12): Google Workspace email @atlasprime.app + Stripe/Apple payment method setup.**
+**Next session focus: Mercury debit card + payment setup, then Apple Developer enrollment. (Google Workspace email is DONE — `will@atlasprime.app` is live.)**
 
-1. **Google Workspace business email** — `will@atlasprime.app`. Domain is live, so this is unblocked. MX records go in Namecheap Advanced DNS (alongside the Vercel A/CNAME records — don't touch those). Needed for Apple Developer Program enrollment. Give Will exact step-by-step instructions.
-2. **Stripe + Apple payment method (Mercury)** — Mercury is funded ($100, 2026-06-11). Order debit card, note account/routing numbers; set Mercury as the payment method for Stripe payouts and Apple Developer billing; consider moving Namecheap/Google Workspace billing onto it for clean business books.
+1. **Mercury debit card + payment setup** — Mercury funded ($100). Create a VIRTUAL debit card first (instant); grab account/routing numbers. Connect Mercury as the **Stripe payout** bank account; use the Mercury card for **Apple Developer** billing ($99/yr) + (optional) Namecheap/Google Workspace billing. Full step-by-step in memory `project_mercury_payment.md`.
+2. **Apple Developer enrollment** — needs the business email (✅), the Mercury card, and a free **D-U-N-S number** for Atlas Prime Labs LLC (request early at developer.apple.com/enroll/duns-lookup — takes a few days). Then RevenueCat + Capacitor → TestFlight.
+3. **(Optional) DKIM** for the new email — Google Admin → Apps → Gmail → Authenticate email → paste the generated TXT into Namecheap (alongside the existing MX/SPF/verification records).
 3. **Apple launch compliance — full review** — Apple Developer Program enrollment (LLC ✅, domain ✅, needs business email + $99/yr + D-U-N-S for org account), App Store Review Guidelines compliance audit (health/fitness app rules, account deletion requirement, privacy nutrition labels, subscription rules → RevenueCat not Stripe on iOS), privacy policy/TOS review.
 4. **TestFlight path** — requires Dev Program enrollment + Capacitor-wrapped binary, but NOT App Store approval (internal testers ~immediately, external = lightweight beta review). Path: enrollment → Capacitor wrapper → TestFlight internal → external beta → submission.
 5. **YouTube API quota** — follow-up sent 2026-06-12 in-thread (project `movement-app-495418`); watch for Google's response. After approval: optionally rename Cloud project display name to atlas-prime.
