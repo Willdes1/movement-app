@@ -125,6 +125,14 @@ function ExerciseRow({ raw, detail, onOpen }: { raw: string; detail?: ExerciseDe
   )
 }
 
+// Assemble a clean "main instructions" line from existing plan data — no AI tokens.
+function buildMainInstructions(day: DayPlan): string {
+  if (day.coaching && day.coaching.trim()) return day.coaching.trim()
+  const focus = day.focus?.trim()
+  if (focus) return `Today's focus is ${focus.toLowerCase()}. Move with control — quality reps over speed — and rest as guided below between efforts.`
+  return `${day.label}. Move with control — quality reps over speed — and rest as guided below between efforts.`
+}
+
 function fallbackDetail(m: string, _day: DayPlan): ExerciseDetail {
   const name = parseExerciseName(m)
   return {
@@ -645,7 +653,7 @@ function CalendarInner() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
             <div>
               <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 3 }}>
-                {new Date(selectedKey + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} · Day {(selectedEntry.weekNum - 1) * 7 + selectedEntry.dayIdx + 1}
+                {new Date(selectedKey + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
               </p>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
                 <p style={{ fontWeight: 800, fontSize: 17 }}>{selectedEntry.day.label}</p>
@@ -654,7 +662,7 @@ function CalendarInner() {
                 )}
               </div>
               <span style={{ fontSize: 11, fontWeight: 700, color: getPhaseInfo(selectedEntry.weekNum).color }}>
-                Week {selectedEntry.weekNum} · {getPhaseInfo(selectedEntry.weekNum).label} Phase
+                Week {selectedEntry.weekNum} · Day {(selectedEntry.weekNum - 1) * 7 + selectedEntry.dayIdx + 1} · {getPhaseInfo(selectedEntry.weekNum).label} Phase
               </span>
             </div>
             <button
@@ -662,6 +670,31 @@ function CalendarInner() {
               style={{ background: 'none', border: 'none', fontSize: 20, color: 'var(--text-dim)', cursor: 'pointer', padding: '0 0 0 12px', lineHeight: 1 }}
             >×</button>
           </div>
+
+          {/* Read-before-you-start overview — top of the day */}
+          {selectedEntry.day.type !== 'rest' && (() => {
+            const allNames = selectedEntry.day.daily_session
+              ? (Object.values(selectedEntry.day.daily_session).flatMap(b => b?.exercises ?? []) as string[])
+              : selectedEntry.day.movements
+            const equip = inferEquipment(allNames)
+            const main = buildMainInstructions(selectedEntry.day)
+            return (
+              <div style={{ marginBottom: 14, padding: '12px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12 }}>
+                {main && <p style={{ fontSize: 12, color: 'var(--text-mid)', lineHeight: 1.55, marginBottom: 12 }}>{main}</p>}
+                <p style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Equipment needed</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                  {equip.map(eq => <span key={eq} style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 20, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-mid)' }}>{eq}</span>)}
+                </div>
+                <p style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Rest guidance</p>
+                {REST_GUIDANCE.map(r => (
+                  <p key={r.label} style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5, marginBottom: 3 }}>
+                    <span style={{ fontWeight: 700, color: 'var(--text-mid)' }}>{r.label}:</span> {r.detail}
+                  </p>
+                ))}
+              </div>
+            )
+          })()}
+
           {selectedEntry.day.daily_session ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
               {REC_BLOCK_ORDER.map(bk => {
@@ -706,34 +739,6 @@ function CalendarInner() {
             </div>
           )}
 
-          {/* Gentle recommendation + equipment + rest guidance */}
-          {selectedEntry.day.type !== 'rest' && (() => {
-            const allNames = selectedEntry.day.daily_session
-              ? (Object.values(selectedEntry.day.daily_session).flatMap(b => b?.exercises ?? []) as string[])
-              : selectedEntry.day.movements
-            const equip = inferEquipment(allNames)
-            const hasAbs = !!selectedEntry.day.daily_session?.abs
-            const hasCooldown = !!selectedEntry.day.daily_session?.cooldown
-            return (
-              <div style={{ marginBottom: 12, padding: '12px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12 }}>
-                {(hasAbs || hasCooldown) && (
-                  <p style={{ fontSize: 12, color: 'var(--text-mid)', lineHeight: 1.5, marginBottom: 10 }}>
-                    💡 {hasAbs ? 'We recommend abs today. ' : ''}{hasCooldown ? 'If you have extra time, add a cool down for best results.' : ''}
-                  </p>
-                )}
-                <p style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Equipment needed</p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-                  {equip.map(eq => <span key={eq} style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 20, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-mid)' }}>{eq}</span>)}
-                </div>
-                <p style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Rest guidance</p>
-                {REST_GUIDANCE.map(r => (
-                  <p key={r.label} style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5, marginBottom: 3 }}>
-                    <span style={{ fontWeight: 700, color: 'var(--text-mid)' }}>{r.label}:</span> {r.detail}
-                  </p>
-                ))}
-              </div>
-            )
-          })()}
           {/* Travel Adjustment — show on any workout day */}
           {selectedEntry.day.type !== 'rest' && (
             <div style={{ marginBottom: 10 }}>
