@@ -12,6 +12,7 @@ import BillingTab from '@/components/admin/BillingTab'
 import CEOBriefingTab from '@/components/admin/CEOBriefingTab'
 import BugReportsTab from '@/components/admin/BugReportsTab'
 import KnowledgeBaseTab from '@/components/admin/KnowledgeBaseTab'
+import StudyHubTab from '@/components/admin/StudyHubTab'
 import SpendTab from '@/components/admin/SpendTab'
 import VideoCurationTab from '@/components/admin/VideoCurationTab'
 import PushTab from '@/components/admin/PushTab'
@@ -42,7 +43,7 @@ const C = {
 }
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
-type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad' | 'health' | 'media' | 'impersonation' | 'retention' | 'notes' | 'billing' | 'ceo' | 'bugs' | 'kb' | 'spend' | 'video' | 'push' | 'stripe' | 'mie' | 'tts' | 'conversions'
+type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad' | 'health' | 'media' | 'impersonation' | 'retention' | 'notes' | 'billing' | 'ceo' | 'bugs' | 'kb' | 'study' | 'spend' | 'video' | 'push' | 'stripe' | 'mie' | 'tts' | 'conversions'
 type TodoRow = { id: string; content: string; category: string; status: string; priority: string; created_at: string; updated_at: string }
 type IdeaRow = { id: string; content: string; category: string; created_at: string }
 type PromoRow = { id: string; code: string; role: string; max_uses: number; uses: number; created_at: string }
@@ -1515,6 +1516,7 @@ const NAV_GROUPS = [
       { id: 'launchpad' as Tab, label: 'Launchpad' },
       { id: 'ceo' as Tab, label: 'CEO Briefing' },
       { id: 'kb' as Tab, label: 'Knowledge Base' },
+      { id: 'study' as Tab, label: '🎓 Study Hub' },
       { id: 'mie' as Tab, label: '🤖 APIE' },
     ],
   },
@@ -1544,7 +1546,7 @@ export default function AdminPage() {
   // Persist active tab in URL hash so refresh lands on the same tab
   useEffect(() => {
     const hash = window.location.hash.slice(1) as Tab
-    const valid: Tab[] = ['overview','users','activity','todos','ideas','promos','marketing','partners','launchpad','health','media','impersonation','retention','notes','billing','ceo','bugs','kb','spend','video','push','stripe','mie','tts','conversions']
+    const valid: Tab[] = ['overview','users','activity','todos','ideas','promos','marketing','partners','launchpad','health','media','impersonation','retention','notes','billing','ceo','bugs','kb','study','spend','video','push','stripe','mie','tts','conversions']
     if (valid.includes(hash)) setTab(hash)
   }, [])
   useEffect(() => { window.location.hash = tab }, [tab])
@@ -1830,6 +1832,7 @@ export default function AdminPage() {
           )}
           {tab === 'bugs' && <BugReportsTab onCountChange={setNewBugCount} />}
           {tab === 'kb' && <KnowledgeBaseTab />}
+          {tab === 'study' && <StudyHubTab />}
           {tab === 'spend' && <SpendTab />}
           {tab === 'video' && <VideoCurationTab />}
           {tab === 'tts'   && <TTSCurationTab />}
