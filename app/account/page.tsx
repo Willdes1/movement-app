@@ -9,6 +9,8 @@ import { usePlan } from '@/lib/usePlan'
 import UpgradeModal from '@/components/UpgradeModal'
 import { useStreak } from '@/lib/useStreak'
 import StreakBadge from '@/components/StreakBadge'
+import ContactSupportModal from '@/components/account/ContactSupportModal'
+import DeleteAccountModal from '@/components/account/DeleteAccountModal'
 
 type Activity = { name: string; level: string }
 const LEVELS = ['beginner', 'intermediate', 'expert', 'elite', 'pro'] as const
@@ -38,6 +40,8 @@ function AccountPageInner() {
   const { currentStreak, longestStreak } = useStreak()
   const [showUpgrade, setShowUpgrade] = useState(false)
   const [billingLoading, setBillingLoading] = useState(false)
+  const [showSupport, setShowSupport] = useState(false)
+  const [showDelete, setShowDelete] = useState(false)
   const [billingMsg, setBillingMsg] = useState('')
   const [profile, setProfile] = useState<UserProfile>({})
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
@@ -134,6 +138,20 @@ function AccountPageInner() {
   async function handleSignOut() {
     await signOut()
     router.push('/auth')
+  }
+
+  // "Take a break" — keep all data, just sign out. Becomes a true billing pause
+  // once subscriptions are live.
+  async function handleTakeBreak() {
+    setShowDelete(false)
+    await signOut()
+    router.push('/auth')
+  }
+
+  // Account fully deleted server-side — clear the local session and leave.
+  async function handleDeleted() {
+    await signOut()
+    router.replace('/auth?deleted=1')
   }
 
   async function checkCurrentCoach() {
@@ -633,13 +651,38 @@ function AccountPageInner() {
         )}
 
         <ActionButton
+          label="Contact Support"
+          sub="Questions, feedback, or something not working?"
+          icon="💬"
+          onClick={() => setShowSupport(true)}
+        />
+
+        <ActionButton
           label="Sign Out"
           sub={`Signed in as ${user.email}`}
           icon="→"
           onClick={handleSignOut}
           danger
         />
+
+        <ActionButton
+          label="Delete My Account"
+          sub="Permanently erase your account and data"
+          icon="🗑️"
+          onClick={() => setShowDelete(true)}
+          danger
+        />
       </div>
+
+      {showSupport && <ContactSupportModal onClose={() => setShowSupport(false)} />}
+      {showDelete && (
+        <DeleteAccountModal
+          onClose={() => setShowDelete(false)}
+          onTakeBreak={handleTakeBreak}
+          onContactSupport={() => { setShowDelete(false); setShowSupport(true) }}
+          onDeleted={handleDeleted}
+        />
+      )}
     </div>
   )
 }
