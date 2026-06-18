@@ -56,7 +56,7 @@ type GeneratedContent = {
 }
 
 export async function POST(req: Request) {
-  const auth = await verifyAdmin(req)
+  const auth = await verifyAdmin(req, 'study')
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const { supabase, userId } = auth
 

@@ -28,7 +28,7 @@ const COACHED_HIDDEN = ['/import-program', '/convert-plan']
 
 export default function Sidebar() {
   const pathname = usePathname()
-  const { user, isAdmin, role, impersonating } = useAuth()
+  const { user, isAdmin, role, impersonating, hasAdminAccess } = useAuth()
   const { coached } = useCoached()
   const [profile, setProfile] = useState<{ name: string | null; sports: string[] | null } | null>(null)
 
@@ -95,6 +95,33 @@ export default function Sidebar() {
           )
         })}
       </div>
+
+      {/* Admin portal link — owner + permitted partners only; hidden during impersonation */}
+      {!impersonating && hasAdminAccess && (
+        <div style={{ padding: '0 8px 4px' }}>
+          <Link
+            href="/admin"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '11px 20px',
+              borderRadius: 10,
+              fontSize: 13,
+              fontWeight: 500,
+              color: 'var(--text-dim)',
+              background: 'transparent',
+              textDecoration: 'none',
+              borderTop: '1px solid var(--border)',
+              marginTop: 4,
+              paddingTop: 12,
+            }}
+          >
+            <span style={{ fontSize: 15, width: 20, textAlign: 'center', flexShrink: 0 }}>🔑</span>
+            Admin Portal
+          </Link>
+        </div>
+      )}
 
       {/* Coach portal link — coaches and admins only; hidden during impersonation */}
       {!impersonating && (isAdmin || role === 'coach') && (

@@ -14,6 +14,9 @@ type AuthContextType = {
   session: Session | null
   loading: boolean
   isAdmin: boolean
+  isOwner: boolean
+  hasAdminAccess: boolean
+  adminTabs: string[] | null   // null = owner / all tabs; array = partner's allowed tab ids
   role: 'admin' | 'coach' | 'beta' | 'free' | 'ff'
   signOut: () => Promise<void>
   effectiveUserId: string | null
@@ -32,6 +35,9 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   loading: true,
   isAdmin: false,
+  isOwner: false,
+  hasAdminAccess: false,
+  adminTabs: null,
   role: 'free',
   signOut: async () => {},
   effectiveUserId: null,
@@ -60,6 +66,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isOwner, setIsOwner] = useState(false)
+  const [hasAdminAccess, setHasAdminAccess] = useState(false)
+  const [adminTabs, setAdminTabs] = useState<string[] | null>(null)
   const [role, setRole] = useState<'admin' | 'coach' | 'beta' | 'free' | 'ff'>('free')
   const [impersonatedUserId, setImpersonatedUserId] = useState<string | null>(null)
   const [impersonatedUserName, setImpersonatedUserName] = useState<string | null>(null)
@@ -78,12 +87,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function fetchUserStatus(userId: string) {
     const { data } = await supabase
       .from('profiles')
-      .select('is_admin, role')
+      .select('is_admin, is_owner, role')
       .eq('id', userId)
       .single()
     const admin = data?.is_admin === true
+    const owner = admin || data?.is_owner === true
     setIsAdmin(admin)
+    setIsOwner(owner)
     setRole(data?.role ?? (admin ? 'admin' : 'free'))
+
+    if (owner) {
+      // Owner sees everything — no tab restriction.
+      setHasAdminAccess(true)
+      setAdminTabs(null)
+      return
+    }
+
+    // Partner path — access driven solely by an active admin_permissions row.
+    const { data: perm } = await supabase
+      .from('admin_permissions')
+      .select('allowed_tabs, active')
+      .eq('user_id', userId)
+      .maybeSingle()
+    if (perm?.active) {
+      setHasAdminAccess(true)
+      setAdminTabs((perm.allowed_tabs ?? []) as string[])
+    } else {
+      setHasAdminAccess(false)
+      setAdminTabs(null)
+    }
   }
 
   // Auto-exit timer — checks every 10 seconds
@@ -147,6 +179,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         fetchUserStatus(session.user.id)
       } else {
         setIsAdmin(false)
+        setIsOwner(false)
+        setHasAdminAccess(false)
+        setAdminTabs(null)
         setRole('free')
         // Close any active impersonation session on sign-out
         const sid = impersonationSessionIdRef.current
@@ -246,7 +281,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      user, session, loading, isAdmin, role, signOut,
+      user, session, loading, isAdmin, isOwner, hasAdminAccess, adminTabs, role, signOut,
       effectiveUserId, impersonating, impersonatedUserName,
       impersonationSessionId, impersonationExpiresAt,
       startImpersonation, stopImpersonation,

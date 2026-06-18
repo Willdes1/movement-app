@@ -6,7 +6,7 @@ export const maxDuration = 30
 
 // GET /api/admin/study/entries?kbId=... — list entries for one knowledge base
 export async function GET(req: Request) {
-  const auth = await verifyAdmin(req)
+  const auth = await verifyAdmin(req, 'study')
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const { supabase } = auth
 
@@ -24,7 +24,7 @@ export async function GET(req: Request) {
 
 // PATCH /api/admin/study/entries — update an entry (id in body): status, tags, title
 export async function PATCH(req: Request) {
-  const auth = await verifyAdmin(req)
+  const auth = await verifyAdmin(req, 'study')
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const { supabase } = auth
 
@@ -44,7 +44,7 @@ export async function PATCH(req: Request) {
 
 // DELETE /api/admin/study/entries — delete an entry (id in body)
 export async function DELETE(req: Request) {
-  const auth = await verifyAdmin(req)
+  const auth = await verifyAdmin(req, 'study')
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const { supabase } = auth
 

@@ -6,7 +6,7 @@ export const maxDuration = 30
 
 // GET /api/admin/study/kbs — list all knowledge bases (with entry + mastery counts)
 export async function GET(req: Request) {
-  const auth = await verifyAdmin(req)
+  const auth = await verifyAdmin(req, 'study')
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const { supabase } = auth
 
@@ -35,7 +35,7 @@ export async function GET(req: Request) {
 
 // POST /api/admin/study/kbs — create a knowledge base
 export async function POST(req: Request) {
-  const auth = await verifyAdmin(req)
+  const auth = await verifyAdmin(req, 'study')
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const { supabase, userId } = auth
 
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
 
 // PATCH /api/admin/study/kbs — update a knowledge base (id in body)
 export async function PATCH(req: Request) {
-  const auth = await verifyAdmin(req)
+  const auth = await verifyAdmin(req, 'study')
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const { supabase } = auth
 
@@ -82,7 +82,7 @@ export async function PATCH(req: Request) {
 
 // DELETE /api/admin/study/kbs — delete a knowledge base + its entries (id in body)
 export async function DELETE(req: Request) {
-  const auth = await verifyAdmin(req)
+  const auth = await verifyAdmin(req, 'study')
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const { supabase } = auth
 

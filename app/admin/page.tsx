@@ -13,6 +13,8 @@ import CEOBriefingTab from '@/components/admin/CEOBriefingTab'
 import BugReportsTab from '@/components/admin/BugReportsTab'
 import KnowledgeBaseTab from '@/components/admin/KnowledgeBaseTab'
 import StudyHubTab from '@/components/admin/StudyHubTab'
+import AccessControlTab from '@/components/admin/AccessControlTab'
+import { GRANTABLE_TABS } from '@/lib/admin-tabs'
 import SpendTab from '@/components/admin/SpendTab'
 import VideoCurationTab from '@/components/admin/VideoCurationTab'
 import PushTab from '@/components/admin/PushTab'
@@ -43,7 +45,7 @@ const C = {
 }
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
-type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad' | 'health' | 'media' | 'impersonation' | 'retention' | 'notes' | 'billing' | 'ceo' | 'bugs' | 'kb' | 'study' | 'spend' | 'video' | 'push' | 'stripe' | 'mie' | 'tts' | 'conversions'
+type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad' | 'health' | 'media' | 'impersonation' | 'retention' | 'notes' | 'billing' | 'ceo' | 'bugs' | 'kb' | 'study' | 'access' | 'spend' | 'video' | 'push' | 'stripe' | 'mie' | 'tts' | 'conversions'
 type TodoRow = { id: string; content: string; category: string; status: string; priority: string; created_at: string; updated_at: string }
 type IdeaRow = { id: string; content: string; category: string; created_at: string }
 type PromoRow = { id: string; code: string; role: string; max_uses: number; uses: number; created_at: string }
@@ -1518,6 +1520,7 @@ const NAV_GROUPS = [
       { id: 'kb' as Tab, label: 'Knowledge Base' },
       { id: 'study' as Tab, label: '🎓 Study Hub' },
       { id: 'mie' as Tab, label: '🤖 APIE' },
+      { id: 'access' as Tab, label: '🔑 Access Control' },
     ],
   },
   {
@@ -1538,15 +1541,23 @@ const NAV_GROUPS = [
 
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 export default function AdminPage() {
-  const { user, isAdmin, loading: authLoading, startImpersonation } = useAuth()
+  const { user, isAdmin, isOwner, hasAdminAccess, adminTabs, loading: authLoading, startImpersonation } = useAuth()
   const router = useRouter()
 
   const [tab, setTab] = useState<Tab>('overview')
 
+  // Which tabs this admin may see. Owner = all; partner = granted & grantable only.
+  const visibleTabIds = useMemo(() => {
+    const all = NAV_GROUPS.flatMap(g => g.items).map(i => i.id as string)
+    if (isOwner) return new Set(all)
+    const granted = new Set((adminTabs ?? []).filter(id => GRANTABLE_TABS.includes(id)))
+    return new Set(all.filter(id => granted.has(id)))
+  }, [isOwner, adminTabs])
+
   // Persist active tab in URL hash so refresh lands on the same tab
   useEffect(() => {
     const hash = window.location.hash.slice(1) as Tab
-    const valid: Tab[] = ['overview','users','activity','todos','ideas','promos','marketing','partners','launchpad','health','media','impersonation','retention','notes','billing','ceo','bugs','kb','study','spend','video','push','stripe','mie','tts','conversions']
+    const valid: Tab[] = ['overview','users','activity','todos','ideas','promos','marketing','partners','launchpad','health','media','impersonation','retention','notes','billing','ceo','bugs','kb','study','access','spend','video','push','stripe','mie','tts','conversions']
     if (valid.includes(hash)) setTab(hash)
   }, [])
   useEffect(() => { window.location.hash = tab }, [tab])
@@ -1586,11 +1597,20 @@ export default function AdminPage() {
   }, [])
 
   useEffect(() => {
-    if (!authLoading && (!user || !isAdmin)) router.replace('/today')
-  }, [authLoading, user, isAdmin, router])
+    if (!authLoading && (!user || !hasAdminAccess)) router.replace('/today')
+  }, [authLoading, user, hasAdminAccess, router])
+
+  // If a partner lands on a section they can't see, move them to their first visible one.
+  useEffect(() => {
+    if (!hasAdminAccess || isOwner) return
+    if (!visibleTabIds.has(tab)) {
+      const first = NAV_GROUPS.flatMap(g => g.items).map(i => i.id as Tab).find(id => visibleTabIds.has(id))
+      if (first) setTab(first)
+    }
+  }, [hasAdminAccess, isOwner, visibleTabIds, tab])
 
   const loadAll = useCallback(async () => {
-    if (!isAdmin) return
+    if (!isOwner) return   // all-user PII data is owner-only; partners never load it
     setDataLoading(true)
 
     const sevenDaysAgo = new Date()
@@ -1699,16 +1719,16 @@ export default function AdminPage() {
     setPromos(promosRes.data ?? [])
     setNewBugCount(bugCountRes.count ?? 0)
     setDataLoading(false)
-  }, [isAdmin])
+  }, [isOwner])
 
-  useEffect(() => { if (isAdmin) loadAll() }, [isAdmin, loadAll])
+  useEffect(() => { if (isOwner) loadAll() }, [isOwner, loadAll])
 
   async function handleRoleChange(userId: string, newRole: string) {
     await supabase.from('profiles').update({ role: newRole }).eq('id', userId)
     await loadAll()
   }
 
-  if (authLoading || (!isAdmin && !authLoading)) {
+  if (authLoading || (!hasAdminAccess && !authLoading)) {
     return (
       <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.bg, color: C.textDim, fontSize: 14 }}>
         {authLoading ? 'Loading…' : 'Access denied'}
@@ -1753,10 +1773,13 @@ export default function AdminPage() {
 
         {/* Nav groups */}
         <nav style={{ padding: '10px 10px', flex: 1, overflowY: 'auto' }}>
-          {NAV_GROUPS.map(group => (
+          {NAV_GROUPS.map(group => {
+            const items = group.items.filter(item => visibleTabIds.has(item.id))
+            if (items.length === 0) return null
+            return (
             <div key={group.label} style={{ marginBottom: 18 }}>
               <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.textDim, padding: '4px 10px 6px' }}>{group.label}</p>
-              {group.items.map(item => {
+              {items.map(item => {
                 const active = tab === item.id
                 const badge = item.id === 'todos' ? (activeTodoCount > 0 ? activeTodoCount : null)
                            : item.id === 'ideas' ? (ideas.length > 0 ? ideas.length : null)
@@ -1770,7 +1793,8 @@ export default function AdminPage() {
                 )
               })}
             </div>
-          ))}
+            )
+          })}
         </nav>
 
         {/* Footer */}
@@ -1814,6 +1838,10 @@ export default function AdminPage() {
 
         {/* Scrollable content */}
         <main style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '20px 16px 40px' : '28px 28px 60px' }}>
+          {!visibleTabIds.has(tab) ? (
+            <div style={{ padding: '60px 20px', textAlign: 'center', color: C.textDim, fontSize: 14 }}>You don&apos;t have access to this section.</div>
+          ) : (
+          <>
           {tab === 'overview' && <OverviewTab users={users} events={events} kpis={kpis} isMobile={isMobile} />}
           {tab === 'users' && <UsersTab users={users} onRoleChange={handleRoleChange} onZoomIn={setSelectedUser} onOpenZoomModal={setZoomTarget} />}
           {tab === 'impersonation' && <ImpersonationActivityTab users={users} />}
@@ -1833,6 +1861,7 @@ export default function AdminPage() {
           {tab === 'bugs' && <BugReportsTab onCountChange={setNewBugCount} />}
           {tab === 'kb' && <KnowledgeBaseTab />}
           {tab === 'study' && <StudyHubTab />}
+          {tab === 'access' && <AccessControlTab />}
           {tab === 'spend' && <SpendTab />}
           {tab === 'video' && <VideoCurationTab />}
           {tab === 'tts'   && <TTSCurationTab />}
@@ -1844,6 +1873,8 @@ export default function AdminPage() {
           {tab === 'ceo' && <CEOBriefingTab />}
           {tab === 'media' && <MediaLibraryTab />}
           {tab === 'health' && <><TokenUsageCard /><LibraryBackfillCard /><ExerciseLibraryCard /><HealthTab /></>}
+          </>
+          )}
         </main>
       </div>
     </div>
