@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import { TAB_CATALOG, GRANTABLE_TABS, TAB_LABEL } from '@/lib/admin-tabs'
+import { TAB_CATALOG, GRANTABLE_TABS, TAB_LABEL, OWNER_ONLY_TABS, isSensitive } from '@/lib/admin-tabs'
 
 const C = {
   bg: '#0d1117', surface: '#161b22', surface2: '#21262d', border: '#30363d',
@@ -18,18 +18,22 @@ type Partner = {
   allowed_tabs: string[]; active: boolean; note: string | null; created_at: string; updated_at: string
 }
 
-// Grantable sections grouped for the checkbox grid.
-const GRANT_GROUPS: { group: string; tabs: { id: string; label: string }[] }[] = (() => {
+// Every section can be granted except the owner-only master key. Grouped for the
+// checkbox grid; sensitive sections (user data / money) are flagged, not locked.
+type GridTab = { id: string; label: string; sensitive: boolean }
+const GRANT_GROUPS: { group: string; tabs: GridTab[] }[] = (() => {
   const order: string[] = []
-  const byGroup: Record<string, { id: string; label: string }[]> = {}
+  const byGroup: Record<string, GridTab[]> = {}
   for (const t of TAB_CATALOG) {
-    if (!t.grantable) continue
+    if (OWNER_ONLY_TABS.includes(t.id)) continue
     if (!byGroup[t.group]) { byGroup[t.group] = []; order.push(t.group) }
-    byGroup[t.group].push({ id: t.id, label: t.label })
+    byGroup[t.group].push({ id: t.id, label: t.label, sensitive: t.sensitive })
   }
   return order.map(group => ({ group, tabs: byGroup[group] }))
 })()
-const PRIVATE_LIST = TAB_CATALOG.filter(t => !t.grantable)
+const OWNER_ONLY_LIST = TAB_CATALOG.filter(t => OWNER_ONLY_TABS.includes(t.id))
+
+const countSensitive = (selected: Set<string>) => [...selected].filter(isSensitive).length
 
 async function authFetch(input: string, init?: RequestInit) {
   const { data: { session } } = await supabase.auth.getSession()
@@ -43,24 +47,41 @@ const labelName = (p: { name: string | null; email: string | null }) => p.name |
 
 // ─── Section checkbox grid (shared by grant modal + partner editor) ───────────
 function SectionGrid({ selected, onToggle }: { selected: Set<string>; onToggle: (id: string) => void }) {
+  const sensitiveCount = countSensitive(selected)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* Legend */}
+      <div style={{ display: 'flex', gap: 16, fontSize: 11, color: C.textDim }}>
+        <span>✅ Safe to share</span>
+        <span style={{ color: C.amber }}>⚠️ Sensitive — user data / money</span>
+      </div>
+
       {GRANT_GROUPS.map(g => (
         <div key={g.group}>
           <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.textDim, marginBottom: 8 }}>{g.group}</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8 }}>
             {g.tabs.map(t => {
               const on = selected.has(t.id)
+              const onBorder = t.sensitive ? 'rgba(245,158,11,0.45)' : C.accentBorder
+              const onBg = t.sensitive ? C.amberDim : C.accentDim
+              const check = t.sensitive ? C.amber : C.accent
               return (
-                <button key={t.id} onClick={() => onToggle(t.id)} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 11px', borderRadius: 8, border: `1px solid ${on ? C.accentBorder : C.border}`, background: on ? C.accentDim : 'transparent', color: on ? C.text : C.textMid, fontSize: 13, fontWeight: on ? 600 : 400, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
-                  <span style={{ width: 16, height: 16, borderRadius: 4, flexShrink: 0, border: `1.5px solid ${on ? C.accent : C.border}`, background: on ? C.accent : 'transparent', color: '#fff', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{on ? '✓' : ''}</span>
-                  {t.label}
+                <button key={t.id} onClick={() => onToggle(t.id)} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 11px', borderRadius: 8, border: `1px solid ${on ? onBorder : C.border}`, background: on ? onBg : 'transparent', color: on ? C.text : C.textMid, fontSize: 13, fontWeight: on ? 600 : 400, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+                  <span style={{ width: 16, height: 16, borderRadius: 4, flexShrink: 0, border: `1.5px solid ${on ? check : C.border}`, background: on ? check : 'transparent', color: '#fff', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{on ? '✓' : ''}</span>
+                  <span style={{ flex: 1 }}>{t.label}</span>
+                  {t.sensitive && <span title="Sensitive — user data / money" style={{ fontSize: 12, flexShrink: 0 }}>⚠️</span>}
                 </button>
               )
             })}
           </div>
         </div>
       ))}
+
+      {sensitiveCount > 0 && (
+        <div style={{ padding: '10px 14px', borderRadius: 8, background: C.amberDim, border: `1px solid rgba(245,158,11,0.3)`, fontSize: 12.5, color: C.amber, lineHeight: 1.5 }}>
+          ⚠️ You&apos;re sharing {sensitiveCount} sensitive section{sensitiveCount > 1 ? 's' : ''} (user data, money, or platform controls). Only grant these to people you fully trust.
+        </div>
+      )}
     </div>
   )
 }
@@ -228,13 +249,13 @@ export default function AccessControlTab() {
         )}
       </div>
 
-      {/* Private sections */}
+      {/* Owner-only + sharing model */}
       <div style={{ marginTop: 28 }}>
-        <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.textDim, marginBottom: 6 }}>🔒 Private to you (never grantable)</p>
-        <p style={{ fontSize: 12, color: C.textDim, marginBottom: 12, lineHeight: 1.5 }}>These sections hold user data, money, or platform controls — partners can never see them, even if you check everything else.</p>
+        <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.textDim, marginBottom: 6 }}>🔑 Owner-only</p>
+        <p style={{ fontSize: 12, color: C.textDim, marginBottom: 12, lineHeight: 1.5 }}>You can share <strong style={{ color: C.textMid }}>any</strong> section with a partner. Sensitive ones (user data / money) are flagged ⚠️ when you grant them — share those with care. The one exception below stays yours alone: it&apos;s the master key that controls everyone&apos;s permissions.</p>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {PRIVATE_LIST.map(t => (
-            <span key={t.id} style={{ fontSize: 11, color: C.textDim, background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 8, padding: '4px 10px' }}>{t.label}</span>
+          {OWNER_ONLY_LIST.map(t => (
+            <span key={t.id} style={{ fontSize: 11, color: C.textDim, background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 8, padding: '4px 10px' }}>🔒 {t.label}</span>
           ))}
         </div>
       </div>
