@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = { title: 'Privacy Policy — Atlas Prime' }
 
 const EFFECTIVE = 'May 7, 2026'
+const LAST_UPDATED = 'June 18, 2026'
 
 export default function PrivacyPage() {
   return (
@@ -21,7 +22,7 @@ export default function PrivacyPage() {
           Privacy Policy
         </h1>
         <p style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-          Effective {EFFECTIVE} &nbsp;·&nbsp; Last updated {EFFECTIVE}
+          Effective {EFFECTIVE} &nbsp;·&nbsp; Last updated {LAST_UPDATED}
         </p>
       </div>
 
@@ -72,6 +73,7 @@ export default function PrivacyPage() {
         <UL items={[
           'Supabase — database hosting, authentication, and file storage. Data is stored in secure cloud infrastructure.',
           'Anthropic — the AI that generates your workout programs. Your fitness profile and relevant training context are sent to Anthropic\'s API to produce personalized content. Anthropic\'s privacy policy governs their handling of API data.',
+          'OpenAI — provides spoken (text-to-speech) narration of exercise instructions and generates the text embeddings used to retrieve relevant coaching knowledge. Limited exercise and coaching text is sent to OpenAI\'s API. OpenAI\'s privacy policy governs their handling of API data.',
           'Google — if you sign in with Google, your Google account information is shared with Google per their privacy policy.',
           'Vercel — the platform that hosts and serves the Atlas Prime web application.',
         ]} />
