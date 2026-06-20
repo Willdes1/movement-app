@@ -2,11 +2,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-
-// Flip to true once billing (RevenueCat / Stripe) is live to activate the
-// discount save-offer. Until then the "too expensive" branch nudges gently
-// (there's nothing to charge yet).
-const BILLING_LIVE = false
+import { BILLING_LIVE } from '@/lib/flags'
 
 type Step = 'intent' | 'reason' | 'offer' | 'confirm'
 type Reason = 'no_time' | 'too_pricey' | 'not_for_me' | 'technical' | 'privacy' | 'other'

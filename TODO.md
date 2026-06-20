@@ -320,6 +320,7 @@ All three feed the same search index. Different shapes, one search surface.
 
 ## 🏗️ Infrastructure
 - [ ] Stripe billing integration (freemium → paid tier)
+    - ⚠️ **BILLING GO-LIVE CHECKLIST (do as the final step before launch):** flip `BILLING_LIVE = true` in `lib/flags.ts` (turns on the delete-funnel discount offer + any future billing-gated UI); add Stripe/RevenueCat to the Privacy Policy data-sharing list; add the "Restore Purchases" button (Apple requirement); iOS uses Apple IAP/RevenueCat ONLY (Stripe = web only, or instant App Store rejection). Full list in memory `project_billing_golive.md`.
 - [ ] Push notifications (streaks, reminders, milestones)
 
 ## ✅ Completed
