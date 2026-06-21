@@ -187,7 +187,7 @@ Massive session — 11 features shipped, all deployed green. The full coach-clie
 
 ### Ops Notes
 - **Vercel webhook dropped twice today** (push received by GitHub, no Vercel status ever posted). Fix: `git commit --allow-empty` + push re-fires it. Verify deploys via `gh api repos/Willdes1/movement-app/commits/<sha>/status`.
-- **`/api/notifications/send` has NO auth check** (pre-existing) — anyone can send pushes. Flagged for lockdown.
+- ~~**`/api/notifications/send` has NO auth check**~~ — FIXED 2026-06-19: now gated by `verifyAdmin(req, 'push')` (admin/owner or push-permitted partner), with an optional `x-cron-secret` header for trusted server callers. PushTab sends the admin JWT.
 
 ### SQL Migrations — ALL CONFIRMED RUN (2026-06-11)
 1. `20260611_coach_day_completions.sql` ✅
@@ -740,7 +740,7 @@ return () => { supabase.removeChannel(channel) }
 7. **TTS backfill** — `/admin#tts` daily (~700 exercises remaining).
 8. **Muscle Beach Method video curation** — `/admin#video`.
 9. **Stripe billing for coach tiers** (web) + **RevenueCat** (iOS/Android) + **Capacitor wrapper**.
-10. **Lock down `/api/notifications/send`** — currently no auth check; anyone can send pushes.
+10. ~~**Lock down `/api/notifications/send`**~~ — DONE 2026-06-19 (admin/owner or push-permitted partner via `verifyAdmin`, plus optional cron secret).
 11. **Real logo** — swap `components/ui/Logo.tsx` when the final asset is ready.
 12. **Someday:** redirect cleanup — flip www.atlasprime.app redirect from 307 → 308 in Vercel (cosmetic; works fine as-is).
 

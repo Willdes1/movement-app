@@ -1,5 +1,6 @@
 import webpush from 'web-push'
 import { createClient } from '@supabase/supabase-js'
+import { verifyAdmin } from '@/lib/admin-auth'
 
 export const runtime = 'nodejs'
 
@@ -10,8 +11,25 @@ function getAdmin() {
   )
 }
 
+// Trusted server-to-server caller (e.g. a future cron job sending nudges) that
+// can't carry a user JWT. Only valid when CRON_SECRET is configured.
+function isCronAuthed(request: Request): boolean {
+  const secret = process.env.CRON_SECRET
+  if (!secret) return false
+  const provided = request.headers.get('x-cron-secret')
+  return !!provided && provided === secret
+}
+
 export async function POST(request: Request) {
   try {
+    // GATE: this endpoint can blast push to every subscriber, so it must never
+    // be public. Allow an admin/owner (or a partner granted the "push" section),
+    // or a trusted server caller holding the cron secret.
+    if (!isCronAuthed(request)) {
+      const auth = await verifyAdmin(request, 'push')
+      if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
+    }
+
     const { title, body, url = '/today', userId } = await request.json()
     if (!title || !body) return Response.json({ error: 'title and body required' }, { status: 400 })
 
