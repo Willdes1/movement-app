@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import type { CoachLibEntry } from '@/contexts/CoachedContext'
 
 interface ParsedDay {
   day: string
@@ -52,6 +53,14 @@ function currentProgramWeek(startDate: string, weeksTotal: number): number {
   return Math.min(Math.max(Math.floor(days / 7) + 1, 1), weeksTotal)
 }
 
+// Matches CoachedSessionCard / my-program normalization so movements line up with
+// the coach's library keys.
+function normalizeExName(raw: string) {
+  return raw.toLowerCase()
+    .replace(/\s+\d+[×x]\d+.*/i, '').replace(/\s+\d+\s+sets?.*/i, '').trim()
+    .replace(/[-–—]/g, ' ').replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '_')
+}
+
 function weekProgress(startDate: string, total: number): number {
   const week = currentProgramWeek(startDate, total)
   return Math.round((week / total) * 100)
@@ -91,6 +100,7 @@ function MyCoachInner() {
   const [assignment, setAssignment] = useState<AssignmentData | null>(null)
   const [coachName, setCoachName]   = useState<string>('')
   const [coachId, setCoachId]       = useState<string | null>(null)
+  const [coachLibrary, setCoachLibrary] = useState<Record<string, CoachLibEntry>>({})
   const [loading, setLoading]       = useState(true)
   const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(new Set())
   const [expandedDays, setExpandedDays]   = useState<Set<string>>(new Set())
@@ -121,6 +131,7 @@ function MyCoachInner() {
       setWeeks(data.weeks)
       setCoachName(data.coachName)
       setCoachId(data.coachId ?? null)
+      setCoachLibrary(data.coachLibrary ?? {})
 
       // Auto-expand current week
       const currWeek = currentProgramWeek(data.assignment.start_date, data.program?.weeks_total ?? 1)
@@ -216,6 +227,17 @@ function MyCoachInner() {
       next.has(key) ? next.delete(key) : next.add(key)
       return next
     })
+  }
+
+  // Subtle marker when the coach has their own demo/cues for this exercise.
+  function coachBadge(m: string) {
+    const c = coachLibrary[normalizeExName(m)]
+    if (!c || !(c.video_type || c.instructions || c.notes)) return null
+    return (
+      <span title={`Coach ${coachName.split(' ')[0] || ''} added a demo & cues — watch it on your Today workout`} style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 800, color: 'var(--accent)', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 6, padding: '2px 7px', flexShrink: 0, whiteSpace: 'nowrap' }}>
+        {c.video_type ? '🎥 ' : ''}★ Coach
+      </span>
+    )
   }
 
   if (loading) return (
@@ -423,9 +445,10 @@ function MyCoachInner() {
           )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {todayDay.movements.map((m, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '8px 12px', background: 'var(--surface2)', borderRadius: 9 }}>
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'var(--surface2)', borderRadius: 9 }}>
                 <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 700, minWidth: 18, textAlign: 'right', flexShrink: 0 }}>{i + 1}</span>
                 <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{m}</span>
+                {coachBadge(m)}
               </div>
             ))}
           </div>
@@ -548,9 +571,10 @@ function MyCoachInner() {
                         {isDayOpen && !isRest && (
                           <div style={{ borderTop: '1px solid var(--border)', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
                             {day.movements.map((m, i) => (
-                              <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '7px 10px', background: 'var(--surface2)', borderRadius: 8 }}>
+                              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', background: 'var(--surface2)', borderRadius: 8 }}>
                                 <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 700, minWidth: 16, textAlign: 'right', flexShrink: 0 }}>{i + 1}</span>
                                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{m}</span>
+                                {coachBadge(m)}
                               </div>
                             ))}
                             {day.focus && (
