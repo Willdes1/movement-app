@@ -11,6 +11,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { supabase } from '@/lib/supabase'
+import LibraryPickerModal, { LibraryItem } from '@/components/coach/LibraryPickerModal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -48,8 +49,17 @@ interface ClientNote {
 }
 
 interface ExerciseSuggestion {
-  name_display: string
-  tip: string | null
+  name: string
+  meta: string | null            // coach instructions snippet, or global tip
+  source: 'library' | 'global'   // the coach's own library vs the global database
+  sets_reps?: string | null      // autofilled on select for library items
+  hasVideo?: boolean
+}
+
+// Build the text inserted into a builder row — append the coach's saved sets×reps
+// for library items so "Incline DB Press" becomes "Incline DB Press 4×10".
+function suggestionValue(s: ExerciseSuggestion): string {
+  return s.source === 'library' && s.sets_reps ? `${s.name} ${s.sets_reps}` : s.name
 }
 
 const DAYS: ManualDay['day'][] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -99,7 +109,7 @@ function SortableExercise({
   inputRef?: React.RefObject<HTMLInputElement | null>
   showRemove: boolean
   suggestions: ExerciseSuggestion[]
-  onSelectSuggestion: (name: string) => void
+  onSelectSuggestion: (s: ExerciseSuggestion) => void
   showSuggestions: boolean
   onFocus: () => void
   onBlur: () => void
@@ -158,13 +168,18 @@ function SortableExercise({
               {suggestions.map((s, i) => (
                 <div
                   key={i}
-                  onMouseDown={e => { e.preventDefault(); onSelectSuggestion(s.name_display) }}
+                  onMouseDown={e => { e.preventDefault(); onSelectSuggestion(s) }}
                   style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid var(--border)' }}
                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{s.name_display}</div>
-                  {s.tip && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 1 }}>{s.tip}</div>}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{s.name}</span>
+                    {s.source === 'library' && <span style={{ fontSize: 9, fontWeight: 800, color: 'var(--accent)', background: 'var(--accent-bg)', border: '1px solid var(--accent-border)', borderRadius: 4, padding: '0 5px', letterSpacing: '0.04em' }}>★ LIBRARY</span>}
+                    {s.hasVideo && <span title="Has video" style={{ fontSize: 11 }}>🎥</span>}
+                    {s.source === 'library' && s.sets_reps && <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 600, marginLeft: 'auto' }}>{s.sets_reps}</span>}
+                  </div>
+                  {s.meta && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.meta}</div>}
                 </div>
               ))}
             </div>
@@ -203,16 +218,18 @@ function SortableExercise({
 // ── Day editor ────────────────────────────────────────────────────────────────
 
 function DayEditor({
-  day, weekIdx, dayIdx, onUpdate, clientNotes,
+  day, weekIdx, dayIdx, onUpdate, clientNotes, coachId,
 }: {
   day: ManualDay
   weekIdx: number
   dayIdx: number
   onUpdate: (weekIdx: number, dayIdx: number, updated: ManualDay) => void
   clientNotes: ClientNote[]
+  coachId: string
 }) {
   const [focusedExId, setFocusedExId] = useState<string | null>(null)
   const [suggestions, setSuggestions] = useState<ExerciseSuggestion[]>([])
+  const [showPicker, setShowPicker] = useState(false)
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastInputRef = useRef<HTMLInputElement>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
@@ -232,19 +249,44 @@ function DayEditor({
   }
 
   async function searchExercises(q: string) {
-    const { data } = await supabase
-      .from('exercise_library')
-      .select('name_display, tip')
-      .ilike('name_display', `%${q}%`)
-      .order('name_display')
-      .limit(6)
-    setSuggestions((data ?? []) as ExerciseSuggestion[])
+    // The coach's own library first, then the global database (de-duped by name).
+    const [libRes, globRes] = await Promise.all([
+      supabase.from('coach_exercise_library')
+        .select('name, sets_reps, instructions, video_type')
+        .eq('coach_id', coachId)
+        .ilike('name', `%${q}%`)
+        .order('name').limit(6),
+      supabase.from('exercise_library')
+        .select('name_display, tip')
+        .ilike('name_display', `%${q}%`)
+        .order('name_display').limit(6),
+    ])
+    const lib: ExerciseSuggestion[] = (libRes.data ?? []).map(r => ({
+      name: r.name,
+      meta: r.instructions ? String(r.instructions).slice(0, 70) : null,
+      source: 'library' as const,
+      sets_reps: r.sets_reps,
+      hasVideo: !!r.video_type,
+    }))
+    const libNames = new Set(lib.map(l => l.name.toLowerCase()))
+    const glob: ExerciseSuggestion[] = (globRes.data ?? [])
+      .filter(r => !libNames.has(String(r.name_display ?? '').toLowerCase()))
+      .map(r => ({ name: r.name_display, meta: r.tip, source: 'global' as const }))
+    setSuggestions([...lib, ...glob].slice(0, 8))
   }
 
-  function selectSuggestion(exId: string, name: string) {
-    update({ exercises: day.exercises.map(e => e.id === exId ? { ...e, value: name } : e) })
+  function selectSuggestion(exId: string, s: ExerciseSuggestion) {
+    const value = suggestionValue(s)
+    update({ exercises: day.exercises.map(e => e.id === exId ? { ...e, value } : e) })
     setSuggestions([])
     setFocusedExId(null)
+  }
+
+  function addFromLibrary(picks: LibraryItem[]) {
+    const newRows = picks.map(p => ({ id: makeId(), value: p.sets_reps ? `${p.name} ${p.sets_reps}` : p.name }))
+    const kept = day.exercises.filter(e => e.value.trim())
+    const merged = [...kept, ...newRows]
+    update({ exercises: merged.length ? merged : [{ id: makeId(), value: '' }] })
   }
 
   function addExercise() {
@@ -357,7 +399,7 @@ function DayEditor({
                 inputRef={exIdx === day.exercises.length - 1 ? lastInputRef : undefined}
                 showRemove={day.exercises.length > 1}
                 suggestions={focusedExId === ex.id ? suggestions : []}
-                onSelectSuggestion={name => selectSuggestion(ex.id, name)}
+                onSelectSuggestion={s => selectSuggestion(ex.id, s)}
                 showSuggestions={focusedExId === ex.id}
                 onFocus={() => setFocusedExId(ex.id)}
                 onBlur={() => setTimeout(() => setFocusedExId(null), 150)}
@@ -367,13 +409,26 @@ function DayEditor({
           </SortableContext>
         </DndContext>
 
-        <button
-          onClick={addExercise}
-          style={{ alignSelf: 'flex-start', fontSize: 11, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', fontWeight: 700, marginTop: 2 }}
-        >
-          + Add exercise
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 2 }}>
+          <button
+            onClick={addExercise}
+            style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', fontWeight: 700 }}
+          >
+            + Add exercise
+          </button>
+          <button
+            onClick={() => setShowPicker(true)}
+            title="Add exercises from your personal library"
+            style={{ fontSize: 11, color: 'var(--accent)', background: 'var(--accent-bg)', border: '1px solid var(--accent-border)', borderRadius: 6, cursor: 'pointer', padding: '3px 10px', fontWeight: 700 }}
+          >
+            📚 From Library
+          </button>
+        </div>
       </div>
+
+      {showPicker && (
+        <LibraryPickerModal coachId={coachId} onAdd={addFromLibrary} onClose={() => setShowPicker(false)} />
+      )}
     </div>
   )
 }
@@ -703,6 +758,7 @@ export default function ManualProgramBuilder({
                       dayIdx={di}
                       onUpdate={updateDay}
                       clientNotes={clientNotes}
+                      coachId={coachId}
                     />
                   ))}
                 </div>
