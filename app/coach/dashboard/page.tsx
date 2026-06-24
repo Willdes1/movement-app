@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import OnboardingOverlay from '@/components/coach/OnboardingOverlay'
+import VoiceCloneCard from '@/components/coach/VoiceCloneCard'
+import { COACH_VOICE_CLONING } from '@/lib/flags'
 
 interface Stats { activeClients: number; totalPrograms: number; activeAssignments: number }
 
@@ -323,6 +325,9 @@ export default function CoachDashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Coaching voice (premium) */}
+      {COACH_VOICE_CLONING && <VoiceCloneCard />}
 
       {/* Recent assignments */}
       {(loading || recent.length > 0) && (

@@ -112,6 +112,11 @@ export async function GET(request: Request) {
       if (k && !(k in coachLibrary)) coachLibrary[k] = row
     }
 
+    // Does this coach have a ready cloned voice? (drives the 🔈 button on the client.)
+    const { data: voice } = await supabase
+      .from('coach_voices').select('status').eq('coach_id', assignment.coach_id).single()
+    const coachVoiceReady = voice?.status === 'ready'
+
     return Response.json({
       assignment: {
         id: assignment.id,
@@ -123,6 +128,7 @@ export async function GET(request: Request) {
       coachName: coachProfile?.name ?? 'Your Coach',
       coachId:   assignment.coach_id,
       coachLibrary,
+      coachVoiceReady,
     })
   } catch (err) {
     console.error('my-program error:', err)

@@ -44,8 +44,13 @@ Voice cloning is a solved, off-the-shelf capability now:
   6 inches away" guide. Offer a re-record.
 
 ## Phases
-1. Single coach voice clone (consent + record + create `voice_id`), on-demand cached
-   generation for the coached Today workout, fallback to default TTS.
+1. ✅ **BUILT 2026-06-23** — Single coach voice clone (consent + record/upload + create
+   `voice_id`), on-demand cached generation for the coached Today workout, fallback to
+   default TTS. Coach Dashboard card (`VoiceCloneCard`), `/api/coach/voice` (clone/status/
+   remove) + `/api/coach/voice/speak` (cached synth), `coach_voices` + `coach_exercise_audio`
+   tables, `coach-voice-audio` public bucket. Gated by `COACH_VOICE_CLONING` flag +
+   `ELEVENLABS_API_KEY`. SQL: `20260623_coach_voice_cloning.sql`.
+   - ⏳ Needs: ElevenLabs API key in Vercel (`ELEVENLABS_API_KEY`) + run the migration.
 2. Pre-generate the full program's exercise audio when a coach assigns it.
 3. Let the athlete choose: coach voice vs. default narrator.
 4. Multiple coach voices / "hype line" intros ("Let's go — last set, give me everything").

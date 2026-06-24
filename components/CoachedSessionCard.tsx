@@ -61,7 +61,7 @@ function splitMovement(raw: string): { name: string; scheme: string } {
 
 export default function CoachedSessionCard() {
   const { user, effectiveUserId, loggedInsert } = useAuth()
-  const { coachName, assignment, program, weeks, coachLibrary } = useCoached()
+  const { coachName, assignment, program, weeks, coachLibrary, coachVoiceReady } = useCoached()
   const userId = effectiveUserId ?? user?.id ?? ''
 
   const { speak, stop, speaking, loading: ttsLoading, gender } = useTTS()
@@ -170,9 +170,36 @@ export default function CoachedSessionCard() {
     const parts = [name]
     if (how) parts.push(how)
     if (tip) parts.push('Coaching tip: ' + tip)
-    // Only reuse the global pre-generated audio when the coach hasn't overridden the cues.
+    const text = parts.join('. ')
+
+    // Coach's cloned voice wins when ready — they hear THEIR coach read the cues.
+    // Cached per (coach, exercise) server-side, so this is a fast CDN URL after the
+    // first play. Any failure falls through to the default TTS path below.
+    if (coachVoiceReady) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const res = await fetch('/api/coach/voice/speak', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ text, name_normalized: key }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (data.url) {
+            await speak(text, { preGeneratedUrl: data.url })
+            setSpeakingKey(null)
+            return
+          }
+        }
+      } catch {
+        // fall through to default narrator
+      }
+    }
+
+    // Default narrator. Only reuse the global pre-generated audio when the coach
+    // hasn't overridden the cues.
     const preUrl = !c ? (gender === 'male' ? g?.tts_url_male : g?.tts_url_female) : undefined
-    await speak(parts.join('. '), { preGeneratedUrl: preUrl ?? undefined, nameNormalized: preUrl ? undefined : key })
+    await speak(text, { preGeneratedUrl: preUrl ?? undefined, nameNormalized: preUrl ? undefined : key })
     setSpeakingKey(null)
   }
 

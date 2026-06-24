@@ -65,6 +65,7 @@ type CoachedContextType = {
   program: CoachProgram | null
   weeks: CoachWeek[]
   coachLibrary: Record<string, CoachLibEntry>
+  coachVoiceReady: boolean
   endedAssignment: EndedAssignment | null
   refresh: () => void
 }
@@ -78,6 +79,7 @@ const CoachedContext = createContext<CoachedContextType>({
   program: null,
   weeks: [],
   coachLibrary: {},
+  coachVoiceReady: false,
   endedAssignment: null,
   refresh: () => {},
 })
@@ -91,6 +93,7 @@ export function CoachedProvider({ children }: { children: React.ReactNode }) {
   const [program, setProgram] = useState<CoachProgram | null>(null)
   const [weeks, setWeeks] = useState<CoachWeek[]>([])
   const [coachLibrary, setCoachLibrary] = useState<Record<string, CoachLibEntry>>({})
+  const [coachVoiceReady, setCoachVoiceReady] = useState(false)
   const [endedAssignment, setEndedAssignment] = useState<EndedAssignment | null>(null)
 
   const load = useCallback(async () => {
@@ -112,9 +115,10 @@ export function CoachedProvider({ children }: { children: React.ReactNode }) {
         setCoachName(data.coachName ?? '')
         setCoachId(data.coachId ?? null)
         setCoachLibrary(data.coachLibrary ?? {})
+        setCoachVoiceReady(data.coachVoiceReady === true)
         setEndedAssignment(null)
       } else {
-        setAssignment(null); setProgram(null); setWeeks([]); setCoachName(''); setCoachId(null); setCoachLibrary({})
+        setAssignment(null); setProgram(null); setWeeks([]); setCoachName(''); setCoachId(null); setCoachLibrary({}); setCoachVoiceReady(false)
         setEndedAssignment(data.endedAssignment ?? null)
       }
     } catch {
@@ -130,7 +134,7 @@ export function CoachedProvider({ children }: { children: React.ReactNode }) {
   return (
     <CoachedContext.Provider value={{
       coached: !!assignment && !!program,
-      loading, coachName, coachId, assignment, program, weeks, coachLibrary, endedAssignment,
+      loading, coachName, coachId, assignment, program, weeks, coachLibrary, coachVoiceReady, endedAssignment,
       refresh: load,
     }}>
       {children}
