@@ -36,6 +36,19 @@ export type CoachAssignment = {
   status: string
 }
 
+// One entry of the coach's personal library, keyed by normalized exercise name.
+export type CoachLibEntry = {
+  name: string
+  instructions: string | null
+  notes: string | null
+  sets_reps: string | null
+  video_type: 'youtube' | 'shorts' | 'upload' | null
+  youtube_url: string | null
+  youtube_start_sec: number | null
+  youtube_end_sec: number | null
+  video_url: string | null
+}
+
 export type EndedAssignment = {
   id: string
   status: string
@@ -51,6 +64,7 @@ type CoachedContextType = {
   assignment: CoachAssignment | null
   program: CoachProgram | null
   weeks: CoachWeek[]
+  coachLibrary: Record<string, CoachLibEntry>
   endedAssignment: EndedAssignment | null
   refresh: () => void
 }
@@ -63,6 +77,7 @@ const CoachedContext = createContext<CoachedContextType>({
   assignment: null,
   program: null,
   weeks: [],
+  coachLibrary: {},
   endedAssignment: null,
   refresh: () => {},
 })
@@ -75,6 +90,7 @@ export function CoachedProvider({ children }: { children: React.ReactNode }) {
   const [assignment, setAssignment] = useState<CoachAssignment | null>(null)
   const [program, setProgram] = useState<CoachProgram | null>(null)
   const [weeks, setWeeks] = useState<CoachWeek[]>([])
+  const [coachLibrary, setCoachLibrary] = useState<Record<string, CoachLibEntry>>({})
   const [endedAssignment, setEndedAssignment] = useState<EndedAssignment | null>(null)
 
   const load = useCallback(async () => {
@@ -95,9 +111,10 @@ export function CoachedProvider({ children }: { children: React.ReactNode }) {
         setWeeks(data.weeks ?? [])
         setCoachName(data.coachName ?? '')
         setCoachId(data.coachId ?? null)
+        setCoachLibrary(data.coachLibrary ?? {})
         setEndedAssignment(null)
       } else {
-        setAssignment(null); setProgram(null); setWeeks([]); setCoachName(''); setCoachId(null)
+        setAssignment(null); setProgram(null); setWeeks([]); setCoachName(''); setCoachId(null); setCoachLibrary({})
         setEndedAssignment(data.endedAssignment ?? null)
       }
     } catch {
@@ -113,7 +130,7 @@ export function CoachedProvider({ children }: { children: React.ReactNode }) {
   return (
     <CoachedContext.Provider value={{
       coached: !!assignment && !!program,
-      loading, coachName, coachId, assignment, program, weeks, endedAssignment,
+      loading, coachName, coachId, assignment, program, weeks, coachLibrary, endedAssignment,
       refresh: load,
     }}>
       {children}

@@ -9,6 +9,14 @@ function getServiceClient() {
   )
 }
 
+// Must match CoachedSessionCard's normalizeExName so movement names line up with
+// the coach's library keys (strip any trailing sets/reps, then normalize).
+function normKey(raw: string): string {
+  return raw.toLowerCase()
+    .replace(/\s+\d+[×x]\d+.*/i, '').replace(/\s+\d+\s+sets?.*/i, '').trim()
+    .replace(/[-–—]/g, ' ').replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '_')
+}
+
 export async function GET(request: Request) {
   try {
     // Verify caller's identity via their JWT
@@ -91,6 +99,19 @@ export async function GET(request: Request) {
 
     const program = (assignment.coach_programs as Record<string, unknown>[] | null)?.[0] ?? null
 
+    // The coach's personal library (their custom clips + cues). RLS keeps this
+    // readable only by the coach, so we resolve it here (service role) and hand
+    // the client a name-keyed map to enrich the exercises the coach programmed.
+    const { data: coachLib } = await supabase
+      .from('coach_exercise_library')
+      .select('name, instructions, notes, sets_reps, video_type, youtube_url, youtube_start_sec, youtube_end_sec, video_url')
+      .eq('coach_id', assignment.coach_id)
+    const coachLibrary: Record<string, unknown> = {}
+    for (const row of coachLib ?? []) {
+      const k = normKey(row.name as string)
+      if (k && !(k in coachLibrary)) coachLibrary[k] = row
+    }
+
     return Response.json({
       assignment: {
         id: assignment.id,
@@ -101,6 +122,7 @@ export async function GET(request: Request) {
       weeks: weeks ?? [],
       coachName: coachProfile?.name ?? 'Your Coach',
       coachId:   assignment.coach_id,
+      coachLibrary,
     })
   } catch (err) {
     console.error('my-program error:', err)

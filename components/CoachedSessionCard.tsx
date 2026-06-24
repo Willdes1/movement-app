@@ -20,6 +20,21 @@ type LibEntry = {
 }
 type LastLog = { sets: number | null; reps: number | null; weight: number | null; logged_at: string }
 
+// Resolved per-exercise media — the coach's own library entry wins over the
+// global exercise library so a coach's custom clip + cues reach their client.
+type Media = {
+  isCoach: boolean
+  kind: 'youtube' | 'upload' | null
+  url: string | null
+  ytSource: string | null
+  clipStart: number | null
+  clipEnd: number | null
+  loopStart: number | null
+  loopEnd: number | null
+  how: string | null
+  tip: string | null
+}
+
 const DOW_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 function todayDayName(): string {
@@ -46,7 +61,7 @@ function splitMovement(raw: string): { name: string; scheme: string } {
 
 export default function CoachedSessionCard() {
   const { user, effectiveUserId, loggedInsert } = useAuth()
-  const { coachName, assignment, program, weeks } = useCoached()
+  const { coachName, assignment, program, weeks, coachLibrary } = useCoached()
   const userId = effectiveUserId ?? user?.id ?? ''
 
   const { speak, stop, speaking, loading: ttsLoading, gender } = useTTS()
@@ -116,16 +131,47 @@ export default function CoachedSessionCard() {
       })
   }, [assignment, userId, weekNum, today, todayDay])
 
+  // Coach's library entry wins; fall back to the global exercise library.
+  function resolveMedia(key: string): Media | null {
+    const c = coachLibrary[key]
+    if (c && (c.video_type || c.instructions || c.notes)) {
+      const upload = c.video_type === 'upload'
+      return {
+        isCoach: true,
+        kind: upload ? 'upload' : (c.youtube_url ? 'youtube' : null),
+        url: upload ? c.video_url : c.youtube_url,
+        ytSource: 'youtube',
+        clipStart: c.youtube_start_sec, clipEnd: c.youtube_end_sec,
+        loopStart: null, loopEnd: null,
+        how: c.instructions, tip: c.notes,
+      }
+    }
+    const g = lib[key]
+    if (g) return {
+      isCoach: false,
+      kind: g.video_url ? 'youtube' : null,
+      url: g.video_url, ytSource: g.video_source,
+      clipStart: g.youtube_start_sec, clipEnd: g.youtube_end_sec,
+      loopStart: g.loop_start_sec, loopEnd: g.loop_end_sec,
+      how: g.how, tip: g.tip,
+    }
+    return null
+  }
+
   async function speakExercise(rawName: string) {
     const key = normalizeExName(rawName)
     if (speakingKey === key) { stop(); setSpeakingKey(null); return }
     setSpeakingKey(key)
-    const entry = lib[key]
+    const c = coachLibrary[key]
+    const g = lib[key]
     const { name } = splitMovement(rawName)
+    const how = c?.instructions ?? g?.how
+    const tip = c?.notes ?? g?.tip
     const parts = [name]
-    if (entry?.how) parts.push(entry.how)
-    if (entry?.tip) parts.push('Coaching tip: ' + entry.tip)
-    const preUrl = gender === 'male' ? entry?.tts_url_male : entry?.tts_url_female
+    if (how) parts.push(how)
+    if (tip) parts.push('Coaching tip: ' + tip)
+    // Only reuse the global pre-generated audio when the coach hasn't overridden the cues.
+    const preUrl = !c ? (gender === 'male' ? g?.tts_url_male : g?.tts_url_female) : undefined
     await speak(parts.join('. '), { preGeneratedUrl: preUrl ?? undefined, nameNormalized: preUrl ? undefined : key })
     setSpeakingKey(null)
   }
@@ -295,19 +341,20 @@ export default function CoachedSessionCard() {
           const isSpeaking = speakingKey === key && (speaking || ttsLoading)
           const last = lastLogs[key]
           const isOpen = openLog === i
-          const entry = lib[key]
+          const media = resolveMedia(key)
           return (
             <div key={i} style={{ borderBottom: i < todayDay.movements.length - 1 ? '1px solid var(--border)' : 'none' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px' }}>
                 <div style={{ width: 4, height: 4, borderRadius: '50%', background: loggedIdx.has(i) ? 'var(--green)' : 'var(--accent)', flexShrink: 0 }} />
-                {!isOpen && entry?.video_url && (
-                  <LoopPreview compact lazy url={entry.video_url} source={entry.video_source} name={name} loopStart={entry.loop_start_sec} loopEnd={entry.loop_end_sec} clipStart={entry.youtube_start_sec} clipEnd={entry.youtube_end_sec} onClick={() => toggleLog(i, mv)} />
+                {!isOpen && media?.kind === 'youtube' && media.url && (
+                  <LoopPreview compact lazy url={media.url} source={media.ytSource} name={name} loopStart={media.loopStart} loopEnd={media.loopEnd} clipStart={media.clipStart} clipEnd={media.clipEnd} onClick={() => toggleLog(i, mv)} />
                 )}
                 <button
                   onClick={() => toggleLog(i, mv)}
                   style={{ flex: 1, display: 'flex', alignItems: 'baseline', gap: 8, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', minWidth: 0 }}
                 >
                   <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', textTransform: 'capitalize' }}>{name}</span>
+                  {media?.isCoach && <span title={`Coach ${coachFirst}'s own demo & cues`} style={{ fontSize: 10, color: 'var(--accent)', flexShrink: 0 }}>★</span>}
                   {scheme && <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 700, flexShrink: 0 }}>{scheme}</span>}
                 </button>
                 {loggedIdx.has(i) && <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 800, flexShrink: 0 }}>✓</span>}
@@ -318,13 +365,21 @@ export default function CoachedSessionCard() {
 
               {isOpen && (
                 <div style={{ padding: '0 12px 12px' }}>
-                  {entry?.video_url && (
+                  {media?.url && (
                     <div style={{ marginBottom: 10 }}>
-                      <LoopPreview url={entry.video_url} source={entry.video_source} name={name} loopStart={entry.loop_start_sec} loopEnd={entry.loop_end_sec} clipStart={entry.youtube_start_sec} clipEnd={entry.youtube_end_sec} />
+                      {media.kind === 'upload'
+                        ? <video src={media.url} controls playsInline style={{ width: '100%', borderRadius: 10, background: '#000', display: 'block' }} />
+                        : <LoopPreview url={media.url} source={media.ytSource} name={name} loopStart={media.loopStart} loopEnd={media.loopEnd} clipStart={media.clipStart} clipEnd={media.clipEnd} />}
                     </div>
                   )}
-                  {lib[key]?.tip && (
-                    <p style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic', marginBottom: 8 }}>💡 {lib[key].tip}</p>
+                  {media?.isCoach && (
+                    <p style={{ fontSize: 10, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 6 }}>★ Coach {coachFirst}&apos;s demo</p>
+                  )}
+                  {media?.isCoach && media.how && (
+                    <p style={{ fontSize: 12, color: 'var(--text-mid)', lineHeight: 1.6, marginBottom: 8, whiteSpace: 'pre-wrap' }}>{media.how}</p>
+                  )}
+                  {media?.tip && (
+                    <p style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic', marginBottom: 8 }}>💡 {media.tip}</p>
                   )}
                   {last && (
                     <p style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>
