@@ -1,6 +1,6 @@
 # Agent Context — Atlas Prime
 > Full briefing for a new agent to continue this project without any prior conversation history.
-> Last updated: 2026-06-12 | Current branch: master | 298 commits
+> Last updated: 2026-06-24 | Current branch: master | 329 commits
 
 ---
 
@@ -99,34 +99,36 @@
 
 ---
 
-## 4. What Was Built This Session (2026-06-17)
+## 4. What Was Built This Session (2026-06-23)
 
-**Huge build day — brand cleanup + 3 large feature arcs (16 feature commits). Google Workspace email went live. Two SQL migrations run.**
+**Big multi-feature night — 10 commits. Admin tooling + App Store compliance + a full coach feature arc + a security fix. Three SQL migrations created (see ⚠️ in §11).**
 
-### Brand cleanup
-- Full-sweep **MIE → APIE** rename across admin portal, AI prompts, docs (`cdb323c`). MIE = the engine (now APIE); kept the lowercase `'mie'` admin route id + historical log entries.
-- Remaining **Movement/Move. → Atlas Prime** leftovers (`3b625fc`): old `Move.` logo in `public/anatomy-explorer.html`, "Movement AI" → "Atlas Prime AI" (recovery pages), auth sign-in line, push placeholder, no-sport nav fallback ('Movement' → 'Athlete'), 5 TODO lines. Fitness-term "movement" left untouched.
+### Admin: Study Hub (`c8431e1`) — SQL `20260618_study_hub.sql` (RUN ✅ by Will)
+- New admin-only tab (Strategy → 🎓 **Study Hub**) for ISSA CFT cert prep. Multi-KB: each Knowledge Base is a subject container with its own scope prompt layered on APIE; generates original structured study material (concepts/summaries/quizzes/flashcards) grounded in pgvector via `retrieveKnowledge()`; tag/search, mastered status, progress tracking. Server-only, copyright guardrail in the prompt. Tables `study_kbs` / `study_entries`. **New `lib/admin-auth.ts`** — `verifyAdmin(req, tab?)` + `verifyOwner(req)`.
 
-### Google Workspace email — LIVE (non-code)
-- `will@atlasprime.app` works. Namecheap Advanced DNS: MX `@` → `smtp.google.com` (priority 1, via Custom MX), SPF TXT `v=spf1 include:_spf.google.com ~all` (added **alongside** the google-site-verification TXT, not overwriting it). Website A `@` → 216.198.79.1 + www CNAME untouched. **DKIM not yet added** (optional: Google Admin → Apps → Gmail → Authenticate email → paste the TXT into Namecheap).
+### Admin: Partner permissions (`577b840`, `609d9d3`) — SQL `20260618_admin_permissions.sql` (⚠️ VERIFY RUN — adds `profiles.is_owner`)
+- Owner vs partner admins. **Owner** = `profiles.is_owner` (migration sets all existing is_admin → owner). **Partners** are NOT `is_admin`; access driven by `admin_permissions` table (`allowed_tabs`, `active`). AuthContext now exposes `isOwner` / `hasAdminAccess` / `adminTabs`; `/admin` gates on `hasAdminAccess`, owner-gates the all-user `loadAll`, filters NAV by `adminTabs`. Owner-only **Access Control** tab (`#access`) grants/revokes by user + section. Every section is grantable; sensitive ones are flagged ⚠️ (not locked); only `access` stays owner-only. Single source `lib/admin-tabs.ts`. Admin portal stays private at store submission. See memory `project_admin_access`.
 
-### Feature 1 — Movement Preview (GIF-style looping video), Phases 1-3 (`dba9eb1`, `a493945`, `6947a76`)
-- Admin loop trimmer in Video Curation (YouTube IFrame API scrubber + draggable in/out handles + live preview); saves `loop_start_sec`/`loop_end_sec` (migration `20260617_exercise_library_loop.sql`, **RUN**). Metadata only.
-- `components/ui/LoopPreview.tsx` + `lib/youtube-iframe.ts` (shared IFrame loader + concurrent-player cap). Muted auto-looping previews on exercises page, calendar modal, coached rows (compact lazy thumbnails). Killed 3 duplicated VideoPlayer copies.
-- **KEY FACT:** exercise_library videos are **YouTube embeds, not files** — no iPhone filmstrip; native-filmstrip trimmer reserved for future self-hosted uploads.
+### App Store compliance (`2fdb3ad`, `8b98138`) — SQL `20260618_account_deletion.sql` (⚠️ VERIFY RUN)
+- Privacy audit: disclosed **OpenAI** as a processor + stamped last-updated.
+- **In-app account deletion** (Apple Guideline 5.1.1 — was missing, and the legal docs falsely claimed it existed): "Delete My Account" funnel on `/account` (intent take-a-break vs delete → reason capture → tailored save offer [pause / contact-support / discount placeholder gated by `BILLING_LIVE`] → type-DELETE confirm). `/api/account/delete` is self-only (JWT-derived id), logs an anonymous reason to `account_deletion_feedback`, best-effort wipes data, then `auth.admin.deleteUser`. **Contact Support** form → existing `bug_reports` pipeline (no email exposed). Components in `components/account/`.
 
-### Feature 2 — Workout UX restructure + set tracking, Phases 1-6 (`ee1e754`→`877ee8a`)
-- Dashboard summary; calendar day view with inline previews + **Coaching Cues**; reusable **`ExerciseDetailModal`** (Common Mistakes = the `tip` field); **set tracking** (`exercise_set_logs` table, migration `20260617_exercise_set_logs.sql`, **RUN**) via `TrackWorkout` (reps/weight/notes, duplicate/add set, opt-in L/R) — writes granular rows + a summary to workout_logs; per-exercise **History tab**; dismissible tracking tips.
+### Security (`9bd7e67`)
+- Locked down **`/api/notifications/send`** (was unauthenticated — anyone could blast push to all users). Now `verifyAdmin(req, 'push')` + optional `x-cron-secret`. PushTab sends the admin JWT.
 
-### Feature 3 — Workout flow UX pass, Phases 1-5 (`6ed3476`→`cc5d8dd`)
-- Dashboard video removed; **Start Session → focused single-day view** (`/calendar?focus=1`, month grid hidden, "View Calendar" one tap away); **overview block at the TOP** (assembled instructions + equipment + rest-by-type) + durable "Week X · Day Y" header; **progressive disclosure** (workout = hero; morning/abs/cooldown/evening = friendly collapsed invitation cards revealed one-at-a-time on scroll via IntersectionObserver sentinel); coached card got the overview + optional per-day **coach walkthrough video** (ManualProgramBuilder field → day JSON, no migration).
-- Note: `d5030e0` briefly broke the build (redundant `day.type` TS guard); fixed in `cc5d8dd` (green).
+### Billing safeguard (`70ccd30`)
+- Centralized **`BILLING_LIVE`** into `lib/flags.ts` (one flip at go-live). Full go-live checklist in memory `project_billing_golive` + TODO under the Stripe item.
 
-### Locked terminology / decisions
-- **"Coaching Cue"** = the per-exercise short instruction (the `how` field). NOT "MIE" (that's the engine).
-- **Common Mistakes** display = the existing `tip` field (the generator fills `tip` with the most common mistake). No new column / no generation.
-- **Equipment** = keyword-inferred from exercise names (`lib/workout-display.ts`), no tokens. `REST_GUIDANCE` + `timeCommitment` also live there.
-- New features must work on **both surfaces** (Athlete App + Coach Portal) — the calendar/today client UI is shared; coached path = CoachedSessionCard.
+### Coach feature arc — Library ↔ Builder ↔ Client (`d9a76c5`, `4180e9a`, `bd12a91`) — NO migration
+- **Builder:** manual program builder autocomplete now pulls the coach's OWN `coach_exercise_library` first (★ LIBRARY tag, 🎥, sets×reps autofill); per-day **"📚 From Library"** picker (`LibraryPickerModal`, multi-add).
+- **Client:** `/api/coach/my-program` resolves the coach's library server-side (RLS-safe) → `coachLibrary` map → `CoachedContext` → **`CoachedSessionCard` prefers the coach's clip + cues per exercise** (★ Coach's demo badge; YouTube→LoopPreview, upload→`<video>`; TTS reads coach cues).
+- **Polish:** `/my-coach` full-program view shows a ★ Coach badge on coach-demo'd exercises.
+
+### Non-code (launch paperwork — all unblocked now)
+- **D-U-N-S requested AND received** (the 9-digit "Resolution DUNS" is the number). **Mercury virtual card created.** Next paperwork: Google Play **org** account ($25, needs D-U-N-S) + Apple Developer enrollment ($99/yr, needs D-U-N-S + Mercury card + business email). Tip: enroll with the **existing personal Apple ID** (creating a new one hit a phone-verify block). `support@atlasprime.app` = free Workspace alias when wanted.
+
+### New idea captured → **next session's build**
+- `to-do/coach-voice-cloning.md` — clone the coach's voice (ElevenLabs) so exercise narration plays in the coach's own voice ("your coach in your ear, every rep"). Premium coach upsell. Will explicitly chose this as the next build.
 
 ---
 
@@ -728,10 +730,11 @@ return () => { supabase.removeChannel(channel) }
 
 ## 11. What to Work on Next (Priority Order)
 
-**Next session focus: Mercury debit card + payment setup, then Apple Developer enrollment. (Google Workspace email is DONE — `will@atlasprime.app` is live.)**
+**Next session focus (Will's pick): build the COACH VOICE CLONING feature — see `to-do/coach-voice-cloning.md`.**
 
-1. **Mercury debit card + payment setup** — Mercury funded ($100). Create a VIRTUAL debit card first (instant); grab account/routing numbers. Connect Mercury as the **Stripe payout** bank account; use the Mercury card for **Apple Developer** billing ($99/yr) + (optional) Namecheap/Google Workspace billing. Full step-by-step in memory `project_mercury_payment.md`.
-2. **Apple Developer enrollment** — needs the business email (✅), the Mercury card, and a free **D-U-N-S number** for Atlas Prime Labs LLC (request early at developer.apple.com/enroll/duns-lookup — takes a few days). Then RevenueCat + Capacitor → TestFlight.
+0. **⚠️ FIRST — verify two SQL migrations from the 2026-06-23 session are run in Supabase:** `20260618_admin_permissions.sql` (adds `profiles.is_owner` — **AuthContext now SELECTs `is_owner`, so if this isn't run the profiles query errors and admin access breaks**) and `20260618_account_deletion.sql`. (`20260618_study_hub.sql` was already run.) If admin is acting up, this is why.
+1. **🎙 Coach voice cloning (next build)** — ElevenLabs instant voice clone per coach (consent + record → `voice_id` stored), cached TTS in the coach's voice for coached workouts (mirror the `tts_url_*` cache pattern, key by coach+exercise), client playback prefers coach voice. Premium coach upsell. Full plan + phases in `to-do/coach-voice-cloning.md`. Ties to `project_coach_pricing`.
+2. **Launch paperwork (Will, non-code):** Google Play **org** account ($25, has D-U-N-S now) + **Apple Developer enrollment** ($99/yr — has D-U-N-S + Mercury card + business email; enroll with existing personal Apple ID). Then RevenueCat + Capacitor → TestFlight. Mercury → Stripe payout wiring is prep (no revenue yet).
 3. **(Optional) DKIM** for the new email — Google Admin → Apps → Gmail → Authenticate email → paste the generated TXT into Namecheap (alongside the existing MX/SPF/verification records).
 3. **Apple launch compliance — full review** — Apple Developer Program enrollment (LLC ✅, domain ✅, needs business email + $99/yr + D-U-N-S for org account), App Store Review Guidelines compliance audit (health/fitness app rules, account deletion requirement, privacy nutrition labels, subscription rules → RevenueCat not Stripe on iOS), privacy policy/TOS review.
 4. **TestFlight path** — requires Dev Program enrollment + Capacitor-wrapped binary, but NOT App Store approval (internal testers ~immediately, external = lightweight beta review). Path: enrollment → Capacitor wrapper → TestFlight internal → external beta → submission.
