@@ -42,7 +42,7 @@ export async function GET(request: Request) {
     }
 
     // Get active assignment for this client
-    const { data: assignment } = await supabase
+    const { data: assignment, error: assignErr } = await supabase
       .from('coach_program_assignments')
       .select('id, program_id, coach_id, start_date, status, created_at, coach_programs(id, name, weeks_total, notes, description)')
       .eq('client_id', targetId)
@@ -50,6 +50,25 @@ export async function GET(request: Request) {
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
+
+    // ── TEMP DEBUG (remove after diagnosing coached-display bug) ──────────────
+    // Surfaces what the server actually sees: the resolved user, and EVERY
+    // assignment row for that user (any status). Rendered on /my-coach.
+    const { data: diagRows, error: diagErr } = await supabase
+      .from('coach_program_assignments')
+      .select('status, client_id, coach_id, start_date')
+      .eq('client_id', targetId)
+    const _debug = {
+      jwtUserId: user.id,
+      targetId,
+      overrideId,
+      activeFound: !!assignment,
+      activeError: assignErr?.message ?? null,
+      rowsForTarget: (diagRows ?? []).map(r => r.status),
+      rowCount: (diagRows ?? []).length,
+      diagError: diagErr?.message ?? null,
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     if (!assignment) {
       // No active program — surface the most recent ended assignment so the
@@ -63,7 +82,7 @@ export async function GET(request: Request) {
         .limit(1)
         .single()
 
-      if (!ended) return Response.json({ assignment: null })
+      if (!ended) return Response.json({ assignment: null, _debug })
 
       const { data: endedCoach } = await supabase
         .from('profiles').select('name').eq('id', ended.coach_id).single()
@@ -74,6 +93,7 @@ export async function GET(request: Request) {
 
       return Response.json({
         assignment: null,
+        _debug,
         endedAssignment: {
           id: ended.id,
           status: ended.status,

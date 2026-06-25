@@ -102,6 +102,7 @@ function MyCoachInner() {
   const [coachId, setCoachId]       = useState<string | null>(null)
   const [coachLibrary, setCoachLibrary] = useState<Record<string, CoachLibEntry>>({})
   const [loading, setLoading]       = useState(true)
+  const [debug, setDebug]           = useState<Record<string, unknown> | null>(null) // TEMP: coached-display bug
   const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(new Set())
   const [expandedDays, setExpandedDays]   = useState<Set<string>>(new Set())
 
@@ -124,6 +125,7 @@ function MyCoachInner() {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
     const data = await res.json()
+    setDebug(data._debug ?? null) // TEMP: coached-display bug
 
     if (data.assignment) {
       setAssignment(data.assignment)
@@ -262,6 +264,13 @@ function MyCoachInner() {
       >
         Go to Account
       </button>
+
+      {/* TEMP DEBUG — coached-display bug. Remove once fixed. */}
+      {debug && (
+        <pre style={{ marginTop: 28, padding: 14, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12, color: 'var(--text-mid)', textAlign: 'left', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+          {JSON.stringify(debug, null, 2)}
+        </pre>
+      )}
     </div>
   )
 
