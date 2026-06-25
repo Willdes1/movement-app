@@ -97,7 +97,13 @@ export async function GET(request: Request) {
       .eq('program_id', assignment.program_id)
       .order('week_number', { ascending: true })
 
-    const program = (assignment.coach_programs as Record<string, unknown>[] | null)?.[0] ?? null
+    // Supabase embeds a to-one relation as a single OBJECT on .single() queries
+    // (and as an array elsewhere) — handle BOTH so the program always resolves.
+    // The ended-assignment + replace-warning paths already defend against both
+    // shapes; this active path was the one spot that didn't, which silently nulled
+    // the program and made `coached` false (program assigned but never showing).
+    const programRaw = assignment.coach_programs as unknown
+    const program = (Array.isArray(programRaw) ? programRaw[0] : programRaw) ?? null
 
     // The coach's personal library (their custom clips + cues). RLS keeps this
     // readable only by the coach, so we resolve it here (service role) and hand
