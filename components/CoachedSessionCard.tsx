@@ -13,7 +13,8 @@ import { inferEquipment, REST_GUIDANCE } from '@/lib/workout-display'
 // no AI substitution.
 
 type LibEntry = {
-  how: string | null; tip: string | null; tts_url_male: string | null; tts_url_female: string | null
+  how: string | null; breathing: string | null; core: string | null; tip: string | null
+  tts_url_male: string | null; tts_url_female: string | null
   video_url: string | null; video_source: string | null
   youtube_start_sec: number | null; youtube_end_sec: number | null
   loop_start_sec: number | null; loop_end_sec: number | null
@@ -32,6 +33,8 @@ type Media = {
   loopStart: number | null
   loopEnd: number | null
   how: string | null
+  breathing: string | null
+  core: string | null
   tip: string | null
 }
 
@@ -99,7 +102,7 @@ export default function CoachedSessionCard(
     if (!normalized.length) return
     supabase
       .from('exercise_library')
-      .select('name_normalized, how, tip, tts_url_male, tts_url_female, video_url, video_source, youtube_start_sec, youtube_end_sec, loop_start_sec, loop_end_sec')
+      .select('name_normalized, how, breathing, core, tip, tts_url_male, tts_url_female, video_url, video_source, youtube_start_sec, youtube_end_sec, loop_start_sec, loop_end_sec')
       .in('name_normalized', normalized)
       .then(({ data }) => {
         const map: Record<string, LibEntry> = {}
@@ -147,7 +150,13 @@ export default function CoachedSessionCard(
         ytSource: 'youtube',
         clipStart: c.youtube_start_sec, clipEnd: c.youtube_end_sec,
         loopStart: null, loopEnd: null,
-        how: c.instructions, tip: c.notes,
+        // Coach's own cues win; fall back to the global library for the standard
+        // fields the coach hasn't (yet) written — so the athlete always gets full
+        // instructions even on a coach program with no custom details.
+        how: c.instructions ?? lib[key]?.how ?? null,
+        breathing: lib[key]?.breathing ?? null,
+        core: lib[key]?.core ?? null,
+        tip: c.notes ?? lib[key]?.tip ?? null,
       }
     }
     const g = lib[key]
@@ -157,7 +166,7 @@ export default function CoachedSessionCard(
       url: g.video_url, ytSource: g.video_source,
       clipStart: g.youtube_start_sec, clipEnd: g.youtube_end_sec,
       loopStart: g.loop_start_sec, loopEnd: g.loop_end_sec,
-      how: g.how, tip: g.tip,
+      how: g.how, breathing: g.breathing, core: g.core, tip: g.tip,
     }
     return null
   }
@@ -404,14 +413,21 @@ export default function CoachedSessionCard(
                     </div>
                   )}
                   {media?.isCoach && (
-                    <p style={{ fontSize: 10, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 6 }}>★ Coach {coachFirst}&apos;s demo</p>
+                    <p style={{ fontSize: 10, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>★ Coach {coachFirst}&apos;s demo</p>
                   )}
-                  {media?.isCoach && media.how && (
-                    <p style={{ fontSize: 12, color: 'var(--text-mid)', lineHeight: 1.6, marginBottom: 8, whiteSpace: 'pre-wrap' }}>{media.how}</p>
-                  )}
-                  {media?.tip && (
-                    <p style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic', marginBottom: 8 }}>💡 {media.tip}</p>
-                  )}
+                  {/* Standard instructions — coach's own cues, else the global library
+                      (so a coach program with no custom details still reads fully). */}
+                  {([
+                    ['How to Perform', media?.how, 'var(--text-mid)'],
+                    ['Breathing', media?.breathing, 'var(--text-dim)'],
+                    ['Core Engagement', media?.core, 'var(--text-dim)'],
+                    ['Common Mistakes', media?.tip, 'var(--accent)'],
+                  ] as const).filter(([, text]) => !!text).map(([label, text, color]) => (
+                    <div key={label} style={{ padding: '10px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, marginBottom: 8 }}>
+                      <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--text-dim)', marginBottom: 4, textTransform: 'uppercase' }}>{label}</p>
+                      <p style={{ fontSize: 12, color, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{text}</p>
+                    </div>
+                  ))}
                   {last && (
                     <p style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>
                       Last session: {last.sets ?? '—'}×{last.reps ?? '—'}{last.weight ? ` @ ${last.weight} lbs` : ''}
