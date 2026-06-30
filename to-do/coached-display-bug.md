@@ -1,9 +1,21 @@
 # BUG: active coach assignment not surfacing on client side
 
-## Status: OPEN — found 2026-06-24, blocks live testing of Coach Voice Cloning
+## Status: ✅ FIXED 2026-06-30 (commit b2a24da)
 
-## Symptom
-A self-assigned coach program does not appear on the athlete side:
+## Root cause (found via temp debug instrumentation)
+The `/api/coach/my-program` active-assignment query embedded
+`coach_programs(id, name, weeks_total, notes, description)` — but `coach_programs`
+has **no `description` column**. PostgREST errored the whole embed
+(`column coach_programs_1.description does not exist`), so `.single()` returned
+null, the route fell through to "no assignment", and `coached` was false for
+EVERY client — not just self-assignment. The sibling queries (replace-warning,
+ended-assignment) only selected real columns, so they worked, which is why the
+row was clearly present in SQL yet never displayed. Fix: removed `description`
+from the select. The `description` field stays in the TS types (optional/null)
+and was only read behind a truthiness guard, so nothing else changed.
+
+## Original symptom (for reference)
+A self-assigned coach program did not appear on the athlete side:
 - `/today` shows the AI plan, not the coached card; no "My Coach" nav item.
 - `/my-coach` (direct URL, fresh fetch, no impersonation override) shows
   **"No Coach Program Yet."**
