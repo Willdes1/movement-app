@@ -12,6 +12,7 @@ const navItems = [
   { href: '/for-you',  label: 'For You',    emoji: '⚡' },
   { href: '/nutrition', label: 'Nutrition',  emoji: '🥗' },
   { href: '/calendar', label: 'Calendar',   emoji: '📅' },
+  { href: '/my-coach', label: 'My Coach',   emoji: '🏋️' },
   { href: '/log',      label: 'History',    emoji: '📋' },
   { href: '/exercises', label: 'Exercises',  emoji: '🔍' },
   { href: '/mobility',       label: 'Mobility',         emoji: '🧘' },
@@ -23,8 +24,8 @@ const navItems = [
 ]
 
 // Hidden while the user has an active coach assignment — these compete
-// with the coach's programming
-const COACHED_HIDDEN = ['/import-program', '/convert-plan']
+// with the coach's programming (the coach program takes over the experience)
+const COACHED_HIDDEN = ['/import-program', '/convert-plan', '/programs']
 
 export default function Sidebar() {
   const pathname = usePathname()

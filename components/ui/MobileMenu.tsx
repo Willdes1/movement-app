@@ -21,8 +21,8 @@ const MENU_ITEMS = [
 ]
 
 // Hidden while the user has an active coach assignment — these compete
-// with the coach's programming
-const COACHED_HIDDEN = ['/import-program', '/convert-plan']
+// with the coach's programming (the coach program takes over the experience)
+const COACHED_HIDDEN = ['/import-program', '/convert-plan', '/programs']
 
 export default function MobileMenu() {
   const pathname = usePathname()

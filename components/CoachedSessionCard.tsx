@@ -59,7 +59,11 @@ function splitMovement(raw: string): { name: string; scheme: string } {
   return { name: raw.trim(), scheme: '' }
 }
 
-export default function CoachedSessionCard() {
+// weekOverride / dayOverride let the calendar reuse this same card to render ANY
+// day of the program. With no props it renders today's session (the Today page).
+export default function CoachedSessionCard(
+  { weekOverride, dayOverride }: { weekOverride?: number; dayOverride?: string } = {}
+) {
   const { user, effectiveUserId, loggedInsert } = useAuth()
   const { coachName, assignment, program, weeks, coachLibrary, coachVoiceReady } = useCoached()
   const userId = effectiveUserId ?? user?.id ?? ''
@@ -82,9 +86,9 @@ export default function CoachedSessionCard() {
   const [coachCompleted, setCoachCompleted] = useState(false)
   const [celebrate, setCelebrate] = useState(false)
 
-  const weekNum = assignment && program ? currentProgramWeek(assignment.start_date, program.weeks_total) : 1
+  const weekNum = weekOverride ?? (assignment && program ? currentProgramWeek(assignment.start_date, program.weeks_total) : 1)
   const week = weeks.find(w => w.week_number === weekNum)
-  const today = todayDayName()
+  const today = dayOverride ?? todayDayName()
   const todayDay = week?.days.find(d => d.day === today)
   const coachFirst = coachName.split(' ')[0] || 'your coach'
 

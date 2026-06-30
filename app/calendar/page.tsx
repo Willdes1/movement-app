@@ -8,6 +8,8 @@ import LoopPreview from '@/components/ui/LoopPreview'
 import { inferEquipment, REST_GUIDANCE } from '@/lib/workout-display'
 import ExerciseDetailModal from '@/components/ui/ExerciseDetailModal'
 import TrackWorkout from '@/components/ui/TrackWorkout'
+import { useCoached } from '@/contexts/CoachedContext'
+import CoachedCalendar from '@/components/CoachedCalendar'
 
 type RecoveryDailyBlock = { label: string; duration: string; exercises: string[] }
 type RecoveryDailySession = {
@@ -247,6 +249,7 @@ function planDayToDate(startDate: string, weekNum: number, dayIndex: number): Da
 function CalendarInner() {
   const { user, loading: authLoading, effectiveUserId } = useAuth()
   const userId = effectiveUserId ?? user?.id ?? ''
+  const { coached, loading: coachedLoading } = useCoached()
   const { activeRecovery } = useTheme()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -520,6 +523,13 @@ function CalendarInner() {
   while (cells.length % 7 !== 0) cells.push(null)
 
   const selectedEntry = selectedKey ? dayMap[selectedKey] : null
+
+  // Coached athletes get the coach's program as their calendar — the AI plan is
+  // paused in the background. (Wait for coached state to resolve to avoid a flash.)
+  if (coachedLoading) {
+    return <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-dim)' }}>Loading…</div>
+  }
+  if (coached) return <CoachedCalendar />
 
   if (authLoading || loading) {
     return <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-dim)' }}>Loading...</div>
