@@ -108,6 +108,8 @@ export default function ProgramDetailPage() {
   const [sharingLoading, setSharingLoading] = useState(false)
   const [seedingExercises, setSeedingExercises] = useState(false)
   const [seedResult, setSeedResult] = useState<{ seeded: number; total: number; queued: number; updated: number } | null>(null)
+  const [genDetails, setGenDetails] = useState(false)
+  const [detailsResult, setDetailsResult] = useState<{ generated: number; remaining: number; total: number } | null>(null)
 
   useEffect(() => {
     if (!user || !id) return
@@ -178,6 +180,24 @@ export default function ProgramDetailPage() {
       setSeedResult({ seeded: data.seeded ?? 0, total: data.total ?? 0, queued: data.queued ?? 0, updated: data.updated ?? 0 })
     } catch { /* silent */ }
     setSeedingExercises(false)
+  }
+
+  // Admin: AI-generate + save the standard instructions (how/breathing/core/tip)
+  // for this program's exercises that are missing them. Chunked — click again to
+  // continue until remaining hits 0.
+  async function generateDetails() {
+    setGenDetails(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    try {
+      const resp = await fetch('/api/admin/generate-program-details', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ programId: id }),
+      })
+      const data = await resp.json()
+      setDetailsResult({ generated: data.generated ?? 0, remaining: data.remaining ?? 0, total: data.total ?? 0 })
+    } catch { /* silent */ }
+    setGenDetails(false)
   }
 
   function toggleWeek(n: number) {
@@ -570,8 +590,23 @@ export default function ProgramDetailPage() {
               </span>
             )}
           </div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 10 }}>
+            <button
+              onClick={generateDetails}
+              disabled={genDetails}
+              style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--accent)', background: 'color-mix(in srgb, var(--accent) 14%, transparent)', color: 'var(--accent)', fontSize: 12, cursor: genDetails ? 'default' : 'pointer', fontWeight: 700 }}
+            >
+              {genDetails ? 'Generating…' : '🧠  Generate Instructions (AI)'}
+            </button>
+            {detailsResult !== null && (
+              <span style={{ fontSize: 12, color: detailsResult.remaining > 0 ? 'var(--accent)' : '#22c55e', fontWeight: 700 }}>
+                ✓ {detailsResult.generated} written
+                {detailsResult.remaining > 0 ? ` · ${detailsResult.remaining} left — click again` : ' · all exercises covered 🎉'}
+              </span>
+            )}
+          </div>
           <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 10, lineHeight: 1.5 }}>
-            Seeding adds all exercises to the exercise library so video curation and coaching cues can generate. After seeding, go to Admin → Video Curation and run a batch.
+            Seeding adds exercises to the library so video curation + cues can run. <strong>Generate Instructions</strong> writes the How-to / Breathing / Core / Common-Mistakes for every exercise (athletes see these on their coached calendar). For videos, run Admin → Video Curation (the program lane appears after seeding).
           </p>
         </div>
       )}
