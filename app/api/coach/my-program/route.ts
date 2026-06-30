@@ -41,34 +41,19 @@ export async function GET(request: Request) {
       if (caller?.is_admin === true) targetId = overrideId
     }
 
-    // Get active assignment for this client
-    const { data: assignment, error: assignErr } = await supabase
+    // Get active assignment for this client.
+    // NOTE: coach_programs has NO `description` column — selecting it here errored
+    // the whole embed and silently nulled the assignment, which made `coached`
+    // false for everyone (the bug that hid assigned programs). Keep this list to
+    // columns that actually exist.
+    const { data: assignment } = await supabase
       .from('coach_program_assignments')
-      .select('id, program_id, coach_id, start_date, status, created_at, coach_programs(id, name, weeks_total, notes, description)')
+      .select('id, program_id, coach_id, start_date, status, created_at, coach_programs(id, name, weeks_total, notes)')
       .eq('client_id', targetId)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
-
-    // ── TEMP DEBUG (remove after diagnosing coached-display bug) ──────────────
-    // Surfaces what the server actually sees: the resolved user, and EVERY
-    // assignment row for that user (any status). Rendered on /my-coach.
-    const { data: diagRows, error: diagErr } = await supabase
-      .from('coach_program_assignments')
-      .select('status, client_id, coach_id, start_date')
-      .eq('client_id', targetId)
-    const _debug = {
-      jwtUserId: user.id,
-      targetId,
-      overrideId,
-      activeFound: !!assignment,
-      activeError: assignErr?.message ?? null,
-      rowsForTarget: (diagRows ?? []).map(r => r.status),
-      rowCount: (diagRows ?? []).length,
-      diagError: diagErr?.message ?? null,
-    }
-    // ─────────────────────────────────────────────────────────────────────────
 
     if (!assignment) {
       // No active program — surface the most recent ended assignment so the
@@ -82,7 +67,7 @@ export async function GET(request: Request) {
         .limit(1)
         .single()
 
-      if (!ended) return Response.json({ assignment: null, _debug })
+      if (!ended) return Response.json({ assignment: null })
 
       const { data: endedCoach } = await supabase
         .from('profiles').select('name').eq('id', ended.coach_id).single()
@@ -93,7 +78,6 @@ export async function GET(request: Request) {
 
       return Response.json({
         assignment: null,
-        _debug,
         endedAssignment: {
           id: ended.id,
           status: ended.status,
