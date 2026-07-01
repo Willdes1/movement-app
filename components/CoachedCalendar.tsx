@@ -7,9 +7,9 @@ import CoachedSessionCard from '@/components/CoachedSessionCard'
 
 // The coached athlete's Calendar. When a user is on a coach's program, this
 // replaces the AI-plan calendar on /calendar. It lays the coach program out on a
-// real month grid (mapped from the assignment start date) so athletes can browse
-// and look ahead — then drives the proven, day-agnostic CoachedSessionCard for
-// whichever day they tap.
+// real month grid mapped from the assignment start date — using the SAME visual
+// language as the AI-plan calendar so switching between the two is seamless —
+// then drives the proven, day-agnostic CoachedSessionCard for the tapped day.
 
 const DOW_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -104,6 +104,10 @@ export default function CoachedCalendar() {
   const month = viewMonth.getMonth()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const leadingBlanks = (new Date(year, month, 1).getDay() + 6) % 7 // Mon=0
+  const cells: (number | null)[] = [
+    ...Array.from({ length: leadingBlanks }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ]
 
   // Human label for the currently selected (week, day).
   let selectedDateLabel = ''
@@ -119,38 +123,40 @@ export default function CoachedCalendar() {
       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 20, background: 'var(--surface2)', border: '1px solid var(--border)', fontSize: 10, fontWeight: 800, color: 'var(--text-mid)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 10 }}>
         🏋️ Programmed by Coach {coachFirst}
       </div>
-      <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 2, letterSpacing: '-0.02em' }}>{program.name}</h1>
-      <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 18 }}>
-        {totalWeeks}-week program · tap any day to train it or look ahead
+      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 2 }}>{program.name}</h1>
+      <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 20 }}>
+        {totalWeeks}-week program · tap any day for details
       </p>
 
       {/* Month navigation */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, padding: '10px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12 }}>
         <button
           onClick={() => setViewMonth(new Date(year, month - 1, 1))}
           aria-label="Previous month"
-          style={{ width: 34, height: 34, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}
-        >‹</button>
+          style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 18, cursor: 'pointer', padding: '2px 8px', fontWeight: 700, fontFamily: 'inherit' }}
+        >←</button>
         <span style={{ fontWeight: 700, fontSize: 15 }}>{MONTHS[month]} {year}</span>
         <button
           onClick={() => setViewMonth(new Date(year, month + 1, 1))}
           aria-label="Next month"
-          style={{ width: 34, height: 34, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}
-        >›</button>
+          style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 18, cursor: 'pointer', padding: '2px 8px', fontWeight: 700, fontFamily: 'inherit' }}
+        >→</button>
       </div>
 
-      {/* Day-of-week headers */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginBottom: 6 }}>
+      {/* Day of week headers */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 3 }}>
         {DOW_ORDER.map(d => (
-          <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.04em' }}>{d.toUpperCase()}</div>
+          <div key={d} style={{ textAlign: 'center', fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', padding: '3px 0', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+            {d}
+          </div>
         ))}
       </div>
 
-      {/* Month grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginBottom: 24 }}>
-        {Array.from({ length: leadingBlanks }).map((_, i) => <div key={`b${i}`} />)}
-        {Array.from({ length: daysInMonth }).map((_, i) => {
-          const dateNum = i + 1
+      {/* Calendar grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+        {cells.map((dateNum, i) => {
+          if (dateNum === null) return <div key={i} style={{ minHeight: 54 }} />
+
           const cellDate = new Date(year, month, dateNum, 12, 0, 0)
           const wk = programWeekOf(cellDate)
           const dName = dowName(cellDate)
@@ -159,47 +165,73 @@ export default function CoachedCalendar() {
           const isTraining = !!(inProgram && dayObj && dayObj.type !== 'rest')
           const done = inProgram && completions.has(`${wk}-${dName}`)
           const isToday = sameYMD(cellDate, today)
-          const isSel = !!(selected && selected.week === wk && selected.day === dName)
+          const isSelected = !!(selected && selected.week === wk && selected.day === dName)
+          const dotColor = done ? 'var(--green)' : isTraining ? 'var(--accent)' : 'var(--text-dim)'
 
           return (
             <button
-              key={dateNum}
+              key={i}
               disabled={!inProgram}
               onClick={() => inProgram && setSelected({ week: wk as number, day: dName })}
               title={isTraining ? (dayObj?.label || 'Training day') : inProgram ? 'Rest day' : undefined}
               style={{
-                display: 'flex', flexDirection: 'column', gap: 4,
-                minHeight: 68, padding: '6px 7px', borderRadius: 10, textAlign: 'left',
-                cursor: inProgram ? 'pointer' : 'default', fontFamily: 'inherit',
-                border: isSel ? '1.5px solid var(--accent)' : isToday ? '1px solid var(--accent-border)' : '1px solid var(--border)',
-                background: isSel ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : inProgram ? 'var(--surface2)' : 'transparent',
-                opacity: inProgram ? 1 : 0.3,
+                minHeight: 54,
+                borderRadius: 8,
+                border: `1.5px solid ${isSelected ? 'var(--accent)' : isToday ? 'var(--accent)' : 'var(--border)'}`,
+                background: isSelected || (isToday && !inProgram) ? 'var(--accent-bg)' : 'var(--surface)',
+                cursor: inProgram ? 'pointer' : 'default',
+                padding: '5px 2px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 2,
+                minWidth: 0,
+                opacity: inProgram ? 1 : 0.28,
+                fontFamily: 'inherit',
+                transition: 'opacity 0.1s, border-color 0.1s',
               }}
             >
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: isToday ? 'var(--accent)' : 'var(--text-mid)' }}>{dateNum}</span>
-                {inProgram && <span style={{ fontSize: 12, lineHeight: 1 }}>{done ? '✅' : isTraining ? '💪' : '·'}</span>}
+              <span style={{ fontSize: 10, fontWeight: isToday ? 800 : 500, color: isToday ? 'var(--accent)' : 'var(--text)' }}>
+                {dateNum}
               </span>
-              {isTraining && dayObj?.label && (
-                <span style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--text-mid)', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {dayObj.label}
-                </span>
+              {inProgram && (
+                <>
+                  <div style={{ width: 5, height: 5, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
+                  {isTraining && (
+                    <span style={{ fontSize: 7.5, fontWeight: 700, color: dotColor, textAlign: 'center', lineHeight: 1.25, wordBreak: 'break-word', padding: '0 2px', maxWidth: '100%' }}>
+                      {(dayObj?.label ?? '').split(' ').slice(0, 2).join(' ')}
+                    </span>
+                  )}
+                </>
               )}
-              {inProgram && <span style={{ fontSize: 8, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.03em', marginTop: 'auto' }}>WK {wk}</span>}
             </button>
           )
         })}
       </div>
 
+      {/* Legend */}
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 14 }}>
+        {[
+          { label: 'Workout', color: 'var(--accent)' },
+          { label: 'Completed', color: 'var(--green)' },
+          { label: 'Rest', color: 'var(--text-dim)' },
+        ].map(l => (
+          <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <div style={{ width: 7, height: 7, borderRadius: '50%', background: l.color, flexShrink: 0 }} />
+            <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 600 }}>{l.label}</span>
+          </div>
+        ))}
+      </div>
+
       {/* Selected day's workout — reuses the proven Today card, keyed so it
           remounts cleanly (re-fetches its own lib/logs/completion) per day. */}
       {selected && (
-        <>
+        <div style={{ marginTop: 20 }}>
           {selectedDateLabel && (
             <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-mid)', marginBottom: 10 }}>{selectedDateLabel}</p>
           )}
           <CoachedSessionCard key={`${selected.week}-${selected.day}`} weekOverride={selected.week} dayOverride={selected.day} />
-        </>
+        </div>
       )}
     </div>
   )
