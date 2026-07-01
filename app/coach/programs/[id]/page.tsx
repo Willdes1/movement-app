@@ -326,7 +326,7 @@ export default function ProgramDetailPage() {
     setAssignSearching(false)
   }
 
-  async function handleAssign(confirmedReplace = false) {
+  async function handleAssign() {
     if (!selectedClient || !program) return
     setAssigning(true); setAssignError('')
     const { data: { session } } = await supabase.auth.getSession()
@@ -334,34 +334,13 @@ export default function ProgramDetailPage() {
 
     const isSelf = selectedClient.id === session.user.id
 
-    // Already on an active program? Require explicit confirmation before replacing.
-    const { data: existing } = await supabase
-      .from('coach_program_assignments')
-      .select('id, start_date, coach_programs(name)')
-      .eq('coach_id', session.user.id)
-      .eq('client_id', selectedClient.id)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-
-    if (existing?.length && !confirmedReplace) {
-      const current = (existing[0].coach_programs as unknown as { name: string }[] | null)?.[0]?.name
-        ?? (existing[0].coach_programs as unknown as { name: string } | null)?.name
-        ?? 'another program'
-      setReplaceWarning({ programName: current, startDate: existing[0].start_date })
-      setAssigning(false)
-      return
-    }
-
-    // Replacing — retire every previously active assignment for this client.
-    // Their logged sets and day completions are kept; re-assigning the old
-    // program later (backdate the start date to resume mid-program) restores it.
-    if (existing?.length) {
-      const { error: retireErr } = await supabase
-        .from('coach_program_assignments')
-        .update({ status: 'replaced' })
-        .in('id', existing.map(e => e.id))
-      if (retireErr) { setAssignError(retireErr.message); setAssigning(false); return }
-    }
+    // New model (Chunk 5a): assigning creates a PENDING assignment. It does NOT
+    // take over — the athlete gets a prompt and taps Activate (which retires any
+    // current active program at that point). Cancel any prior pending from this
+    // coach to this client so prompts don't stack.
+    await supabase.from('coach_program_assignments')
+      .update({ status: 'cancelled' })
+      .eq('coach_id', session.user.id).eq('client_id', selectedClient.id).eq('status', 'pending')
 
     // Self-assignments skip the roster — a coach shouldn't appear in their own client list
     if (!isSelf) {
@@ -372,13 +351,21 @@ export default function ProgramDetailPage() {
 
     const { error: assignErr } = await supabase.from('coach_program_assignments').insert({
       program_id: program.id, coach_id: session.user.id,
-      client_id: selectedClient.id, start_date: assignStartDate, status: 'active',
+      client_id: selectedClient.id, start_date: assignStartDate, status: 'pending',
     })
     if (assignErr) { setAssignError(assignErr.message); setAssigning(false); return }
+
+    // Best-effort push so they know to open the app.
+    fetch('/api/coach/notify-assignment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ clientId: selectedClient.id, programName: program.name }),
+    }).catch(() => {})
+
     setReplaceWarning(null)
     setAssignSuccess(isSelf
-      ? `Assigned to yourself — find it under My Coach in your athlete app, starting ${assignStartDate}`
-      : `Assigned to ${selectedClient.name ?? 'client'} — starting ${assignStartDate}`)
+      ? `Assigned to yourself — open your athlete app and tap Activate to start it`
+      : `Sent to ${selectedClient.name ?? 'client'} — they'll get a prompt to activate it`)
     setAssigning(false)
   }
 
@@ -1030,7 +1017,7 @@ export default function ProgramDetailPage() {
                       Assigning <strong>{program.name}</strong> will replace it as the active program. All logged workouts and completed days are kept — to return to the old program later, just re-assign it (backdate the start date to pick up where it left off).
                     </p>
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <button onClick={() => handleAssign(true)} disabled={assigning}
+                      <button onClick={() => handleAssign()} disabled={assigning}
                         style={{ flex: 1, padding: '11px 16px', background: '#f59e0b', color: '#000', border: 'none', borderRadius: 10, fontWeight: 800, fontSize: 13, cursor: 'pointer', opacity: assigning ? 0.6 : 1 }}>
                         {assigning ? 'Replacing…' : 'Replace Program'}
                       </button>

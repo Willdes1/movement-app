@@ -15,6 +15,7 @@ import GenerationBanner from '@/components/GenerationBanner'
 import ReportBugButton from '@/components/ReportBugButton'
 import OnboardingModal from '@/components/OnboardingModal'
 import CoachWinBackModal from '@/components/CoachWinBackModal'
+import CoachAssignmentPrompt from '@/components/CoachAssignmentPrompt'
 import JoinLinkRedeemer from '@/components/JoinLinkRedeemer'
 import AppMain from '@/components/AppMain'
 import ServiceWorkerRegistrar from '@/components/ServiceWorkerRegistrar'
@@ -65,6 +66,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <MobileMenu />
               <AppMain>
                 <ImpersonationBanner />
+                <CoachAssignmentPrompt />
                 <RecoveryBanner />
                 <ImportedProgramBanner />
                 <GenerationBanner />

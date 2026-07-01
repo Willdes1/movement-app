@@ -41,6 +41,24 @@ export async function GET(request: Request) {
       if (caller?.is_admin === true) targetId = overrideId
     }
 
+    // Pending assignment (Chunk 5a) — a coach assigned a program that this athlete
+    // hasn't activated yet. Surfaced so the app can prompt "Activate?".
+    let pendingAssignment: { id: string; programName: string | null; coachName: string; startDate: string } | null = null
+    {
+      const { data: p } = await supabase
+        .from('coach_program_assignments')
+        .select('id, start_date, coach_id, coach_programs(name)')
+        .eq('client_id', targetId).eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1).single()
+      if (p) {
+        const { data: pc } = await supabase.from('profiles').select('name').eq('id', p.coach_id).single()
+        const pname = (p.coach_programs as unknown as { name: string }[] | null)?.[0]?.name
+          ?? (p.coach_programs as unknown as { name: string } | null)?.name ?? null
+        pendingAssignment = { id: p.id, programName: pname, coachName: pc?.name ?? 'your coach', startDate: p.start_date }
+      }
+    }
+
     // Get active assignment for this client.
     // NOTE: coach_programs has NO `description` column — selecting it here errored
     // the whole embed and silently nulled the assignment, which made `coached`
@@ -67,7 +85,7 @@ export async function GET(request: Request) {
         .limit(1)
         .single()
 
-      if (!ended) return Response.json({ assignment: null })
+      if (!ended) return Response.json({ assignment: null, pendingAssignment })
 
       const { data: endedCoach } = await supabase
         .from('profiles').select('name').eq('id', ended.coach_id).single()
@@ -78,6 +96,7 @@ export async function GET(request: Request) {
 
       return Response.json({
         assignment: null,
+        pendingAssignment,
         endedAssignment: {
           id: ended.id,
           status: ended.status,
@@ -139,6 +158,7 @@ export async function GET(request: Request) {
       coachId:   assignment.coach_id,
       coachLibrary,
       coachVoiceReady,
+      pendingAssignment,
     })
   } catch (err) {
     console.error('my-program error:', err)

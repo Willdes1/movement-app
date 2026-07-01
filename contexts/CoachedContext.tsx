@@ -61,6 +61,13 @@ export type EndedAssignment = {
   coachName: string
 }
 
+export type PendingAssignment = {
+  id: string
+  programName: string | null
+  coachName: string
+  startDate: string
+}
+
 type CoachedContextType = {
   coached: boolean
   loading: boolean
@@ -72,6 +79,7 @@ type CoachedContextType = {
   coachLibrary: Record<string, CoachLibEntry>
   coachVoiceReady: boolean
   endedAssignment: EndedAssignment | null
+  pendingAssignment: PendingAssignment | null
   refresh: () => void
 }
 
@@ -86,6 +94,7 @@ const CoachedContext = createContext<CoachedContextType>({
   coachLibrary: {},
   coachVoiceReady: false,
   endedAssignment: null,
+  pendingAssignment: null,
   refresh: () => {},
 })
 
@@ -100,6 +109,7 @@ export function CoachedProvider({ children }: { children: React.ReactNode }) {
   const [coachLibrary, setCoachLibrary] = useState<Record<string, CoachLibEntry>>({})
   const [coachVoiceReady, setCoachVoiceReady] = useState(false)
   const [endedAssignment, setEndedAssignment] = useState<EndedAssignment | null>(null)
+  const [pendingAssignment, setPendingAssignment] = useState<PendingAssignment | null>(null)
 
   const load = useCallback(async () => {
     if (!user || !effectiveUserId) { setLoading(false); return }
@@ -122,9 +132,11 @@ export function CoachedProvider({ children }: { children: React.ReactNode }) {
         setCoachLibrary(data.coachLibrary ?? {})
         setCoachVoiceReady(data.coachVoiceReady === true)
         setEndedAssignment(null)
+        setPendingAssignment(data.pendingAssignment ?? null)
       } else {
         setAssignment(null); setProgram(null); setWeeks([]); setCoachName(''); setCoachId(null); setCoachLibrary({}); setCoachVoiceReady(false)
         setEndedAssignment(data.endedAssignment ?? null)
+        setPendingAssignment(data.pendingAssignment ?? null)
       }
     } catch {
       // network failure — treat as not coached rather than blocking the app
@@ -139,7 +151,7 @@ export function CoachedProvider({ children }: { children: React.ReactNode }) {
   return (
     <CoachedContext.Provider value={{
       coached: !!assignment && !!program,
-      loading, coachName, coachId, assignment, program, weeks, coachLibrary, coachVoiceReady, endedAssignment,
+      loading, coachName, coachId, assignment, program, weeks, coachLibrary, coachVoiceReady, endedAssignment, pendingAssignment,
       refresh: load,
     }}>
       {children}
