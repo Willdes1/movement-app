@@ -11,6 +11,7 @@ import CoachedSessionCard from '@/components/CoachedSessionCard'
 import { useStreak } from '@/lib/useStreak'
 import { useTTS } from '@/hooks/useTTS'
 import { inferEquipment, timeCommitment } from '@/lib/workout-display'
+import { displayName } from '@/lib/name'
 
 type DailyBlock = { label: string; duration: string; exercises: string[]; tip?: string }
 type DailySession = { morning?: DailyBlock; warmup?: DailyBlock; workout?: DailyBlock; abs?: DailyBlock; cooldown?: DailyBlock; evening?: DailyBlock }
@@ -97,7 +98,7 @@ export default function TodayPage() {
         supabase.from('training_programs').select('id, start_date').eq('user_id', userId).single(),
       ])
 
-      if (profile?.name) setFirstName(profile.name.split(' ')[0])
+      if (profile?.name) setFirstName(displayName(profile.name))
       setProfileReady(!!(profile?.sport || profile?.goal))
 
       if (!prog) { setHasProgram(false); return }

@@ -22,6 +22,7 @@ const BILATERAL_AREAS = ['Knee', 'Shoulder', 'Hip', 'Ankle', 'Hamstring', 'Hip f
 const SINGLE_AREAS = ['Lower back', 'Neck']
 const SIDES = ['Left', 'Right', 'Both']
 const WORKOUT_LOCATIONS = ['Home', 'Gym', 'Both']
+const NAME_EMOJIS = ['💪', '🔥', '⚡', '🏆', '🎯', '🚀', '😤', '🥷', '🦍', '🏋️', '🏂', '🛹', '🏄', '🥊', '💯', '⭐']
 const HOME_EQUIPMENT = ['Treadmill', 'Pull-up bar', 'Bench', 'Dumbbells', 'Barbells', 'Resistance bands', 'Kettlebells', 'Jump rope']
 const TRAINING_LEVELS = [
   { value: 'beginner',     label: 'Beginner',     sub: '< 1 year' },
@@ -410,6 +411,28 @@ export default function ProfilePage() {
             style={inputStyle}
           />
           {nameConfirmed && <GreenCheck />}
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 7 }}>Add some flair (optional) — tap to add or remove</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {NAME_EMOJIS.map(em => {
+                const active = (profile.name ?? '').includes(em)
+                return (
+                  <button
+                    key={em}
+                    type="button"
+                    onClick={() => {
+                      const cur = profile.name ?? ''
+                      update('name', cur.includes(em) ? cur.replace(em, '').replace(/\s+/g, ' ').trim() : (cur.trim() ? `${cur.trim()} ${em}` : em))
+                      setNameConfirmed(false)
+                    }}
+                    style={{ fontSize: 18, lineHeight: 1, padding: '6px 9px', borderRadius: 10, cursor: 'pointer', border: active ? '1.5px solid var(--accent)' : '1px solid var(--border)', background: active ? 'color-mix(in srgb, var(--accent) 16%, transparent)' : 'var(--surface2)' }}
+                  >
+                    {em}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
         </Field>
 
         {/* Sex assigned at birth */}

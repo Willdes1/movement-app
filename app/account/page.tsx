@@ -10,6 +10,7 @@ import UpgradeModal from '@/components/UpgradeModal'
 import { useStreak } from '@/lib/useStreak'
 import StreakBadge from '@/components/StreakBadge'
 import ContactSupportModal from '@/components/account/ContactSupportModal'
+import { displayName, avatarInitials } from '@/lib/name'
 import DeleteAccountModal from '@/components/account/DeleteAccountModal'
 
 type Activity = { name: string; level: string }
@@ -256,9 +257,9 @@ function AccountPageInner() {
 
   if (loading || !user) return null
 
-  const firstName = profile?.name?.split(' ')[0]
+  const firstName = displayName(profile?.name)
   const initials = profile?.name
-    ? profile.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+    ? avatarInitials(profile.name)
     : user.email?.[0]?.toUpperCase() ?? '?'
 
   const sports = profile?.sport ? profile.sport.split(', ') : []

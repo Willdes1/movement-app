@@ -6,6 +6,7 @@ import { useCoached } from '@/contexts/CoachedContext'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import Logo from '@/components/ui/Logo'
+import { displayName } from '@/lib/name'
 
 const navItems = [
   { href: '/today',     label: 'Home',       emoji: '🏠' },
@@ -45,7 +46,7 @@ export default function Sidebar() {
 
   if (pathname.startsWith('/admin') || pathname.startsWith('/auth') || pathname.startsWith('/coach') || pathname.startsWith('/legal') || pathname.startsWith('/join')) return null
 
-  const firstName = profile?.name?.split(' ')[0] ?? 'Athlete'
+  const firstName = displayName(profile?.name) || 'Athlete'
   const sport = profile?.sports?.[0] ?? 'Athlete'
 
   return (

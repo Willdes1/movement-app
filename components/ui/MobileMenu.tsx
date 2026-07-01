@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useCoached } from '@/contexts/CoachedContext'
 import { supabase } from '@/lib/supabase'
 import Logo from '@/components/ui/Logo'
+import { displayName } from '@/lib/name'
 
 const MENU_ITEMS = [
   { href: '/for-you',        label: 'For You',           desc: 'Daily feed & mindset',              emoji: '⚡' },
@@ -57,7 +58,7 @@ export default function MobileMenu() {
     pathname.startsWith('/join')
   ) return null
 
-  const firstName = profile?.name?.split(' ')[0] ?? 'Athlete'
+  const firstName = displayName(profile?.name) || 'Athlete'
   const sport = profile?.sports?.[0] ?? 'Athlete'
 
   return (
