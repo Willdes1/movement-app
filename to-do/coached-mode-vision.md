@@ -1,6 +1,11 @@
 # Coached Mode v2 — "Program Modes" (athlete experience parity)
 
 > Locked with Will 2026-06-30. Build in chunks; ship + verify each.
+> ✅ COMPLETE 2026-06-30 — Chunks 1–5 + Q1 all shipped (commits through ff0bda9).
+>   1 standard instructions on coach exercises · 2 coach instruction editor
+>   (structured + custom + import-to-library + in-place) · Q1 field template ·
+>   3 one-click self-hiding bulk curation · 5a athlete-confirmed activation +
+>   notification · 5b save/resume/restart · 5c pause-coaching / one-active manager.
 
 ## North star
 An athlete is always in exactly ONE active "mode" — **AI plan**, **Coach plan**, or
