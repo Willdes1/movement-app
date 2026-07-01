@@ -224,7 +224,7 @@ export default function NutritionPage() {
   // ── Setup screen ──────────────────────────────────────────────────────────────
   if (screen === 'setup') {
     return (
-      <div className="page-content-narrow" style={{ padding: '24px 16px 100px' }}>
+      <div className="page-content" style={{ padding: '24px 16px 100px' }}>
         {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} highlightPlan="plus" />}
 
         <h1 style={{ fontSize: 26, fontWeight: 900, letterSpacing: '-0.02em', marginBottom: 4 }}>Nutrition AI</h1>
@@ -419,7 +419,7 @@ export default function NutritionPage() {
   const phaseColor = Object.entries(PHASE_COLORS).find(([k]) => activePhase?.name.includes(k))?.[1] ?? 'var(--accent)'
 
   return (
-    <div className="page-content-narrow" style={{ padding: '24px 16px 100px' }}>
+    <div className="page-content" style={{ padding: '24px 16px 100px' }}>
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} highlightPlan="plus" />}
 
       {/* Header */}
