@@ -1,6 +1,6 @@
 # Agent Context — Atlas Prime
 > Full briefing for a new agent to continue this project without any prior conversation history.
-> Last updated: 2026-06-24 | Current branch: master | 329 commits
+> Last updated: 2026-07-01 | Current branch: master | 348 commits
 
 ---
 
@@ -99,7 +99,57 @@
 
 ---
 
-## 4. What Was Built This Session (2026-06-23)
+## 4. What Was Built This Session (2026-06-30 → 07-01)
+
+**Marathon session — shipped the Coach Voice Cloning feature, fixed a launch-level
+coached-display bug, and completed the entire Coached Mode v2 epic (instructions +
+program switching). ~20 commits.**
+
+### 🎙 Coach Voice Cloning (Phase 1) — SQL `20260623_coach_voice_cloning.sql`
+- ElevenLabs Instant Voice Cloning. Coach records consent + sample on Dashboard
+  (`VoiceCloneCard`) → `voice_id` on `coach_voices`. Coached client's 🔈 synthesizes
+  cues in the coach's voice, cached per (coach, exercise) in public `coach-voice-audio`
+  bucket + `coach_exercise_audio`. Fallback to default TTS. Gated by `COACH_VOICE_CLONING`
+  flag + `ELEVENLABS_API_KEY`. Files: `lib/elevenlabs.ts`, `app/api/coach/voice` + `/voice/speak`.
+- ⏳ **Live test still blocked on:** ElevenLabs key in Vercel + a working coached client
+  (now unblocked by the display fix below).
+
+### 🐛 Launch-level bug fix — coached programs weren't displaying (commit b2a24da)
+- `my-program` selected `coach_programs.description`, a column that DOESN'T EXIST → the
+  embed errored → assignment nulled → **`coached` was false for EVERY client**, not just
+  self-assign. Removed the bad column. Found via temp debug instrumentation. This had been
+  silently breaking the whole coached experience.
+- Also fixed `coach_program_assignments_status_check` to allow `replaced` (SQL 20260624).
+
+### 🏗️ Coached Mode v2 — the full epic (spec: `to-do/coached-mode-vision.md`)
+- **Calendar takeover:** when coached, `/calendar` shows the coach program (`CoachedCalendar`,
+  week/day picker driving the day-agnostic `CoachedSessionCard`); AI plan paused. My Coach in
+  desktop nav; AI-plan surfaces hidden while coached.
+- **Chunk 1** — standard instructions (how/breathing/core/tip) on coach exercises, free from the
+  global library.
+- **Chunk 2** — coach instruction editor: structured + custom fields (`CoachInstructionFields`
+  shared component), Autofill-free + AI-generate, **import-to-library** + **in-place ✎ Cues**
+  editor on the program page. SQL `20260630_coach_exercise_instructions.sql`.
+- **Q1 Field Template** — coach chooses which standard fields show + order. SQL
+  `20260630_coach_field_template.sql`.
+- **Chunk 3** — one-click **self-hiding** bulk instruction curation across all programs
+  (`InstructionCuratePanel` atop Video Curation tab; `/api/admin/curate-all-instructions`).
+  Also per-program `Generate Instructions` button.
+- **Chunk 5a** — athlete-confirmed activation: coach assign → `pending` + push/in-app prompt
+  (`CoachAssignmentPrompt`) → athlete taps Activate. SQL `20260630_assignment_pending.sql`.
+- **Chunk 5b** — save/resume/restart: `resume_week` stamp, resume (date-shift) vs fresh (Day 1,
+  clears completions, keeps logs); "My Coach Programs" switcher on /my-coach. SQL
+  `20260630_assignment_resume_week.sql`.
+- **Chunk 5c** — pause coaching → AI plan resurfaces; one-active manager (paused programs
+  resumable from /my-coach even when on own plan). `/api/coach/pause-assignment`.
+
+### Idea captured (priority)
+- `to-do/onboarding-help-knowledge-base.md` — one help-content source → first-use hover hints
+  + internal KB + AI "ask the app" chat. Do with onboarding.
+
+---
+
+## Previous Session (2026-06-23)
 
 **Big multi-feature night — 10 commits. Admin tooling + App Store compliance + a full coach feature arc + a security fix. Three SQL migrations created (see ⚠️ in §11).**
 
@@ -730,10 +780,23 @@ return () => { supabase.removeChannel(channel) }
 
 ## 11. What to Work on Next (Priority Order)
 
-**Next session focus (Will's pick): build the COACH VOICE CLONING feature — see `to-do/coach-voice-cloning.md`.**
+**NEXT MISSION (Will's pick, 2026-07-01): "loading up our internal library" — Will has a
+task about populating the internal library. Get the details from him at session start.**
+Likely relates to the exercise_library / knowledge store / the new onboarding-help KB idea
+(`to-do/onboarding-help-knowledge-base.md`). Ask before assuming.
 
-0. **⚠️ FIRST — verify two SQL migrations from the 2026-06-23 session are run in Supabase:** `20260618_admin_permissions.sql` (adds `profiles.is_owner` — **AuthContext now SELECTs `is_owner`, so if this isn't run the profiles query errors and admin access breaks**) and `20260618_account_deletion.sql`. (`20260618_study_hub.sql` was already run.) If admin is acting up, this is why.
-1. **🎙 Coach voice cloning (next build)** — ElevenLabs instant voice clone per coach (consent + record → `voice_id` stored), cached TTS in the coach's voice for coached workouts (mirror the `tts_url_*` cache pattern, key by coach+exercise), client playback prefers coach voice. Premium coach upsell. Full plan + phases in `to-do/coach-voice-cloning.md`. Ties to `project_coach_pricing`.
+0. **⚠️ RUN THESE PENDING MIGRATIONS in Supabase** (all `IF NOT EXISTS`, safe; Will was running
+   them as we shipped — verify all done):
+   - `20260630_coach_exercise_instructions.sql` (coach_exercise_library how/breathing/core/tip/custom_fields)
+   - `20260630_coach_field_template.sql` (profiles.coach_field_template)
+   - `20260630_assignment_pending.sql` (status constraint + 'pending')
+   - `20260630_assignment_resume_week.sql` (coach_program_assignments.resume_week)
+   - `20260623_coach_voice_cloning.sql` + `20260624_assignment_status_replaced.sql`
+1. **🎙 Coach voice cloning — go live + test.** Phase 1 is BUILT. Needs: `ELEVENLABS_API_KEY` in
+   Vercel (free tier OK for testing; upgrade to $5 Starter before a PAYING customer hears a
+   cloned voice) + run `20260623_coach_voice_cloning.sql`. Then test with a coached client
+   (now possible — coached display bug fixed). Full plan `to-do/coach-voice-cloning.md`. Phases
+   2-4 (pre-generate on assign, athlete voice choice, hype lines) after.
 2. **Launch paperwork (Will, non-code):** Google Play **org** account ($25, has D-U-N-S now) + **Apple Developer enrollment** ($99/yr — has D-U-N-S + Mercury card + business email; enroll with existing personal Apple ID). Then RevenueCat + Capacitor → TestFlight. Mercury → Stripe payout wiring is prep (no revenue yet).
 3. **(Optional) DKIM** for the new email — Google Admin → Apps → Gmail → Authenticate email → paste the generated TXT into Namecheap (alongside the existing MX/SPF/verification records).
 3. **Apple launch compliance — full review** — Apple Developer Program enrollment (LLC ✅, domain ✅, needs business email + $99/yr + D-U-N-S for org account), App Store Review Guidelines compliance audit (health/fitness app rules, account deletion requirement, privacy nutrition labels, subscription rules → RevenueCat not Stripe on iOS), privacy policy/TOS review.
