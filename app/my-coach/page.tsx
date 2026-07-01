@@ -164,6 +164,75 @@ function MyCoachInner() {
     setSwitching(null)
   }
 
+  // Chunk 5c — step off coaching back to your own AI plan (coach program saved).
+  async function pauseCoaching() {
+    if (!confirm('Switch to your own plan? Your coach program is saved — resume it anytime from My Coach.')) return
+    setSwitching('__pause__')
+    const { data: { session } } = await supabase.auth.getSession()
+    await fetch('/api/coach/pause-assignment', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session?.access_token}` },
+    })
+    await load()
+    refreshCoached()
+    setSwitching(null)
+    router.push('/today')
+  }
+
+  // The switch/resume/restart card — reused in the active view and the empty state.
+  function programSwitcher(showPause: boolean) {
+    if (coachPrograms.length === 0) return null
+    return (
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '16px 18px', marginBottom: 20 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>
+          My Coach Programs
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {coachPrograms.map(cp => {
+            const busy = switching === cp.assignmentId
+            return (
+              <div key={cp.assignmentId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: cp.isActive ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'var(--surface2)' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cp.programName ?? 'Program'}</div>
+                  <div style={{ fontSize: 11, color: cp.isActive ? 'var(--accent)' : 'var(--text-dim)', fontWeight: 600 }}>
+                    {cp.isActive ? '▶ Active now' : cp.resumeWeek && cp.resumeWeek > 1 ? `Paused at Week ${cp.resumeWeek}` : 'Not started'}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  {cp.isActive ? (
+                    <button onClick={() => { if (confirm('Restart this program from Day 1? Your logged sets/PRs are kept — only the calendar resets.')) switchProgram(cp.assignmentId, 'fresh') }} disabled={busy}
+                      style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-mid)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      {busy ? '…' : '↺ Restart'}
+                    </button>
+                  ) : (
+                    <>
+                      {cp.resumeWeek && cp.resumeWeek > 1 && (
+                        <button onClick={() => switchProgram(cp.assignmentId, 'resume')} disabled={busy}
+                          style={{ padding: '7px 12px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: '#fff', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                          {busy ? '…' : `Resume · Wk ${cp.resumeWeek}`}
+                        </button>
+                      )}
+                      <button onClick={() => switchProgram(cp.assignmentId, 'fresh')} disabled={busy}
+                        style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid var(--accent)', background: (cp.resumeWeek && cp.resumeWeek > 1) ? 'transparent' : 'var(--accent)', color: (cp.resumeWeek && cp.resumeWeek > 1) ? 'var(--accent)' : '#fff', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                        {busy ? '…' : 'Start Fresh'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        {showPause && coachPrograms.some(c => c.isActive) && (
+          <button onClick={pauseCoaching} disabled={switching === '__pause__'}
+            style={{ marginTop: 12, width: '100%', padding: '10px', borderRadius: 10, border: '1px dashed var(--border)', background: 'transparent', color: 'var(--text-dim)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            {switching === '__pause__' ? 'Switching…' : '← Switch to my own plan (pause coaching)'}
+          </button>
+        )}
+      </div>
+    )
+  }
+
   // Load messages when Messages tab is opened
   useEffect(() => {
     if (tab === 'messages' && coachId && user) loadChat()
@@ -266,22 +335,34 @@ function MyCoachInner() {
     </div>
   )
 
-  // Empty state — no active assignment
+  // Empty state — no active coach program. If they have PAUSED coach programs,
+  // let them resume one here (they're on their own AI plan right now).
   if (!assignment || !program) return (
-    <div style={{ padding: '60px 20px 100px', maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
-      <div style={{ fontSize: 48, marginBottom: 20 }}>🏋️</div>
-      <h1 style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.03em', marginBottom: 10 }}>
-        No Coach Program Yet
-      </h1>
-      <p style={{ fontSize: 14, color: 'var(--text-dim)', lineHeight: 1.6, marginBottom: 28 }}>
-        Ask your coach for their invite code, then enter it in your Account page to join their roster and receive a program.
-      </p>
-      <button
-        onClick={() => router.push('/account')}
-        style={{ padding: '13px 28px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 12, fontWeight: 800, fontSize: 15, cursor: 'pointer', fontFamily: 'inherit' }}
-      >
-        Go to Account
-      </button>
+    <div style={{ padding: '40px 20px 100px', maxWidth: 560, margin: '0 auto' }}>
+      {coachPrograms.length > 0 ? (
+        <>
+          <div style={{ textAlign: 'center', marginBottom: 22 }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🏋️</div>
+            <h1 style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.03em', marginBottom: 8 }}>Your Coach Programs</h1>
+            <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6 }}>
+              You&apos;re on your own plan right now. Resume a coach program anytime below — your progress is saved.
+            </p>
+          </div>
+          {programSwitcher(false)}
+        </>
+      ) : (
+        <div style={{ textAlign: 'center', paddingTop: 20 }}>
+          <div style={{ fontSize: 48, marginBottom: 20 }}>🏋️</div>
+          <h1 style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.03em', marginBottom: 10 }}>No Coach Program Yet</h1>
+          <p style={{ fontSize: 14, color: 'var(--text-dim)', lineHeight: 1.6, marginBottom: 28 }}>
+            Ask your coach for their invite code, then enter it in your Account page to join their roster and receive a program.
+          </p>
+          <button onClick={() => router.push('/account')}
+            style={{ padding: '13px 28px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 12, fontWeight: 800, fontSize: 15, cursor: 'pointer', fontFamily: 'inherit' }}>
+            Go to Account
+          </button>
+        </div>
+      )}
     </div>
   )
 
@@ -434,55 +515,8 @@ function MyCoachInner() {
         )}
       </div>
 
-      {/* My Coach Programs — switch / resume / restart (Chunk 5b) */}
-      {coachPrograms.length > 0 && (
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '16px 18px', marginBottom: 20 }}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>
-            My Coach Programs
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {coachPrograms.map(cp => {
-              const busy = switching === cp.assignmentId
-              return (
-                <div key={cp.assignmentId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: cp.isActive ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'var(--surface2)' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cp.programName ?? 'Program'}</div>
-                    <div style={{ fontSize: 11, color: cp.isActive ? 'var(--accent)' : 'var(--text-dim)', fontWeight: 600 }}>
-                      {cp.isActive ? '▶ Active now' : cp.resumeWeek && cp.resumeWeek > 1 ? `Paused at Week ${cp.resumeWeek}` : 'Not started'}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    {cp.isActive ? (
-                      <button onClick={() => { if (confirm('Restart this program from Day 1? Your logged sets/PRs are kept — only the calendar resets.')) switchProgram(cp.assignmentId, 'fresh') }} disabled={busy}
-                        style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-mid)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-                        {busy ? '…' : '↺ Restart'}
-                      </button>
-                    ) : (
-                      <>
-                        {cp.resumeWeek && cp.resumeWeek > 1 && (
-                          <button onClick={() => switchProgram(cp.assignmentId, 'resume')} disabled={busy}
-                            style={{ padding: '7px 12px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: '#fff', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
-                            {busy ? '…' : `Resume · Wk ${cp.resumeWeek}`}
-                          </button>
-                        )}
-                        <button onClick={() => switchProgram(cp.assignmentId, 'fresh')} disabled={busy}
-                          style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid var(--accent)', background: (cp.resumeWeek && cp.resumeWeek > 1) ? 'transparent' : 'var(--accent)', color: (cp.resumeWeek && cp.resumeWeek > 1) ? 'var(--accent)' : '#fff', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
-                          {busy ? '…' : 'Start Fresh'}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-          {coachPrograms.length === 1 && coachPrograms[0].isActive && (
-            <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 10, lineHeight: 1.5 }}>
-              When your coach assigns another program, it'll appear here to switch to — your progress on each is saved.
-            </p>
-          )}
-        </div>
-      )}
+      {/* My Coach Programs — switch / resume / restart */}
+      {programSwitcher(true)}
 
       {/* Progress card */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '18px 20px', marginBottom: 20 }}>
