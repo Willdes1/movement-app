@@ -114,7 +114,7 @@ export async function GET(request: Request) {
     // the client a name-keyed map to enrich the exercises the coach programmed.
     const { data: coachLib } = await supabase
       .from('coach_exercise_library')
-      .select('name, instructions, notes, sets_reps, video_type, youtube_url, youtube_start_sec, youtube_end_sec, video_url')
+      .select('name, instructions, notes, how, breathing, core, tip, custom_fields, sets_reps, video_type, youtube_url, youtube_start_sec, youtube_end_sec, video_url')
       .eq('coach_id', assignment.coach_id)
     const coachLibrary: Record<string, unknown> = {}
     for (const row of coachLib ?? []) {

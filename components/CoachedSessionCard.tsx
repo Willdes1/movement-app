@@ -36,6 +36,7 @@ type Media = {
   breathing: string | null
   core: string | null
   tip: string | null
+  customFields: { label: string; text: string }[]
 }
 
 const DOW_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -150,13 +151,14 @@ export default function CoachedSessionCard(
         ytSource: 'youtube',
         clipStart: c.youtube_start_sec, clipEnd: c.youtube_end_sec,
         loopStart: null, loopEnd: null,
-        // Coach's own cues win; fall back to the global library for the standard
-        // fields the coach hasn't (yet) written — so the athlete always gets full
-        // instructions even on a coach program with no custom details.
-        how: c.instructions ?? lib[key]?.how ?? null,
-        breathing: lib[key]?.breathing ?? null,
-        core: lib[key]?.core ?? null,
-        tip: c.notes ?? lib[key]?.tip ?? null,
+        // Coach's own structured cues win; fall back to legacy fields, then the
+        // global library — so the athlete always gets full instructions even on a
+        // coach program with no custom details.
+        how: c.how ?? c.instructions ?? lib[key]?.how ?? null,
+        breathing: c.breathing ?? lib[key]?.breathing ?? null,
+        core: c.core ?? lib[key]?.core ?? null,
+        tip: c.tip ?? c.notes ?? lib[key]?.tip ?? null,
+        customFields: Array.isArray(c.custom_fields) ? c.custom_fields : [],
       }
     }
     const g = lib[key]
@@ -167,6 +169,7 @@ export default function CoachedSessionCard(
       clipStart: g.youtube_start_sec, clipEnd: g.youtube_end_sec,
       loopStart: g.loop_start_sec, loopEnd: g.loop_end_sec,
       how: g.how, breathing: g.breathing, core: g.core, tip: g.tip,
+      customFields: [],
     }
     return null
   }
@@ -426,6 +429,13 @@ export default function CoachedSessionCard(
                     <div key={label} style={{ padding: '10px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, marginBottom: 8 }}>
                       <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--text-dim)', marginBottom: 4, textTransform: 'uppercase' }}>{label}</p>
                       <p style={{ fontSize: 12, color, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{text}</p>
+                    </div>
+                  ))}
+                  {/* Coach's own custom fields (e.g. Heart Rate) */}
+                  {(media?.customFields ?? []).filter(cf => cf.label && cf.text).map((cf, ci) => (
+                    <div key={`cf-${ci}`} style={{ padding: '10px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, marginBottom: 8 }}>
+                      <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--accent)', marginBottom: 4, textTransform: 'uppercase' }}>{cf.label}</p>
+                      <p style={{ fontSize: 12, color: 'var(--text-mid)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{cf.text}</p>
                     </div>
                   ))}
                   {last && (

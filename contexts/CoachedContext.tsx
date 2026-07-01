@@ -41,6 +41,11 @@ export type CoachLibEntry = {
   name: string
   instructions: string | null
   notes: string | null
+  how: string | null
+  breathing: string | null
+  core: string | null
+  tip: string | null
+  custom_fields: { label: string; text: string }[] | null
   sets_reps: string | null
   video_type: 'youtube' | 'shorts' | 'upload' | null
   youtube_url: string | null
