@@ -59,6 +59,31 @@ export async function GET(request: Request) {
       }
     }
 
+    // Coach program history (Chunk 5b) — the athlete's switchable programs: the
+    // active one (restartable) + any they've paused/replaced (resumable). Deduped
+    // to the latest assignment per program.
+    const coachPrograms: { assignmentId: string; status: string; isActive: boolean; programName: string | null; weeksTotal: number; resumeWeek: number | null; startDate: string }[] = []
+    {
+      const { data: hist } = await supabase
+        .from('coach_program_assignments')
+        .select('id, status, start_date, resume_week, program_id, coach_programs(name, weeks_total)')
+        .eq('client_id', targetId)
+        .in('status', ['active', 'replaced', 'paused'])
+        .order('created_at', { ascending: false })
+      const byProgram = new Set<string>()
+      for (const r of hist ?? []) {
+        if (byProgram.has(r.program_id)) continue
+        byProgram.add(r.program_id)
+        const cp = r.coach_programs as unknown as { name: string; weeks_total: number }[] | { name: string; weeks_total: number } | null
+        const one = Array.isArray(cp) ? cp[0] : cp
+        coachPrograms.push({
+          assignmentId: r.id, status: r.status, isActive: r.status === 'active',
+          programName: one?.name ?? null, weeksTotal: one?.weeks_total ?? 1,
+          resumeWeek: r.resume_week ?? null, startDate: r.start_date,
+        })
+      }
+    }
+
     // Get active assignment for this client.
     // NOTE: coach_programs has NO `description` column — selecting it here errored
     // the whole embed and silently nulled the assignment, which made `coached`
@@ -85,7 +110,7 @@ export async function GET(request: Request) {
         .limit(1)
         .single()
 
-      if (!ended) return Response.json({ assignment: null, pendingAssignment })
+      if (!ended) return Response.json({ assignment: null, pendingAssignment, coachPrograms })
 
       const { data: endedCoach } = await supabase
         .from('profiles').select('name').eq('id', ended.coach_id).single()
@@ -97,6 +122,7 @@ export async function GET(request: Request) {
       return Response.json({
         assignment: null,
         pendingAssignment,
+        coachPrograms,
         endedAssignment: {
           id: ended.id,
           status: ended.status,
@@ -159,6 +185,7 @@ export async function GET(request: Request) {
       coachLibrary,
       coachVoiceReady,
       pendingAssignment,
+      coachPrograms,
     })
   } catch (err) {
     console.error('my-program error:', err)

@@ -4,7 +4,9 @@ import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import type { CoachLibEntry } from '@/contexts/CoachedContext'
+import { useCoached, type CoachLibEntry } from '@/contexts/CoachedContext'
+
+type CoachProgramItem = { assignmentId: string; status: string; isActive: boolean; programName: string | null; weeksTotal: number; resumeWeek: number | null; startDate: string }
 
 interface ParsedDay {
   day: string
@@ -101,6 +103,9 @@ function MyCoachInner() {
   const [coachName, setCoachName]   = useState<string>('')
   const [coachId, setCoachId]       = useState<string | null>(null)
   const [coachLibrary, setCoachLibrary] = useState<Record<string, CoachLibEntry>>({})
+  const [coachPrograms, setCoachPrograms] = useState<CoachProgramItem[]>([])
+  const [switching, setSwitching]   = useState<string | null>(null)
+  const { refresh: refreshCoached } = useCoached()
   const [loading, setLoading]       = useState(true)
   const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(new Set())
   const [expandedDays, setExpandedDays]   = useState<Set<string>>(new Set())
@@ -124,6 +129,7 @@ function MyCoachInner() {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
     const data = await res.json()
+    setCoachPrograms(data.coachPrograms ?? [])
 
     if (data.assignment) {
       setAssignment(data.assignment)
@@ -142,6 +148,20 @@ function MyCoachInner() {
     }
 
     setLoading(false)
+  }
+
+  // Switch / resume / restart a coach program, then refresh the app-wide coached state.
+  async function switchProgram(assignmentId: string, mode: 'resume' | 'fresh') {
+    setSwitching(assignmentId)
+    const { data: { session } } = await supabase.auth.getSession()
+    await fetch('/api/coach/activate-assignment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ assignmentId, mode }),
+    })
+    await load()
+    refreshCoached()
+    setSwitching(null)
   }
 
   // Load messages when Messages tab is opened
@@ -413,6 +433,56 @@ function MyCoachInner() {
           <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, margin: 0 }}>{program.description}</p>
         )}
       </div>
+
+      {/* My Coach Programs — switch / resume / restart (Chunk 5b) */}
+      {coachPrograms.length > 0 && (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '16px 18px', marginBottom: 20 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>
+            My Coach Programs
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {coachPrograms.map(cp => {
+              const busy = switching === cp.assignmentId
+              return (
+                <div key={cp.assignmentId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: cp.isActive ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'var(--surface2)' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cp.programName ?? 'Program'}</div>
+                    <div style={{ fontSize: 11, color: cp.isActive ? 'var(--accent)' : 'var(--text-dim)', fontWeight: 600 }}>
+                      {cp.isActive ? '▶ Active now' : cp.resumeWeek && cp.resumeWeek > 1 ? `Paused at Week ${cp.resumeWeek}` : 'Not started'}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    {cp.isActive ? (
+                      <button onClick={() => { if (confirm('Restart this program from Day 1? Your logged sets/PRs are kept — only the calendar resets.')) switchProgram(cp.assignmentId, 'fresh') }} disabled={busy}
+                        style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-mid)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                        {busy ? '…' : '↺ Restart'}
+                      </button>
+                    ) : (
+                      <>
+                        {cp.resumeWeek && cp.resumeWeek > 1 && (
+                          <button onClick={() => switchProgram(cp.assignmentId, 'resume')} disabled={busy}
+                            style={{ padding: '7px 12px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: '#fff', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                            {busy ? '…' : `Resume · Wk ${cp.resumeWeek}`}
+                          </button>
+                        )}
+                        <button onClick={() => switchProgram(cp.assignmentId, 'fresh')} disabled={busy}
+                          style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid var(--accent)', background: (cp.resumeWeek && cp.resumeWeek > 1) ? 'transparent' : 'var(--accent)', color: (cp.resumeWeek && cp.resumeWeek > 1) ? 'var(--accent)' : '#fff', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                          {busy ? '…' : 'Start Fresh'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          {coachPrograms.length === 1 && coachPrograms[0].isActive && (
+            <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 10, lineHeight: 1.5 }}>
+              When your coach assigns another program, it'll appear here to switch to — your progress on each is saved.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Progress card */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '18px 20px', marginBottom: 20 }}>
