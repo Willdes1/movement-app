@@ -338,7 +338,7 @@ function MyCoachInner() {
   // Empty state — no active coach program. If they have PAUSED coach programs,
   // let them resume one here (they're on their own AI plan right now).
   if (!assignment || !program) return (
-    <div className="page-content-narrow" style={{ padding: '40px 20px 100px' }}>
+    <div className="page-content" style={{ padding: '40px 20px 100px' }}>
       {coachPrograms.length > 0 ? (
         <>
           <div style={{ textAlign: 'center', marginBottom: 22 }}>
@@ -373,7 +373,7 @@ function MyCoachInner() {
   const todayDay    = currWeek?.days.find(d => d.day === today)
 
   return (
-    <div className="page-content-narrow" style={{ padding: '24px 20px 100px' }}>
+    <div className="page-content" style={{ padding: '24px 20px 100px' }}>
 
       {/* Tab switcher */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 24 }}>

@@ -6,21 +6,30 @@ import { useCoached } from '@/contexts/CoachedContext'
 import CoachedSessionCard from '@/components/CoachedSessionCard'
 
 // The coached athlete's Calendar. When a user is on a coach's program, this
-// replaces the AI-plan calendar on /calendar. It's a week/day picker that drives
-// the proven CoachedSessionCard (reused, day-agnostic) for the selected day.
+// replaces the AI-plan calendar on /calendar. It lays the coach program out on a
+// real month grid (mapped from the assignment start date) so athletes can browse
+// and look ahead — then drives the proven, day-agnostic CoachedSessionCard for
+// whichever day they tap.
 
 const DOW_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-const DOW_FULL: Record<string, string> = {
-  Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday',
-}
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
-function todayDayName(): string {
-  return DOW_ORDER[(new Date().getDay() + 6) % 7]
+// Normalize a DB date/timestamp to local noon on that calendar day — avoids the
+// UTC-midnight off-by-one that bites negative timezones.
+function parseLocalDate(s: string): Date {
+  return new Date(s.slice(0, 10) + 'T12:00:00')
 }
-
-function currentProgramWeek(startDate: string, weeksTotal: number): number {
-  const days = Math.floor((Date.now() - new Date(startDate).getTime()) / 86_400_000)
-  return Math.min(Math.max(Math.floor(days / 7) + 1, 1), weeksTotal)
+function mondayNoonOf(d: Date): Date {
+  const dow = (d.getDay() + 6) % 7 // Mon=0
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0)
+  x.setDate(x.getDate() - dow)
+  return x
+}
+function dowName(d: Date): string {
+  return DOW_ORDER[(d.getDay() + 6) % 7]
+}
+function sameYMD(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 }
 
 export default function CoachedCalendar() {
@@ -28,24 +37,28 @@ export default function CoachedCalendar() {
   const { coachName, program, assignment, weeks } = useCoached()
   const userId = effectiveUserId ?? user?.id ?? ''
 
-  const liveWeek = assignment && program ? currentProgramWeek(assignment.start_date, program.weeks_total) : 1
-  const realToday = todayDayName()
+  const totalWeeks = program?.weeks_total ?? weeks.length ?? 1
+  // Week 1 is anchored to the Monday of the week the assignment started.
+  const startMonday = useMemo(
+    () => (assignment ? mondayNoonOf(parseLocalDate(assignment.start_date)) : null),
+    [assignment]
+  )
 
-  const [selectedWeek, setSelectedWeek] = useState(liveWeek)
-  const [selectedDay, setSelectedDay] = useState<string>(realToday)
   const [completions, setCompletions] = useState<Set<string>>(new Set())
+  const [viewMonth, setViewMonth] = useState<Date>(() => {
+    const t = new Date()
+    return new Date(t.getFullYear(), t.getMonth(), 1)
+  })
+  const [selected, setSelected] = useState<{ week: number; day: string } | null>(null)
 
-  const week = useMemo(() => weeks.find(w => w.week_number === selectedWeek), [weeks, selectedWeek])
-
-  // Default the selected day to today if today is in this week, else the first
-  // training day, else the first day.
-  useEffect(() => {
-    if (!week) return
-    const hasToday = week.days.some(d => d.day === selectedDay)
-    if (hasToday) return
-    const firstTraining = week.days.find(d => d.type !== 'rest')
-    setSelectedDay(firstTraining?.day ?? week.days[0]?.day ?? realToday)
-  }, [week]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Map a real calendar date → program week (1..totalWeeks), or null if outside.
+  function programWeekOf(date: Date): number | null {
+    if (!startMonday) return null
+    const days = Math.round((date.getTime() - startMonday.getTime()) / 86_400_000)
+    if (days < 0) return null
+    const wk = Math.floor(days / 7) + 1
+    return wk >= 1 && wk <= totalWeeks ? wk : null
+  }
 
   // Load every completed (week, day) for this assignment → checkmarks.
   useEffect(() => {
@@ -60,81 +73,134 @@ export default function CoachedCalendar() {
         for (const r of data ?? []) set.add(`${r.week_number}-${r.day_name}`)
         setCompletions(set)
       })
-  }, [assignment, userId, selectedDay])
+  }, [assignment, userId, selected])
+
+  // Land on today's session if today is inside the program; otherwise week 1's
+  // first training day, and jump the month view to match.
+  useEffect(() => {
+    if (selected || !startMonday || weeks.length === 0) return
+    const t = new Date()
+    const tWk = programWeekOf(t)
+    if (tWk) {
+      setSelected({ week: tWk, day: dowName(t) })
+      setViewMonth(new Date(t.getFullYear(), t.getMonth(), 1))
+      return
+    }
+    const wk1 = weeks.find(w => w.week_number === 1) ?? weeks[0]
+    const firstTraining = wk1?.days.find(d => d.type !== 'rest') ?? wk1?.days[0]
+    if (wk1 && firstTraining) {
+      setSelected({ week: wk1.week_number, day: firstTraining.day })
+      const d = new Date(startMonday)
+      d.setDate(d.getDate() + (wk1.week_number - 1) * 7 + Math.max(0, DOW_ORDER.indexOf(firstTraining.day)))
+      setViewMonth(new Date(d.getFullYear(), d.getMonth(), 1))
+    }
+  }, [startMonday, weeks]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!program || !assignment) return null
 
   const coachFirst = coachName.split(' ')[0] || 'your coach'
-  const totalWeeks = program.weeks_total ?? weeks.length ?? 1
+  const today = new Date()
+  const year = viewMonth.getFullYear()
+  const month = viewMonth.getMonth()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const leadingBlanks = (new Date(year, month, 1).getDay() + 6) % 7 // Mon=0
+
+  // Human label for the currently selected (week, day).
+  let selectedDateLabel = ''
+  if (selected && startMonday) {
+    const d = new Date(startMonday)
+    d.setDate(d.getDate() + (selected.week - 1) * 7 + Math.max(0, DOW_ORDER.indexOf(selected.day)))
+    selectedDateLabel = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+  }
 
   return (
-    <div style={{ padding: '24px 16px 120px', maxWidth: 480, margin: '0 auto' }}>
+    <div className="page-content" style={{ padding: '24px 16px 120px' }}>
       {/* Header */}
       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 20, background: 'var(--surface2)', border: '1px solid var(--border)', fontSize: 10, fontWeight: 800, color: 'var(--text-mid)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 10 }}>
         🏋️ Programmed by Coach {coachFirst}
       </div>
       <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 2, letterSpacing: '-0.02em' }}>{program.name}</h1>
       <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 18 }}>
-        {totalWeeks}-week program · tap any day to train it
+        {totalWeeks}-week program · tap any day to train it or look ahead
       </p>
 
-      {/* Week selector */}
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8, marginBottom: 14, WebkitOverflowScrolling: 'touch' }}>
-        {weeks.map(w => {
-          const sel = w.week_number === selectedWeek
-          const isLive = w.week_number === liveWeek
+      {/* Month navigation */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <button
+          onClick={() => setViewMonth(new Date(year, month - 1, 1))}
+          aria-label="Previous month"
+          style={{ width: 34, height: 34, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}
+        >‹</button>
+        <span style={{ fontWeight: 700, fontSize: 15 }}>{MONTHS[month]} {year}</span>
+        <button
+          onClick={() => setViewMonth(new Date(year, month + 1, 1))}
+          aria-label="Next month"
+          style={{ width: 34, height: 34, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}
+        >›</button>
+      </div>
+
+      {/* Day-of-week headers */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginBottom: 6 }}>
+        {DOW_ORDER.map(d => (
+          <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.04em' }}>{d.toUpperCase()}</div>
+        ))}
+      </div>
+
+      {/* Month grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginBottom: 24 }}>
+        {Array.from({ length: leadingBlanks }).map((_, i) => <div key={`b${i}`} />)}
+        {Array.from({ length: daysInMonth }).map((_, i) => {
+          const dateNum = i + 1
+          const cellDate = new Date(year, month, dateNum, 12, 0, 0)
+          const wk = programWeekOf(cellDate)
+          const dName = dowName(cellDate)
+          const dayObj = wk ? weeks.find(w => w.week_number === wk)?.days.find(d => d.day === dName) : undefined
+          const inProgram = wk != null
+          const isTraining = !!(inProgram && dayObj && dayObj.type !== 'rest')
+          const done = inProgram && completions.has(`${wk}-${dName}`)
+          const isToday = sameYMD(cellDate, today)
+          const isSel = !!(selected && selected.week === wk && selected.day === dName)
+
           return (
             <button
-              key={w.id}
-              onClick={() => setSelectedWeek(w.week_number)}
+              key={dateNum}
+              disabled={!inProgram}
+              onClick={() => inProgram && setSelected({ week: wk as number, day: dName })}
+              title={isTraining ? (dayObj?.label || 'Training day') : inProgram ? 'Rest day' : undefined}
               style={{
-                flexShrink: 0, padding: '8px 14px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
-                border: sel ? 'none' : '1px solid var(--border)',
-                background: sel ? 'var(--accent)' : 'var(--surface2)',
-                color: sel ? '#fff' : 'var(--text-mid)',
-                fontSize: 12, fontWeight: 800, whiteSpace: 'nowrap',
+                display: 'flex', flexDirection: 'column', gap: 4,
+                minHeight: 68, padding: '6px 7px', borderRadius: 10, textAlign: 'left',
+                cursor: inProgram ? 'pointer' : 'default', fontFamily: 'inherit',
+                border: isSel ? '1.5px solid var(--accent)' : isToday ? '1px solid var(--accent-border)' : '1px solid var(--border)',
+                background: isSel ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : inProgram ? 'var(--surface2)' : 'transparent',
+                opacity: inProgram ? 1 : 0.3,
               }}
             >
-              Week {w.week_number}{isLive ? ' •' : ''}
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: isToday ? 'var(--accent)' : 'var(--text-mid)' }}>{dateNum}</span>
+                {inProgram && <span style={{ fontSize: 12, lineHeight: 1 }}>{done ? '✅' : isTraining ? '💪' : '·'}</span>}
+              </span>
+              {isTraining && dayObj?.label && (
+                <span style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--text-mid)', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {dayObj.label}
+                </span>
+              )}
+              {inProgram && <span style={{ fontSize: 8, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.03em', marginTop: 'auto' }}>WK {wk}</span>}
             </button>
           )
         })}
       </div>
 
-      {/* Day selector for the selected week */}
-      {week && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginBottom: 20 }}>
-          {DOW_ORDER.map(dow => {
-            const d = week.days.find(x => x.day === dow)
-            const sel = selectedDay === dow
-            const isRest = !d || d.type === 'rest'
-            const done = completions.has(`${selectedWeek}-${dow}`)
-            const isLiveToday = selectedWeek === liveWeek && dow === realToday
-            return (
-              <button
-                key={dow}
-                onClick={() => setSelectedDay(dow)}
-                title={d?.label || DOW_FULL[dow]}
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                  padding: '8px 2px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
-                  border: sel ? '1.5px solid var(--accent)' : '1px solid var(--border)',
-                  background: sel ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : 'var(--surface2)',
-                  position: 'relative',
-                }}
-              >
-                <span style={{ fontSize: 9, fontWeight: 800, color: isLiveToday ? 'var(--accent)' : 'var(--text-dim)', letterSpacing: '0.04em' }}>{dow.toUpperCase()}</span>
-                <span style={{ fontSize: 14, lineHeight: 1 }}>{done ? '✅' : isRest ? '·' : '💪'}</span>
-                {isLiveToday && <span style={{ position: 'absolute', top: 3, right: 4, width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)' }} />}
-              </button>
-            )
-          })}
-        </div>
-      )}
-
       {/* Selected day's workout — reuses the proven Today card, keyed so it
           remounts cleanly (re-fetches its own lib/logs/completion) per day. */}
-      <CoachedSessionCard key={`${selectedWeek}-${selectedDay}`} weekOverride={selectedWeek} dayOverride={selectedDay} />
+      {selected && (
+        <>
+          {selectedDateLabel && (
+            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-mid)', marginBottom: 10 }}>{selectedDateLabel}</p>
+          )}
+          <CoachedSessionCard key={`${selected.week}-${selected.day}`} weekOverride={selected.week} dayOverride={selected.day} />
+        </>
+      )}
     </div>
   )
 }
