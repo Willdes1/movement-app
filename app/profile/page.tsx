@@ -353,7 +353,7 @@ export default function ProfilePage() {
   // ── Overview ─────────────────────────────────────────────────────────────────
   if (screen === 'overview') {
     return (
-      <div className="page-content-narrow" style={{ padding: '24px 16px' }}>
+      <div className="page-content" style={{ padding: '24px 16px' }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>Profile</h1>
         <p style={{ color: 'var(--text-dim)', fontSize: 13, marginBottom: 24 }}>Your athlete profile powers your personalized plan</p>
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden', marginBottom: 16 }}>
@@ -391,7 +391,7 @@ export default function ProfilePage() {
 
   // ── Edit screen ───────────────────────────────────────────────────────────────
   return (
-    <div className="page-content-narrow" style={{ padding: '24px 16px 100px' }}>
+    <div className="page-content" style={{ padding: '24px 16px 100px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
         <button onClick={() => setScreen('overview')} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 14, padding: 0 }}>← Back</button>
         <h1 style={{ fontSize: 20, fontWeight: 700 }}>Edit Profile</h1>
