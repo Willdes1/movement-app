@@ -22,6 +22,7 @@ import StripeTab from '@/components/admin/StripeTab'
 import APIETab from '@/components/admin/APIETab'
 import ConversionsTab from '@/components/admin/ConversionsTab'
 import TTSCurationTab from '@/components/admin/TTSCurationTab'
+import LibrarySeedTab from '@/components/admin/LibrarySeedTab'
 import Logo from '@/components/ui/Logo'
 
 // ─── PALETTE ─────────────────────────────────────────────────────────────────
@@ -45,7 +46,7 @@ const C = {
 }
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
-type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad' | 'health' | 'media' | 'impersonation' | 'retention' | 'notes' | 'billing' | 'ceo' | 'bugs' | 'kb' | 'study' | 'access' | 'spend' | 'video' | 'push' | 'stripe' | 'mie' | 'tts' | 'conversions'
+type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad' | 'health' | 'media' | 'impersonation' | 'retention' | 'notes' | 'billing' | 'ceo' | 'bugs' | 'kb' | 'study' | 'access' | 'spend' | 'video' | 'push' | 'stripe' | 'mie' | 'tts' | 'conversions' | 'seed'
 type TodoRow = { id: string; content: string; category: string; status: string; priority: string; created_at: string; updated_at: string }
 type IdeaRow = { id: string; content: string; category: string; created_at: string }
 type PromoRow = { id: string; code: string; role: string; max_uses: number; uses: number; created_at: string }
@@ -1865,6 +1866,7 @@ export default function AdminPage() {
           {tab === 'spend' && <SpendTab />}
           {tab === 'video' && <VideoCurationTab />}
           {tab === 'tts'   && <TTSCurationTab />}
+          {tab === 'seed'  && <LibrarySeedTab />}
           {tab === 'push'   && <PushTab />}
           {tab === 'stripe' && <StripeTab />}
           {tab === 'mie'         && <APIETab />}
