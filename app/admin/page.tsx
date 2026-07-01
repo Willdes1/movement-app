@@ -1530,6 +1530,7 @@ const NAV_GROUPS = [
       { id: 'media' as Tab, label: 'Media Library' },
       { id: 'video' as Tab, label: 'Video Curation' },
       { id: 'tts'   as Tab, label: '🎙 TTS Audio' },
+      { id: 'seed'  as Tab, label: '🏗️ Library Builder' },
     ],
   },
   {

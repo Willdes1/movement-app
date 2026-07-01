@@ -19,6 +19,7 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 const MODEL_IDS: Record<string, string> = {
   haiku:  'claude-haiku-4-5-20251001',
   sonnet: 'claude-sonnet-4-6',
+  opus:   'claude-opus-4-8',
 }
 
 // Shared with seed-program-exercises / curate-all-instructions so dedup keys match.
@@ -115,7 +116,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({})) as { category?: string; count?: number; model?: string }
   const category = (body.category ?? '').trim()
   const count = Math.max(1, Math.min(Math.round(Number(body.count) || 20), 40))
-  const model = body.model === 'sonnet' ? MODEL_IDS.sonnet : MODEL_IDS.haiku
+  const model = MODEL_IDS[body.model ?? ''] ?? MODEL_IDS.haiku
   if (!category) return NextResponse.json({ error: 'Pick a sport or category first.' }, { status: 400 })
 
   const sourceLabel = `seed:${category}`
