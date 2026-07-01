@@ -546,7 +546,7 @@ export default function ProgramDetailPage() {
   const totalExercises = weeks.flatMap(w => w.days.flatMap(d => d.movements)).filter(m => m !== 'Full rest').length
 
   return (
-    <div className="coach-page" style={{ maxWidth: 1100 }}>
+    <div className="coach-page">
       <button onClick={() => router.push('/coach/programs')}
         style={{ fontSize: 12, color: 'var(--text-dim)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 4 }}>
         ← My Programs

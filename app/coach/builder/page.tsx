@@ -292,7 +292,7 @@ export default function CoachBuilderPage() {
   // ── Pick step ────────────────────────────────────────────────────────────
   if (step === 'pick') {
     return (
-      <div className="coach-page" style={{ maxWidth: 1100 }}>
+      <div className="coach-page">
         <div style={{ marginBottom: 40 }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>Atlas Prime</div>
           <h1 style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.03em', marginBottom: 6 }}>Program Builder</h1>
@@ -649,7 +649,7 @@ export default function CoachBuilderPage() {
 
   // ── Preview + Saving step ────────────────────────────────────────────────
   return (
-    <div className="coach-page" style={{ maxWidth: 1100 }}>
+    <div className="coach-page">
       <div className="coach-page-header">
         <div>
           <button

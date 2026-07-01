@@ -123,7 +123,7 @@ export default function ProgramsPage() {
   }
 
   return (
-    <div style={{ padding: '24px 16px 100px', maxWidth: 480, margin: '0 auto' }}>
+    <div className="page-content" style={{ padding: '24px 16px 100px' }}>
       <button
         onClick={() => router.back()}
         style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: 0, marginBottom: 20 }}

@@ -90,7 +90,7 @@ export default function CoachAnalyticsPage() {
   const inactive = clients.filter(c => c.workouts_7d === 0).length
 
   return (
-    <div className="coach-page" style={{ maxWidth: 1100 }}>
+    <div className="coach-page">
       {/* Header */}
       <div className="coach-page-header">
         <div>

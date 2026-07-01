@@ -194,7 +194,7 @@ export default function CoachClientsPage() {
   const modalProgram = programs.find(p => p.id === selProgramId)
 
   return (
-    <div className="coach-page" style={{ maxWidth: 1100 }}>
+    <div className="coach-page">
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 36, gap: 16, flexWrap: 'wrap' }}>
         <div>

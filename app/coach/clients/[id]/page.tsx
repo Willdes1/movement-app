@@ -156,7 +156,7 @@ export default function CoachClientDetailPage() {
   const progress     = activeAssign ? weekProgress(activeAssign.start_date, activeAssign.weeks_total) : null
 
   return (
-    <div className="coach-page" style={{ maxWidth: 1000 }}>
+    <div className="coach-page">
       {/* Back */}
       <button
         onClick={() => router.push('/coach/clients')}

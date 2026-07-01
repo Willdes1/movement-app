@@ -102,7 +102,7 @@ export default function CoachProgramsPage() {
   }
 
   return (
-    <div className="coach-page" style={{ maxWidth: 1100 }}>
+    <div className="coach-page">
       {/* Header */}
       <div className="coach-page-header">
         <div>

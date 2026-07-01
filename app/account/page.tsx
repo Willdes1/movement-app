@@ -267,7 +267,7 @@ function AccountPageInner() {
   const backgroundComplete = !!(trainingLevel)
 
   return (
-    <div style={{ padding: '24px 16px 100px', maxWidth: 480, margin: '0 auto' }}>
+    <div className="page-content-narrow" style={{ padding: '24px 16px 100px' }}>
 
       {/* Avatar + greeting */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 28 }}>

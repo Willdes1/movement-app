@@ -122,7 +122,7 @@ export default function ForYouPage() {
   const hasProfile = Boolean(profile?.sport || profile?.goal)
 
   return (
-    <div style={{ padding: '24px 16px 120px', maxWidth: 480, margin: '0 auto' }}>
+    <div className="page-content" style={{ padding: '24px 16px 120px' }}>
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
@@ -200,7 +200,7 @@ export default function ForYouPage() {
 
       {/* Feed */}
       {cards && !generating && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="feed-grid">
           {cards.map((card, i) => {
             const isTip = card.type === 'tip'
             const color  = isTip ? 'var(--accent)'        : 'var(--yellow)'
@@ -246,7 +246,7 @@ export default function ForYouPage() {
           })}
 
           {/* Footer */}
-          <div style={{ textAlign: 'center', padding: '12px 0 4px' }}>
+          <div style={{ textAlign: 'center', padding: '12px 0 4px', gridColumn: '1 / -1' }}>
             <p style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 10 }}>
               Generated {generatedAt ? formatDate(generatedAt) : ''} · Refreshes monthly
             </p>

@@ -147,7 +147,7 @@ export default function CoachDashboardPage() {
   }
 
   return (
-    <div className="coach-page" style={{ maxWidth: 1100 }}>
+    <div className="coach-page">
       <OnboardingOverlay />
       {/* Header */}
       <div style={{ marginBottom: 32 }}>

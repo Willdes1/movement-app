@@ -554,7 +554,7 @@ function CalendarInner() {
   }
 
   return (
-    <div style={{ padding: '24px 16px 120px', maxWidth: 480, margin: '0 auto' }}>
+    <div className="page-content" style={{ padding: '24px 16px 120px' }}>
 
       {/* Header */}
       {focusMode ? (

@@ -344,7 +344,7 @@ export default function CoachLibraryPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="coach-page" style={{ maxWidth: 900 }}>
+    <div className="coach-page">
 
       {/* Header */}
       <div className="coach-page-header">

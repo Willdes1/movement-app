@@ -106,7 +106,7 @@ export default function MobilityPage() {
   }
 
   return (
-    <div style={{ padding: '24px 16px 100px', maxWidth: 480, margin: '0 auto' }}>
+    <div className="page-content" style={{ padding: '24px 16px 100px' }}>
       <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>Mobility</h1>
       <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 20 }}>
         Stretching, mobility drills, and recovery movements

@@ -98,7 +98,7 @@ export default function ExercisesPage() {
   const isEmpty = query.trim() === '' && filter === 'all'
 
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto', padding: '32px 20px 100px' }}>
+    <div className="page-content" style={{ padding: '32px 20px 100px' }}>
 
       {/* Header */}
       <div style={{ marginBottom: 28 }}>

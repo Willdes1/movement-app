@@ -50,7 +50,7 @@ export default function RecoveryPage() {
   }
 
   return (
-    <div style={{ padding: '24px 16px 100px', maxWidth: 480, margin: '0 auto' }}>
+    <div className="page-content" style={{ padding: '24px 16px 100px' }}>
       <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>Recovery</h1>
       <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 24 }}>Structured return-to-sport playbooks</p>
 
