@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import CoachInstructionFields, { type Cues, BLANK_CUES } from '@/components/coach/CoachInstructionFields'
 
 interface ParsedDay {
   day: string
@@ -62,6 +63,15 @@ function extractScheme(movement: string): string {
   return match ? match[0].trim() : ''
 }
 
+// Strip the sets/reps scheme → clean exercise name (matches the athlete side).
+function stripSchemeName(raw: string): string {
+  return raw.replace(/\s+\d+\s*[x×]\s*[\d][\d\-–]*.*/i, '').replace(/\s+\d+\s+sets?.*/i, '').trim()
+}
+// Normalized key that lines up with my-program's normKey + the athlete's lookup.
+function normKey(raw: string): string {
+  return stripSchemeName(raw).toLowerCase().replace(/[-–—]/g, ' ').replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '_')
+}
+
 export default function ProgramDetailPage() {
   const { user, isAdmin } = useAuth()
   const router = useRouter()
@@ -110,6 +120,16 @@ export default function ProgramDetailPage() {
   const [seedResult, setSeedResult] = useState<{ seeded: number; total: number; queued: number; updated: number } | null>(null)
   const [genDetails, setGenDetails] = useState(false)
   const [detailsResult, setDetailsResult] = useState<{ generated: number; remaining: number; total: number } | null>(null)
+
+  // Import program exercises → coach library
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<{ imported: number; total: number } | null>(null)
+
+  // In-place per-exercise instruction editor
+  const [cuesTarget, setCuesTarget] = useState<{ name: string } | null>(null)
+  const [cues, setCues] = useState<Cues>(BLANK_CUES)
+  const [cuesRowId, setCuesRowId] = useState<string | null>(null)
+  const [cuesBusy, setCuesBusy] = useState(false)
 
   useEffect(() => {
     if (!user || !id) return
@@ -198,6 +218,83 @@ export default function ProgramDetailPage() {
       setDetailsResult({ generated: data.generated ?? 0, remaining: data.remaining ?? 0, total: data.total ?? 0 })
     } catch { /* silent */ }
     setGenDetails(false)
+  }
+
+  // Part A — pull this program's exercises into the coach's Library (deduped),
+  // pre-filling each with the standard cues for FREE from the global library.
+  async function importToLibrary() {
+    if (!user) return
+    setImporting(true); setImportResult(null)
+    // Unique exercises across the program (skip rest days)
+    const seen = new Map<string, string>() // normKey -> clean display name
+    for (const w of weeks) {
+      for (const day of w.days) {
+        if (day.type === 'rest') continue
+        for (const m of day.movements) {
+          const k = normKey(m)
+          if (k.length > 2 && !seen.has(k)) seen.set(k, stripSchemeName(m))
+        }
+      }
+    }
+    const all = [...seen.entries()] // [normKey, display]
+    // Dedup against what's already in the coach's library
+    const { data: existing } = await supabase
+      .from('coach_exercise_library').select('name').eq('coach_id', user.id)
+    const have = new Set((existing ?? []).map(e => normKey(e.name as string)))
+    const toAdd = all.filter(([k]) => !have.has(k))
+    if (!toAdd.length) { setImportResult({ imported: 0, total: all.length }); setImporting(false); return }
+    // Pre-fill standard cues from the global library
+    const { data: globalRows } = await supabase
+      .from('exercise_library').select('name_normalized, how, breathing, core, tip')
+      .in('name_normalized', toAdd.map(([k]) => k))
+    const gMap = new Map((globalRows ?? []).map(r => [r.name_normalized as string, r]))
+    const rows = toAdd.map(([k, display]) => {
+      const g = gMap.get(k)
+      return {
+        coach_id: user.id, name: display, name_normalized: k,
+        how: g?.how ?? null, breathing: g?.breathing ?? null, core: g?.core ?? null, tip: g?.tip ?? null,
+        custom_fields: [],
+      }
+    })
+    await supabase.from('coach_exercise_library').insert(rows)
+    setImportResult({ imported: rows.length, total: all.length })
+    setImporting(false)
+  }
+
+  // Part B — open the in-place instruction editor for one exercise.
+  async function openCues(movement: string) {
+    const name = stripSchemeName(movement)
+    setCuesTarget({ name }); setCues(BLANK_CUES); setCuesRowId(null); setCuesBusy(true)
+    const { data } = await supabase
+      .from('coach_exercise_library')
+      .select('id, how, breathing, core, tip, custom_fields')
+      .eq('coach_id', user!.id).eq('name_normalized', normKey(movement)).single()
+    if (data) {
+      setCuesRowId(data.id)
+      setCues({
+        how: data.how ?? '', breathing: data.breathing ?? '', core: data.core ?? '', tip: data.tip ?? '',
+        custom_fields: Array.isArray(data.custom_fields) ? data.custom_fields : [],
+      })
+    }
+    setCuesBusy(false)
+  }
+
+  async function saveCues() {
+    if (!cuesTarget || !user) return
+    setCuesBusy(true)
+    const clean = {
+      how: cues.how.trim() || null, breathing: cues.breathing.trim() || null,
+      core: cues.core.trim() || null, tip: cues.tip.trim() || null,
+      custom_fields: cues.custom_fields.map(c => ({ label: c.label.trim(), text: c.text.trim() })).filter(c => c.label && c.text),
+    }
+    if (cuesRowId) {
+      await supabase.from('coach_exercise_library').update(clean).eq('id', cuesRowId)
+    } else {
+      await supabase.from('coach_exercise_library').insert({
+        coach_id: user.id, name: cuesTarget.name, name_normalized: normKey(cuesTarget.name), ...clean,
+      })
+    }
+    setCuesBusy(false); setCuesTarget(null)
   }
 
   function toggleWeek(n: number) {
@@ -617,9 +714,23 @@ export default function ProgramDetailPage() {
         </div>
       )}
 
-      {/* Swap hint */}
+      {/* Import to library + editing hint */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+        <button
+          onClick={importToLibrary}
+          disabled={importing}
+          style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--accent)', background: 'color-mix(in srgb, var(--accent) 12%, transparent)', color: 'var(--accent)', fontSize: 12, fontWeight: 700, cursor: importing ? 'default' : 'pointer', fontFamily: 'inherit' }}
+        >
+          {importing ? 'Importing…' : '📥 Import exercises to my Library'}
+        </button>
+        {importResult !== null && (
+          <span style={{ fontSize: 12, color: '#22c55e', fontWeight: 700 }}>
+            ✓ {importResult.imported} added to your Library{importResult.imported === 0 ? ' (all already there)' : ' — cues pre-filled'}
+          </span>
+        )}
+      </div>
       <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12 }}>
-        Hover any exercise and click <strong style={{ color: 'var(--text)' }}>↔ Swap</strong> to replace it.
+        Hover any exercise for <strong style={{ color: 'var(--text)' }}>✎ Cues</strong> (edit instructions here) or <strong style={{ color: 'var(--text)' }}>↔ Swap</strong> (replace it).
       </div>
 
       {/* Week accordion */}
@@ -677,23 +788,20 @@ export default function ProgramDetailPage() {
                               >
                                 <span style={{ fontSize: 12, color: 'var(--text-dim)', paddingLeft: 36 }}>• {m}</span>
                                 {hovered && (
-                                  <button
-                                    onClick={() => openSwap(week.id, di, mi, m)}
-                                    style={{
-                                      flexShrink: 0,
-                                      padding: '2px 8px',
-                                      background: 'var(--accent)18',
-                                      color: 'var(--accent)',
-                                      border: '1px solid var(--accent)40',
-                                      borderRadius: 6,
-                                      fontSize: 11,
-                                      fontWeight: 700,
-                                      cursor: 'pointer',
-                                      whiteSpace: 'nowrap',
-                                    }}
-                                  >
-                                    ↔ Swap
-                                  </button>
+                                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                                    <button
+                                      onClick={() => openCues(m)}
+                                      style={{ padding: '2px 8px', background: 'var(--surface2)', color: 'var(--text-mid)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                                    >
+                                      ✎ Cues
+                                    </button>
+                                    <button
+                                      onClick={() => openSwap(week.id, di, mi, m)}
+                                      style={{ padding: '2px 8px', background: 'var(--accent)18', color: 'var(--accent)', border: '1px solid var(--accent)40', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                                    >
+                                      ↔ Swap
+                                    </button>
+                                  </div>
                                 )}
                               </div>
                             )
@@ -940,6 +1048,35 @@ export default function ProgramDetailPage() {
                 )}
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* In-place instruction editor (Part B) */}
+      {cuesTarget && (
+        <div onClick={() => !cuesBusy && setCuesTarget(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 520, maxHeight: '88vh', overflowY: 'auto', padding: 22 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Coaching Instructions</div>
+                <h3 style={{ fontSize: 18, fontWeight: 800, margin: '4px 0 0' }}>{cuesTarget.name}</h3>
+              </div>
+              <button onClick={() => setCuesTarget(null)} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--text-dim)', cursor: 'pointer', lineHeight: 1 }}>×</button>
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 16, lineHeight: 1.5 }}>
+              Saved to your Library and shown to every athlete on any program using this exercise.
+            </p>
+            <CoachInstructionFields value={cues} onChange={patch => setCues(c => ({ ...c, ...patch }))} exerciseName={cuesTarget.name} />
+            <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+              <button onClick={saveCues} disabled={cuesBusy}
+                style={{ padding: '11px 22px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: cuesBusy ? 'default' : 'pointer', fontFamily: 'inherit', opacity: cuesBusy ? 0.6 : 1 }}>
+                {cuesBusy ? 'Saving…' : 'Save Instructions'}
+              </button>
+              <button onClick={() => setCuesTarget(null)} disabled={cuesBusy}
+                style={{ padding: '11px 18px', borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-dim)', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}

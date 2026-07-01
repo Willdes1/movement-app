@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
+import CoachInstructionFields from '@/components/coach/CoachInstructionFields'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type VideoType = 'youtube' | 'shorts' | 'upload' | null
@@ -157,11 +158,6 @@ export default function CoachLibraryPage() {
   const [uploadProgress, setUploadProgress] = useState('')
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  // Instruction fields
-  const [autofilling, setAutofilling] = useState(false)
-  const [aiGenerating, setAiGenerating] = useState(false)
-  const [aiNote, setAiNote] = useState('')
-  const [showManual, setShowManual] = useState(false)
 
   const load = useCallback(async () => {
     if (!user) return
@@ -296,55 +292,6 @@ export default function CoachLibraryPage() {
     }
     setSaving(false)
   }
-
-  // Fill the standard fields for FREE from our global exercise library (only fills
-  // blanks — never overwrites what the coach already wrote).
-  async function autofillFromLibrary() {
-    if (!form.name.trim()) { setAiNote('Enter the exercise name first.'); return }
-    setAutofilling(true); setAiNote('')
-    const { data } = await supabase
-      .from('exercise_library')
-      .select('how, breathing, core, tip')
-      .eq('name_normalized', normalizeName(form.name))
-      .single()
-    if (data && (data.how || data.breathing || data.core || data.tip)) {
-      setForm(f => ({
-        ...f,
-        how: f.how || data.how || '',
-        breathing: f.breathing || data.breathing || '',
-        core: f.core || data.core || '',
-        tip: f.tip || data.tip || '',
-      }))
-      setAiNote('Filled from the library — edit anything you like.')
-    } else {
-      setAiNote('Not in the library yet — try Generate with AI.')
-    }
-    setAutofilling(false)
-  }
-
-  // AI-generate the standard fields for this one exercise.
-  async function generateWithAI() {
-    if (!form.name.trim()) { setAiNote('Enter the exercise name first.'); return }
-    setAiGenerating(true); setAiNote('')
-    try {
-      const res = await fetch('/api/generate-exercise-details', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ exercises: [form.name.trim()] }),
-      })
-      const d = (await res.json())?.details?.[0]
-      if (d?.how) {
-        setForm(f => ({ ...f, how: d.how, breathing: d.breathing || f.breathing, core: d.core || f.core, tip: d.tip || f.tip }))
-        setAiNote('Generated — edit anything you like.')
-      } else setAiNote('Generation failed — try again.')
-    } catch { setAiNote('Generation failed — try again.') }
-    setAiGenerating(false)
-  }
-
-  const addCustomField    = () => setForm(f => ({ ...f, custom_fields: [...f.custom_fields, { label: '', text: '' }] }))
-  const removeCustomField = (i: number) => setForm(f => ({ ...f, custom_fields: f.custom_fields.filter((_, idx) => idx !== i) }))
-  const updateCustomField = (i: number, patch: Partial<CustomField>) =>
-    setForm(f => ({ ...f, custom_fields: f.custom_fields.map((c, idx) => idx === i ? { ...c, ...patch } : c) }))
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this exercise from your library?')) return
@@ -549,62 +496,11 @@ export default function CoachLibraryPage() {
               </div>
 
               {/* Coaching instructions — the standard fields the athlete sees */}
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
-                  <Label>Coaching Instructions</Label>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button type="button" onClick={autofillFromLibrary} disabled={autofilling || aiGenerating}
-                      style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text-mid)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-                      {autofilling ? '…' : '✨ Autofill (free)'}
-                    </button>
-                    <button type="button" onClick={generateWithAI} disabled={autofilling || aiGenerating}
-                      style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--accent)', background: 'color-mix(in srgb, var(--accent) 14%, transparent)', color: 'var(--accent)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-                      {aiGenerating ? 'Generating…' : '🧠 Generate with AI'}
-                    </button>
-                  </div>
-                </div>
-                {aiNote && <p style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>{aiNote}</p>}
-                {([
-                  ['how', 'How to Perform'],
-                  ['breathing', 'Breathing'],
-                  ['core', 'Core Engagement'],
-                  ['tip', 'Common Mistakes'],
-                ] as const).map(([k, label]) => (
-                  <div key={k} style={{ marginBottom: 10 }}>
-                    <p style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 5 }}>{label}</p>
-                    <textarea
-                      value={form[k]}
-                      onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))}
-                      placeholder={`${label}…`}
-                      rows={k === 'how' ? 3 : 2}
-                      style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.55 }}
-                    />
-                  </div>
-                ))}
-
-                {/* Custom fields — "take over fully manually" with your own headers */}
-                {!showManual && form.custom_fields.length === 0 ? (
-                  <button type="button" onClick={() => { setShowManual(true); addCustomField() }}
-                    style={{ padding: '4px 0', background: 'none', border: 'none', color: 'var(--accent)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-                    + Add your own field (e.g. Heart Rate)
-                  </button>
-                ) : (
-                  <div style={{ marginTop: 4 }}>
-                    <p style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Your Custom Fields</p>
-                    {form.custom_fields.map((cf, i) => (
-                      <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'flex-start' }}>
-                        <input value={cf.label} onChange={e => updateCustomField(i, { label: e.target.value })} placeholder="Label" style={{ ...inputStyle, flex: '0 0 36%' }} />
-                        <textarea value={cf.text} onChange={e => updateCustomField(i, { text: e.target.value })} placeholder="What to tell the athlete…" rows={2} style={{ ...inputStyle, flex: 1, resize: 'vertical', lineHeight: 1.5 }} />
-                        <button type="button" onClick={() => removeCustomField(i)} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 18, cursor: 'pointer', lineHeight: 1, padding: '6px 2px' }}>×</button>
-                      </div>
-                    ))}
-                    <button type="button" onClick={addCustomField}
-                      style={{ padding: '4px 0', background: 'none', border: 'none', color: 'var(--accent)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-                      + Add another field
-                    </button>
-                  </div>
-                )}
-              </div>
+              <CoachInstructionFields
+                value={{ how: form.how, breathing: form.breathing, core: form.core, tip: form.tip, custom_fields: form.custom_fields }}
+                onChange={patch => setForm(f => ({ ...f, ...patch }))}
+                exerciseName={form.name}
+              />
 
               {/* Coach notes */}
               <div>
