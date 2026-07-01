@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import YouTubeLoopTrimmer from './YouTubeLoopTrimmer'
+import InstructionCuratePanel from './InstructionCuratePanel'
 
 const C = {
   bg: '#0d1117', surface: '#161b22', surface2: '#21262d', border: '#30363d',
@@ -450,6 +451,9 @@ export default function VideoCurationTab() {
         <h2 style={{ fontSize: 20, fontWeight: 800, color: C.text, marginBottom: 4 }}>Exercise Video Curation</h2>
         <p style={{ fontSize: 13, color: C.textDim }}>AI discovers certified fitness channels, proposes the best video per exercise. You review and approve.</p>
       </div>
+
+      {/* Self-hiding bulk instruction curation (vanishes at 100%) */}
+      <InstructionCuratePanel />
 
       {/* ── Channel Discovery Panel ─────────────────────────────────────────── */}
       <div style={{
