@@ -2,7 +2,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
-import CoachInstructionFields from '@/components/coach/CoachInstructionFields'
+import CoachInstructionFields, { STANDARD_LABELS, DEFAULT_FIELD_ORDER } from '@/components/coach/CoachInstructionFields'
+
+type StdKey = keyof typeof STANDARD_LABELS
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type VideoType = 'youtube' | 'shorts' | 'upload' | null
@@ -158,6 +160,41 @@ export default function CoachLibraryPage() {
   const [uploadProgress, setUploadProgress] = useState('')
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Field Template (which standard fields show + order)
+  const [showFields, setShowFields] = useState(false)
+  const [tplList, setTplList] = useState<{ key: StdKey; on: boolean }[]>(DEFAULT_FIELD_ORDER.map(k => ({ key: k, on: true })))
+  const [tplSaving, setTplSaving] = useState(false)
+
+  useEffect(() => {
+    if (!user) return
+    supabase.from('profiles').select('coach_field_template').eq('id', user.id).single()
+      .then(({ data }) => {
+        const saved = data?.coach_field_template
+        if (Array.isArray(saved) && saved.length) {
+          const on = (saved as string[]).filter((k): k is StdKey => k in STANDARD_LABELS)
+          const off = DEFAULT_FIELD_ORDER.filter(k => !on.includes(k))
+          setTplList([...on.map(k => ({ key: k, on: true })), ...off.map(k => ({ key: k, on: false }))])
+        }
+      })
+  }, [user])
+
+  function moveField(i: number, dir: -1 | 1) {
+    setTplList(list => {
+      const j = i + dir
+      if (j < 0 || j >= list.length) return list
+      const next = [...list]
+      ;[next[i], next[j]] = [next[j], next[i]]
+      return next
+    })
+  }
+  async function saveTemplate() {
+    if (!user) return
+    setTplSaving(true)
+    const order = tplList.filter(f => f.on).map(f => f.key)
+    await supabase.from('profiles').update({ coach_field_template: order.length ? order : DEFAULT_FIELD_ORDER }).eq('id', user.id)
+    setTplSaving(false); setShowFields(false)
+  }
 
   const load = useCallback(async () => {
     if (!user) return
@@ -318,13 +355,51 @@ export default function CoachLibraryPage() {
             Your personal exercise database — with videos, instructions, and coaching notes.
           </p>
         </div>
-        <button
-          onClick={openAdd}
-          style={{ padding: '10px 22px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap' }}
-        >
-          + Add Exercise
-        </button>
+        <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+          <button
+            onClick={() => setShowFields(true)}
+            style={{ padding: '10px 18px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text-mid)', fontWeight: 700, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            ⚙ Fields
+          </button>
+          <button
+            onClick={openAdd}
+            style={{ padding: '10px 22px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            + Add Exercise
+          </button>
+        </div>
       </div>
+
+      {/* Field Template editor — which standard fields show + their order */}
+      {showFields && (
+        <div onClick={() => !tplSaving && setShowFields(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 420, padding: 22 }}>
+            <h3 style={{ fontSize: 18, fontWeight: 800, margin: '0 0 4px' }}>Instruction Fields</h3>
+            <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16, lineHeight: 1.5 }}>
+              Choose which standard fields appear (and their order) in every exercise editor. Uncheck to hide one; use the arrows to reorder. Your custom fields are always available on top.
+            </p>
+            {tplList.map((f, i) => (
+              <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 10, marginBottom: 8, background: f.on ? 'var(--surface2)' : 'transparent' }}>
+                <input type="checkbox" checked={f.on} onChange={() => setTplList(l => l.map((x, idx) => idx === i ? { ...x, on: !x.on } : x))} />
+                <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: f.on ? 'var(--text)' : 'var(--text-dim)' }}>{STANDARD_LABELS[f.key]}</span>
+                <button onClick={() => moveField(i, -1)} disabled={i === 0} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-mid)', cursor: i === 0 ? 'default' : 'pointer', padding: '2px 8px', opacity: i === 0 ? 0.4 : 1 }}>↑</button>
+                <button onClick={() => moveField(i, 1)} disabled={i === tplList.length - 1} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-mid)', cursor: i === tplList.length - 1 ? 'default' : 'pointer', padding: '2px 8px', opacity: i === tplList.length - 1 ? 0.4 : 1 }}>↓</button>
+              </div>
+            ))}
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+              <button onClick={saveTemplate} disabled={tplSaving}
+                style={{ padding: '11px 22px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', opacity: tplSaving ? 0.6 : 1 }}>
+                {tplSaving ? 'Saving…' : 'Save'}
+              </button>
+              <button onClick={() => setShowFields(false)} disabled={tplSaving}
+                style={{ padding: '11px 18px', borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-dim)', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Search */}
       <div style={{ position: 'relative', marginBottom: 20 }}>

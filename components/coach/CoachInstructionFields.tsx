@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
 // Shared instruction editor — the 4 standard fields (auto-fillable free from the
@@ -17,12 +17,13 @@ export type Cues = {
 
 export const BLANK_CUES: Cues = { how: '', breathing: '', core: '', tip: '', custom_fields: [] }
 
-const STANDARD: [keyof Cues, string][] = [
-  ['how', 'How to Perform'],
-  ['breathing', 'Breathing'],
-  ['core', 'Core Engagement'],
-  ['tip', 'Common Mistakes'],
-]
+export const STANDARD_LABELS: Record<'how' | 'breathing' | 'core' | 'tip', string> = {
+  how: 'How to Perform',
+  breathing: 'Breathing',
+  core: 'Core Engagement',
+  tip: 'Common Mistakes',
+}
+export const DEFAULT_FIELD_ORDER: (keyof typeof STANDARD_LABELS)[] = ['how', 'breathing', 'core', 'tip']
 
 // Match the global exercise_library key (strip sets/reps scheme, dashes → spaces).
 function globalKey(name: string): string {
@@ -48,6 +49,25 @@ export default function CoachInstructionFields({ value, onChange, exerciseName }
   const [generating, setGenerating] = useState(false)
   const [note, setNote] = useState('')
   const [showManual, setShowManual] = useState(false)
+  // Which standard fields to show + order — the coach's Field Template. Defaults
+  // to all four. Resilient: any error (e.g. migration not run) → default.
+  const [fieldOrder, setFieldOrder] = useState<(keyof typeof STANDARD_LABELS)[]>(DEFAULT_FIELD_ORDER)
+
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        const { data } = await supabase.from('profiles').select('coach_field_template').eq('id', user.id).single()
+        const tpl = data?.coach_field_template
+        if (active && Array.isArray(tpl) && tpl.length) {
+          setFieldOrder(tpl.filter((k: string): k is keyof typeof STANDARD_LABELS => k in STANDARD_LABELS))
+        }
+      } catch { /* default order */ }
+    })()
+    return () => { active = false }
+  }, [])
 
   // Fill blanks for FREE from our global library (never overwrites the coach's own text).
   async function autofill() {
@@ -113,13 +133,13 @@ export default function CoachInstructionFields({ value, onChange, exerciseName }
       </div>
       {note && <p style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>{note}</p>}
 
-      {STANDARD.map(([k, label]) => (
+      {fieldOrder.map(k => (
         <div key={k} style={{ marginBottom: 10 }}>
-          <p style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 5 }}>{label}</p>
+          <p style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 5 }}>{STANDARD_LABELS[k]}</p>
           <textarea
             value={value[k] as string}
             onChange={e => onChange({ [k]: e.target.value } as Partial<Cues>)}
-            placeholder={`${label}…`}
+            placeholder={`${STANDARD_LABELS[k]}…`}
             rows={k === 'how' ? 3 : 2}
             style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.55 }}
           />
