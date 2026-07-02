@@ -1,5 +1,20 @@
 import { getOpenAI } from './openai'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { logTokens } from './log-tokens'
+import { embedCostUsd } from './ai-costs'
+
+// Fire-and-forget cost logging — never add latency to the embedding hot path.
+function trackEmbedding(tokens: number) {
+  if (!tokens) return
+  void logTokens({
+    operation: 'embeddings',
+    route: '/lib/knowledge-retrieval',
+    input_tokens: tokens,
+    cost_usd: embedCostUsd(tokens),
+    provider: 'openai',
+    model: 'text-embedding-3-small',
+  })
+}
 
 let _supabaseAdmin: SupabaseClient | null = null
 
@@ -27,6 +42,7 @@ export async function embedText(text: string): Promise<number[]> {
     model: 'text-embedding-3-small',
     input: text.slice(0, 8000),
   })
+  trackEmbedding(response.usage?.total_tokens ?? 0)
   return response.data[0].embedding
 }
 
@@ -35,6 +51,7 @@ export async function embedBatch(texts: string[]): Promise<number[][]> {
     model: 'text-embedding-3-small',
     input: texts.map(t => t.slice(0, 8000)),
   })
+  trackEmbedding(response.usage?.total_tokens ?? 0)
   return response.data.map(d => d.embedding)
 }
 

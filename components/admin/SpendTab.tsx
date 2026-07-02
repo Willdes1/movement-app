@@ -26,13 +26,29 @@ type Expense = {
   vendor: string | null; notes: string | null; receipt_url: string | null
   expense_date: string; created_at: string
 }
-type TokenRow = { operation: string | null; input_tokens: number | null; output_tokens: number | null }
+type TokenRow = {
+  operation: string | null
+  input_tokens: number | null
+  output_tokens: number | null
+  estimated_cost_usd: number | null
+  metadata: { provider?: string; model?: string } | null
+}
 
-const INPUT_RATE  = 3 / 1_000_000   // $3 per 1M input tokens
-const OUTPUT_RATE = 15 / 1_000_000  // $15 per 1M output tokens
+const INPUT_RATE  = 3 / 1_000_000   // $3 per 1M input tokens (Claude fallback)
+const OUTPUT_RATE = 15 / 1_000_000  // $15 per 1M output tokens (Claude fallback)
 
+// Trust the per-row cost the route stored (accurate across providers — OpenAI
+// bills per char/token/minute, not at Claude rates). Only fall back to the
+// token math for legacy rows that predate estimated_cost_usd.
 function tokenCost(r: TokenRow) {
+  if (r.estimated_cost_usd != null) return Number(r.estimated_cost_usd)
   return (r.input_tokens ?? 0) * INPUT_RATE + (r.output_tokens ?? 0) * OUTPUT_RATE
+}
+
+function providerLabel(p?: string) {
+  if (p === 'openai') return 'OpenAI'
+  if (p === 'anthropic') return 'Claude'
+  return p ?? ''
 }
 
 function fmtUSD(n: number) {
@@ -95,7 +111,7 @@ export default function SpendTab() {
     setLoading(true)
     const [{ data: exp }, { data: tok }] = await Promise.all([
       supabase.from('project_expenses').select('*').order('expense_date', { ascending: false }),
-      supabase.from('token_usage').select('operation, input_tokens, output_tokens'),
+      supabase.from('token_usage').select('operation, input_tokens, output_tokens, estimated_cost_usd, metadata'),
     ])
     setExpenses((exp ?? []) as Expense[])
     setTokenRows((tok ?? []) as TokenRow[])
@@ -162,14 +178,20 @@ export default function SpendTab() {
     .reduce((s, e) => s + Number(e.amount_usd), 0)
 
   // Token breakdown by operation
-  const opMap = new Map<string, { count: number; input: number; output: number }>()
+  const opMap = new Map<string, { count: number; input: number; output: number; cost: number; provider: string }>()
   for (const r of tokenRows) {
     const key = r.operation ?? 'unknown'
-    const cur = opMap.get(key) ?? { count: 0, input: 0, output: 0 }
-    opMap.set(key, { count: cur.count + 1, input: cur.input + (r.input_tokens ?? 0), output: cur.output + (r.output_tokens ?? 0) })
+    const cur = opMap.get(key) ?? { count: 0, input: 0, output: 0, cost: 0, provider: '' }
+    opMap.set(key, {
+      count: cur.count + 1,
+      input: cur.input + (r.input_tokens ?? 0),
+      output: cur.output + (r.output_tokens ?? 0),
+      cost: cur.cost + tokenCost(r),
+      provider: cur.provider || (r.metadata?.provider ?? ''),
+    })
   }
   const opStats = [...opMap.entries()]
-    .map(([op, s]) => ({ op, ...s, cost: s.input * INPUT_RATE + s.output * OUTPUT_RATE }))
+    .map(([op, s]) => ({ op, ...s }))
     .sort((a, b) => b.cost - a.cost)
 
   const inp: React.CSSProperties = {
@@ -225,7 +247,12 @@ export default function SpendTab() {
             </div>
             {opStats.map((s, i) => (
               <div key={s.op} style={{ display: 'grid', gridTemplateColumns: '2fr 60px 80px 80px 80px', padding: '10px 16px', borderBottom: i < opStats.length - 1 ? `1px solid ${C.border}` : 'none', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: C.text, fontFamily: 'monospace' }}>{s.op}</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: C.text, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.op}</span>
+                  {s.provider && (
+                    <span style={{ flexShrink: 0, fontSize: 9, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', padding: '2px 6px', borderRadius: 10, color: s.provider === 'openai' ? C.green : C.purple, background: s.provider === 'openai' ? C.greenDim : 'rgba(167,139,250,0.12)' }}>{providerLabel(s.provider)}</span>
+                  )}
+                </span>
                 <span style={{ fontSize: 12, color: C.textMid, fontFamily: 'monospace' }}>{s.count}</span>
                 <span style={{ fontSize: 11, color: C.textDim, fontFamily: 'monospace' }}>{s.input.toLocaleString()}</span>
                 <span style={{ fontSize: 11, color: C.textDim, fontFamily: 'monospace' }}>{s.output.toLocaleString()}</span>

@@ -2,6 +2,8 @@ export const maxDuration = 60
 export const runtime = 'nodejs'
 
 import OpenAI from 'openai'
+import { logTokens } from '@/lib/log-tokens'
+import { ttsCostUsd } from '@/lib/ai-costs'
 
 let _openai: OpenAI | null = null
 function getOpenAI() {
@@ -30,18 +32,20 @@ function buildSpeechText(ex: { name_display: string; how?: string | null; breath
   return parts.join('. ')
 }
 
+// Returns { ok, chars } — chars is the billed character count (0 on failure,
+// so we don't over-count OpenAI spend for calls that never produced audio).
 async function generateAndUpload(
   supabase: any,
   ex: { name_normalized: string; name_display: string; how?: string | null; breathing?: string | null; core?: string | null; tip?: string | null },
   voice: 'onyx' | 'nova'
-): Promise<boolean> {
+): Promise<{ ok: boolean; chars: number }> {
+  const sent = buildSpeechText(ex).slice(0, 4096)
   try {
-    const text = buildSpeechText(ex)
     const response = await withTimeout(
       getOpenAI().audio.speech.create({
         model: 'tts-1',
         voice,
-        input: text.slice(0, 4096),
+        input: sent,
         speed: 0.92,
       }),
       10000
@@ -53,7 +57,7 @@ async function generateAndUpload(
       .from('exercise-tts')
       .upload(path, buffer, { contentType: 'audio/mpeg', upsert: true })
 
-    if (uploadErr) { console.warn(`Upload failed for ${ex.name_normalized}:`, uploadErr); return false }
+    if (uploadErr) { console.warn(`Upload failed for ${ex.name_normalized}:`, uploadErr); return { ok: false, chars: sent.length } }
 
     const { data: urlData } = supabase.storage.from('exercise-tts').getPublicUrl(path)
     const col = voice === 'nova' ? 'tts_url_female' : 'tts_url_male'
@@ -63,10 +67,10 @@ async function generateAndUpload(
       .update({ [col]: urlData.publicUrl })
       .eq('name_normalized', ex.name_normalized)
 
-    return true
+    return { ok: true, chars: sent.length }
   } catch (err) {
     console.warn(`TTS generation failed for ${ex.name_normalized}:`, err)
-    return false
+    return { ok: false, chars: 0 }
   }
 }
 
@@ -116,6 +120,7 @@ export async function POST(request: Request) {
     let maleOk = 0
     let femaleOk = 0
     let failed = 0
+    let billedChars = 0
 
     for (let i = 0; i < typedExercises.length; i += CONCURRENCY) {
       const chunk = typedExercises.slice(i, i + CONCURRENCY)
@@ -126,9 +131,22 @@ export async function POST(request: Request) {
         ]))
       )
       for (const [m, f] of results) {
-        if (m) maleOk++; else failed++
-        if (f) femaleOk++
+        if (m.ok) maleOk++; else failed++
+        if (f.ok) femaleOk++
+        billedChars += m.chars + f.chars
       }
+    }
+
+    // Track the OpenAI TTS spend (billed per character of input, both voices).
+    if (billedChars > 0) {
+      await logTokens({
+        operation: 'tts_generate',
+        route: '/api/admin/generate-tts',
+        input_tokens: billedChars,
+        cost_usd: ttsCostUsd(billedChars),
+        provider: 'openai',
+        model: 'tts-1',
+      })
     }
 
     // Total remaining

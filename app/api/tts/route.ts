@@ -1,4 +1,6 @@
 import OpenAI from 'openai'
+import { logTokens } from '@/lib/log-tokens'
+import { ttsCostUsd } from '@/lib/ai-costs'
 
 let _openai: OpenAI | null = null
 function getOpenAI() {
@@ -27,14 +29,25 @@ export async function POST(request: Request) {
     if (!ALLOWED_VOICES.includes(voice)) return Response.json({ error: 'invalid voice' }, { status: 400 })
 
     // Generate audio
+    const sent = text.slice(0, 4096)
     const response = await getOpenAI().audio.speech.create({
       model: 'tts-1',
       voice: voice as 'onyx' | 'nova' | 'alloy' | 'echo' | 'fable' | 'shimmer',
-      input: text.slice(0, 4096),
+      input: sent,
       speed: 0.92,
     })
 
     const buffer = Buffer.from(await response.arrayBuffer())
+
+    // Track OpenAI TTS spend (billed per character of input).
+    await logTokens({
+      operation: 'tts_realtime',
+      route: '/api/tts',
+      input_tokens: sent.length,
+      cost_usd: ttsCostUsd(sent.length),
+      provider: 'openai',
+      model: 'tts-1',
+    })
 
     // Auto-save to Supabase Storage if exercise key provided
     if (name_normalized) {

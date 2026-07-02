@@ -4,6 +4,8 @@ export const maxDuration = 60
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient } from '@supabase/supabase-js'
+import { logTokens } from '@/lib/log-tokens'
+import { whisperCostUsd } from '@/lib/ai-costs'
 
 export async function POST(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
@@ -23,10 +25,22 @@ export async function POST(req: NextRequest) {
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
 
+  // verbose_json returns audio `duration` (seconds) so we can bill accurately.
   const transcription = await openai.audio.transcriptions.create({
     file: audioFile,
     model: 'whisper-1',
     language: 'en',
+    response_format: 'verbose_json',
+  })
+
+  const seconds = (transcription as { duration?: number }).duration ?? 0
+  await logTokens({
+    operation: 'whisper_transcribe',
+    route: '/api/coach/transcribe',
+    input_tokens: Math.round(seconds),
+    cost_usd: whisperCostUsd(seconds),
+    provider: 'openai',
+    model: 'whisper-1',
   })
 
   return NextResponse.json({ text: transcription.text })
