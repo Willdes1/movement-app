@@ -2,17 +2,19 @@ export const runtime = 'nodejs'
 export const maxDuration = 60
 
 import { NextResponse } from 'next/server'
+import { SupabaseClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
 import { verifyAdmin } from '@/lib/admin-auth'
 import { logTokens } from '@/lib/log-tokens'
 
-// Admin "Library Builder" — bulk-generate real exercises (with full instructions)
-// for any sport or training category, de-dupe against exercise_library, insert the
-// new ones, and queue them for the Video Curator. TTS auto-picks them up because
-// they arrive with `how` populated. Feeds both content pipelines so the platform
-// is preloaded and the YouTube curator always has a backlog. Cheap by design —
-// defaults to Haiku, generates + instructs in a single batched call, and never
-// spends a token regenerating an exercise we already have.
+// Admin "Library Builder" — two jobs on one endpoint:
+//   • GENERATE (default): bulk-generate real exercises WITH instructions for any
+//     sport/category, dedup against exercise_library, insert the new ones, and
+//     queue them for the Video Curator (TTS auto-picks them up).
+//   • UPGRADE (mode:'upgrade'): regenerate instructions for the already-seeded
+//     exercises with a better model (e.g. Sonnet), overwriting the older cues and
+//     nulling stale TTS so audio re-syncs. Cursor-paginated by id so the client
+//     loops to completion. Cheap by design; never pays twice for the same movement.
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -61,8 +63,35 @@ Rules:
 - Return exactly the number requested, unless you genuinely run out of distinct, quality movements for the category.
 - Output nothing but the raw JSON array.`
 
-type GenItem = { name: string; how: string; breathing: string; core: string; tip: string }
+const DETAILS_PROMPT = `You are a world-class certified strength and conditioning coach and physical therapist. Generate precise, exercise-specific technique details for each exercise provided.
 
+Return ONLY a valid JSON array — no markdown, no code fences, no explanation.
+
+Each element must match this exact shape:
+{
+  "how": "<2-3 sentences: setup, execution, and the key form checkpoint most people overlook on THIS specific exercise>",
+  "breathing": "<1 sentence: exactly when to inhale and exhale for THIS movement, tied to its push/pull/hinge/rotation phase — never generic>",
+  "core": "<1 sentence: the specific bracing or core-position cue that changes the outcome for THIS exercise — not generic>",
+  "tip": "<1 sentence: the single most common mistake on THIS specific exercise and exactly how to fix it — be concrete>"
+}
+
+Generate one entry per exercise, in the EXACT same order as the input list. Return nothing but the raw JSON array.`
+
+type GenItem = { name: string; how: string; breathing: string; core: string; tip: string }
+type Detail = { how: string; breathing: string; core: string; tip: string }
+
+// Extract the first text block + parse a JSON array out of it.
+function parseArray(message: Anthropic.Message): { arr: unknown[]; inTok: number; outTok: number } {
+  let raw = ''
+  for (const block of message.content) {
+    if (block.type === 'text') { raw = block.text.trim(); break }
+  }
+  const match = raw.match(/\[[\s\S]*\]/)
+  const arr = match ? JSON.parse(match[0]) : []
+  return { arr: Array.isArray(arr) ? arr : [], inTok: message.usage.input_tokens, outTok: message.usage.output_tokens }
+}
+
+// GENERATE — names + full instructions for a category, in one batched call.
 async function generate(model: string, category: string, count: number, avoid: string[]) {
   const avoidBlock = avoid.length
     ? `\n\nWe ALREADY have these for this category — generate DIFFERENT ones, do not repeat any of them:\n${avoid.slice(0, 150).join(', ')}`
@@ -74,20 +103,89 @@ async function generate(model: string, category: string, count: number, avoid: s
     system: SYSTEM_PROMPT,
     messages: [{ role: 'user', content: prompt }],
   })
-  let raw = ''
-  for (const block of message.content) {
-    if (block.type === 'text') { raw = block.text.trim(); break }
+  const { arr, inTok, outTok } = parseArray(message)
+  const items: GenItem[] = arr.map((d) => {
+    const o = d as Record<string, unknown>
+    return {
+      name: String(o.name ?? '').trim(),
+      how: String(o.how ?? '').trim(),
+      breathing: String(o.breathing ?? '').trim(),
+      core: String(o.core ?? '').trim(),
+      tip: String(o.tip ?? '').trim(),
+    }
+  }).filter(d => d.name && d.how)
+  return { items, inTok, outTok }
+}
+
+// UPGRADE — regenerate instructions for a list of existing exercise names.
+async function generateDetails(model: string, names: string[]) {
+  const prompt = `Generate exercise details for each of the following:\n\n${names.map((n, i) => `${i + 1}. ${n}`).join('\n')}`
+  const message = await anthropic.messages.create({
+    model,
+    max_tokens: Math.min(names.length * 220 + 400, 8000),
+    system: DETAILS_PROMPT,
+    messages: [{ role: 'user', content: prompt }],
+  })
+  const { arr, inTok, outTok } = parseArray(message)
+  const details: Detail[] = arr.map((d) => {
+    const o = d as Record<string, unknown>
+    return {
+      how: String(o.how ?? '').trim(),
+      breathing: String(o.breathing ?? '').trim(),
+      core: String(o.core ?? '').trim(),
+      tip: String(o.tip ?? '').trim(),
+    }
+  })
+  return { details, inTok, outTok }
+}
+
+const UPGRADE_CAP = 32
+const UPGRADE_CHUNK = 8
+
+// Regenerate instructions for the next page of seeded exercises (id-ordered).
+async function runUpgrade(supabase: SupabaseClient, userId: string, model: string, afterId: string | null) {
+  let query = supabase
+    .from('exercise_library')
+    .select('id, name_display')
+    .like('source_program', 'seed:%')
+    .order('id', { ascending: true })
+    .limit(UPGRADE_CAP)
+  if (afterId) query = query.gt('id', afterId)
+  const { data: rows } = await query
+  const list = (rows ?? []) as { id: string; name_display: string }[]
+  if (!list.length) return { upgraded: 0, lastId: null as string | null, done: true }
+
+  const chunks: { id: string; name_display: string }[][] = []
+  for (let i = 0; i < list.length; i += UPGRADE_CHUNK) chunks.push(list.slice(i, i + UPGRADE_CHUNK))
+
+  let inTok = 0, outTok = 0, upgraded = 0
+  const results = await Promise.all(chunks.map(async chunk => {
+    try {
+      const { details, inTok: it, outTok: ot } = await generateDetails(model, chunk.map(c => c.name_display))
+      return { chunk, details, it, ot }
+    } catch (err) {
+      console.error('upgrade chunk failed:', err)
+      return { chunk, details: [] as Detail[], it: 0, ot: 0 }
+    }
+  }))
+
+  for (const { chunk, details, it, ot } of results) {
+    inTok += it; outTok += ot
+    for (let i = 0; i < chunk.length && i < details.length; i++) {
+      const d = details[i]
+      if (!d.how) continue
+      // Overwrite cues + null stale TTS so audio regenerates from the better text.
+      await supabase.from('exercise_library')
+        .update({ how: d.how, breathing: d.breathing, core: d.core, tip: d.tip, tts_url_male: null, tts_url_female: null })
+        .eq('id', chunk[i].id)
+      upgraded++
+    }
   }
-  const match = raw.match(/\[[\s\S]*\]/)
-  const arr = match ? JSON.parse(match[0]) : []
-  const items: GenItem[] = (Array.isArray(arr) ? arr : []).map((d: Record<string, unknown>) => ({
-    name: String(d.name ?? '').trim(),
-    how: String(d.how ?? '').trim(),
-    breathing: String(d.breathing ?? '').trim(),
-    core: String(d.core ?? '').trim(),
-    tip: String(d.tip ?? '').trim(),
-  })).filter(d => d.name && d.how)
-  return { items, inTok: message.usage.input_tokens, outTok: message.usage.output_tokens }
+
+  if (inTok || outTok) {
+    await logTokens({ operation: 'upgrade_library', route: 'seed-library', input_tokens: inTok, output_tokens: outTok, user_id: userId })
+  }
+  return { upgraded, lastId: list[list.length - 1].id, done: list.length < UPGRADE_CAP }
 }
 
 // GET — live pipeline counters for the panel dashboard.
@@ -95,28 +193,42 @@ export async function GET(req: Request) {
   const auth = await verifyAdmin(req, 'seed')
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const { supabase } = auth
-  const [totalRes, videoRes, ttsRes] = await Promise.all([
+  const [totalRes, videoRes, ttsRes, seededRes] = await Promise.all([
     supabase.from('exercise_library').select('id', { count: 'exact', head: true }),
     supabase.from('exercise_library').select('id', { count: 'exact', head: true }).is('video_url', null),
     supabase.from('exercise_library').select('id', { count: 'exact', head: true }).is('tts_url_male', null).not('how', 'is', null),
+    supabase.from('exercise_library').select('id', { count: 'exact', head: true }).like('source_program', 'seed:%'),
   ])
   return NextResponse.json({
     total: totalRes.count ?? 0,
     needVideo: videoRes.count ?? 0,
     needTts: ttsRes.count ?? 0,
+    seededTotal: seededRes.count ?? 0,
   })
 }
 
-// POST — generate one batch for a category, then insert + queue the new ones.
+// POST — generate one batch for a category, OR upgrade the next page of seeds.
 export async function POST(req: Request) {
   const auth = await verifyAdmin(req, 'seed')
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const { supabase, userId } = auth
 
-  const body = await req.json().catch(() => ({})) as { category?: string; count?: number; model?: string }
+  const body = await req.json().catch(() => ({})) as { category?: string; count?: number; model?: string; mode?: string; afterId?: string | null }
+  const model = MODEL_IDS[body.model ?? ''] ?? MODEL_IDS.haiku
+
+  // Upgrade mode — regenerate instructions for already-seeded exercises.
+  if (body.mode === 'upgrade') {
+    try {
+      const result = await runUpgrade(supabase, userId, model, body.afterId ?? null)
+      return NextResponse.json(result)
+    } catch (err) {
+      console.error('seed-library upgrade failed:', err)
+      return NextResponse.json({ error: 'Upgrade failed — try again in a moment.' }, { status: 502 })
+    }
+  }
+
   const category = (body.category ?? '').trim()
   const count = Math.max(1, Math.min(Math.round(Number(body.count) || 20), 40))
-  const model = MODEL_IDS[body.model ?? ''] ?? MODEL_IDS.haiku
   if (!category) return NextResponse.json({ error: 'Pick a sport or category first.' }, { status: 400 })
 
   const sourceLabel = `seed:${category}`

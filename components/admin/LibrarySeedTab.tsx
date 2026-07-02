@@ -3,10 +3,9 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties, type Reac
 import { supabase } from '@/lib/supabase'
 
 // Admin "Library Builder" — preload the exercise library across every sport +
-// training focus. Generate one category at a time, or "Fill Every Category" to
-// loop the whole list hands-free. Each run generates real exercises WITH
-// instructions, dedups against the library, and queues the new ones for the
-// Video Curator (TTS picks them up automatically). Backed by /api/admin/seed-library.
+// training focus. Generate one category at a time, "Fill Every Category" to loop
+// the whole list hands-free, or "Upgrade" to regenerate the instructions on
+// already-seeded exercises with a better model. Backed by /api/admin/seed-library.
 
 const SPORTS = [
   'Skateboarding', 'Snowboarding', 'Skiing', 'Surfing', 'BMX', 'Motocross', 'Parkour',
@@ -31,11 +30,11 @@ const ALL_CATEGORIES = [...SPORTS, ...FOCUS]
 
 const K = {
   card: '#161b22', input: '#0d1117', border: '#30363d', accent: '#3b82f6',
-  green: '#22c55e', amber: '#f59e0b', text: '#e6edf3', textMid: '#b1bac4', textDim: '#6e7681',
+  green: '#22c55e', amber: '#f59e0b', purple: '#a78bfa', text: '#e6edf3', textMid: '#b1bac4', textDim: '#6e7681',
 }
 
 type Model = 'haiku' | 'sonnet' | 'opus'
-type Counts = { total: number; needVideo: number; needTts: number }
+type Counts = { total: number; needVideo: number; needTts: number; seededTotal: number }
 type RunResult = { category: string; added: number; skipped: number; queued: number; generated: number }
 
 export default function LibrarySeedTab() {
@@ -45,10 +44,13 @@ export default function LibrarySeedTab() {
   const [busy, setBusy] = useState(false)
   const [filling, setFilling] = useState(false)
   const [fillProg, setFillProg] = useState<{ done: number; total: number; added: number } | null>(null)
+  const [upgrading, setUpgrading] = useState(false)
+  const [upProg, setUpProg] = useState<{ done: number; total: number } | null>(null)
   const [counts, setCounts] = useState<Counts | null>(null)
   const [log, setLog] = useState<RunResult[]>([])
   const [error, setError] = useState<string | null>(null)
   const stopRef = useRef(false)
+  const upStopRef = useRef(false)
 
   const authHeaders = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -82,7 +84,7 @@ export default function LibrarySeedTab() {
 
   async function run() {
     const cat = category.trim()
-    if (busy || filling) return
+    if (busy || filling || upgrading) return
     if (!cat) { setError('Pick a sport or category first.'); return }
     setBusy(true); setError(null)
     try {
@@ -93,7 +95,7 @@ export default function LibrarySeedTab() {
   }
 
   async function runAll() {
-    if (busy || filling) return
+    if (busy || filling || upgrading) return
     stopRef.current = false
     setFilling(true); setError(null)
     setFillProg({ done: 0, total: ALL_CATEGORIES.length, added: 0 })
@@ -108,8 +110,38 @@ export default function LibrarySeedTab() {
     setFilling(false)
   }
 
+  async function runUpgrade() {
+    if (busy || filling || upgrading) return
+    upStopRef.current = false
+    setUpgrading(true); setError(null)
+    const total = counts?.seededTotal ?? 0
+    setUpProg({ done: 0, total })
+    let done = 0
+    let afterId: string | null = null
+    let guard = 0
+    while (guard++ < 400) {
+      if (upStopRef.current) break
+      try {
+        const res: Response = await fetch('/api/admin/seed-library', {
+          method: 'POST',
+          headers: await authHeaders(),
+          body: JSON.stringify({ mode: 'upgrade', model, afterId }),
+        })
+        const data: { upgraded?: number; lastId?: string | null; done?: boolean; error?: string } = await res.json()
+        if (!res.ok) { setError(data.error ?? 'Upgrade failed.'); break }
+        done += data.upgraded ?? 0
+        afterId = data.lastId ?? afterId
+        setUpProg({ done, total })
+        if (data.done || !data.lastId) break
+      } catch { setError('Network error during upgrade.'); break }
+    }
+    loadCounts()
+    setUpgrading(false)
+  }
+
   const fmt = (n: number) => n.toLocaleString()
-  const disabled = busy || filling
+  const disabled = busy || filling || upgrading
+  const modelLabel = model === 'haiku' ? 'Haiku' : model === 'opus' ? 'Opus' : 'Sonnet'
 
   return (
     <div>
@@ -118,7 +150,7 @@ export default function LibrarySeedTab() {
         Preload the exercise library across every sport so any athlete in the world can generate a plan with
         <strong style={{ color: K.text }}> zero lag</strong> — the exercises, instructions, and video queue are already there.
         Each run generates real exercises <strong style={{ color: K.text }}>with full instructions</strong>, skips anything you
-        already have, and queues the new ones for the Video Curator. Haiku ≈ <strong style={{ color: K.text }}>$0.001 / exercise</strong>.
+        already have, and queues the new ones for the Video Curator.
       </p>
 
       {/* Live pipeline counters */}
@@ -162,7 +194,7 @@ export default function LibrarySeedTab() {
             <FieldLabel>Model</FieldLabel>
             <select value={model} onChange={e => setModel(e.target.value as Model)} disabled={disabled} style={inputStyle}>
               <option value="haiku">Haiku · cheapest</option>
-              <option value="sonnet">Sonnet · balanced</option>
+              <option value="sonnet">Sonnet · best value</option>
               <option value="opus">Opus · top quality</option>
             </select>
           </div>
@@ -178,36 +210,49 @@ export default function LibrarySeedTab() {
       </div>
 
       {/* Fill everything */}
-      <div style={{ background: 'rgba(59,130,246,0.06)', border: `1px solid rgba(59,130,246,0.35)`, borderRadius: 14, padding: 18, maxWidth: 720, marginBottom: 24 }}>
+      <div style={{ background: 'rgba(59,130,246,0.06)', border: `1px solid rgba(59,130,246,0.35)`, borderRadius: 14, padding: 18, maxWidth: 720, marginBottom: 16 }}>
         <div style={{ fontSize: 14, fontWeight: 800, color: K.text, marginBottom: 4 }}>🌍 Fill every category</div>
         <p style={{ fontSize: 13, color: K.textMid, lineHeight: 1.5, marginBottom: 14 }}>
-          Loops through all <strong style={{ color: K.text }}>{ALL_CATEGORIES.length}</strong> sports + focuses, <strong style={{ color: K.text }}>{count}</strong> each,
+          Loops through all <strong style={{ color: K.text }}>{ALL_CATEGORIES.length}</strong> sports + focuses, <strong style={{ color: K.text }}>{count}</strong> each on <strong style={{ color: K.text }}>{modelLabel}</strong>,
           skipping anything you already have. Runs one category at a time right here — leave the tab open, and stop anytime.
         </p>
         {filling && fillProg ? (
-          <div>
-            <div style={{ height: 6, borderRadius: 6, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginBottom: 10 }}>
-              <div style={{ width: `${Math.round((fillProg.done / fillProg.total) * 100)}%`, height: '100%', background: K.accent, transition: 'width 0.3s' }} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 13, color: K.textMid }}>
-                {fillProg.done}/{fillProg.total} categories · <strong style={{ color: K.green }}>+{fmt(fillProg.added)} added</strong>
-              </span>
-              <button
-                onClick={() => { stopRef.current = true }}
-                style={{ marginLeft: 'auto', padding: '8px 16px', borderRadius: 8, border: `1px solid ${K.border}`, background: K.input, color: K.textMid, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}
-              >
-                Stop
-              </button>
-            </div>
-          </div>
+          <ProgressRow
+            pct={Math.round((fillProg.done / fillProg.total) * 100)}
+            label={`${fillProg.done}/${fillProg.total} categories · `}
+            strong={`+${fmt(fillProg.added)} added`}
+            onStop={() => { stopRef.current = true }}
+          />
+        ) : (
+          <button onClick={runAll} disabled={disabled} style={primaryBtn(disabled)}>
+            🌍 Fill Every Category ({count} each)
+          </button>
+        )}
+      </div>
+
+      {/* Upgrade existing */}
+      <div style={{ background: 'rgba(167,139,250,0.06)', border: `1px solid rgba(167,139,250,0.35)`, borderRadius: 14, padding: 18, maxWidth: 720, marginBottom: 24 }}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: K.text, marginBottom: 4 }}>⬆️ Upgrade seeded instructions</div>
+        <p style={{ fontSize: 13, color: K.textMid, lineHeight: 1.5, marginBottom: 14 }}>
+          Regenerates the how / breathing / core / tip on all{' '}
+          <strong style={{ color: K.text }}>{counts ? fmt(counts.seededTotal) : '…'}</strong> exercises you seeded with{' '}
+          <strong style={{ color: K.text }}>{modelLabel}</strong>, overwriting older cues and re-syncing audio (it clears TTS so
+          it regenerates from the improved text). Use this to bring an earlier Haiku batch up to Sonnet quality.
+        </p>
+        {upgrading && upProg ? (
+          <ProgressRow
+            pct={upProg.total ? Math.round((upProg.done / upProg.total) * 100) : 0}
+            label={`Upgrading… `}
+            strong={`${fmt(upProg.done)}${upProg.total ? ` / ${fmt(upProg.total)}` : ''}`}
+            onStop={() => { upStopRef.current = true }}
+          />
         ) : (
           <button
-            onClick={runAll}
-            disabled={disabled}
-            style={{ padding: '11px 22px', borderRadius: 10, border: 'none', background: K.accent, color: '#fff', fontWeight: 800, fontSize: 14, cursor: disabled ? 'default' : 'pointer', fontFamily: 'inherit', opacity: disabled ? 0.7 : 1 }}
+            onClick={runUpgrade}
+            disabled={disabled || !counts?.seededTotal}
+            style={{ ...primaryBtn(disabled || !counts?.seededTotal), background: K.purple }}
           >
-            🌍 Fill Every Category ({count} each)
+            ⬆️ Upgrade All Seeded to {modelLabel}
           </button>
         )}
       </div>
@@ -254,8 +299,31 @@ export default function LibrarySeedTab() {
   )
 }
 
+function ProgressRow({ pct, label, strong, onStop }: { pct: number; label: string; strong: string; onStop: () => void }) {
+  return (
+    <div>
+      <div style={{ height: 6, borderRadius: 6, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginBottom: 10 }}>
+        <div style={{ width: `${pct}%`, height: '100%', background: K.accent, transition: 'width 0.3s' }} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 13, color: K.textMid }}>{label}<strong style={{ color: K.green }}>{strong}</strong></span>
+        <button
+          onClick={onStop}
+          style={{ marginLeft: 'auto', padding: '8px 16px', borderRadius: 8, border: `1px solid ${K.border}`, background: K.input, color: K.textMid, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}
+        >
+          Stop
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function FieldLabel({ children }: { children: ReactNode }) {
   return <label style={{ display: 'block', fontSize: 11, color: K.textDim, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>{children}</label>
+}
+
+function primaryBtn(disabled: boolean): CSSProperties {
+  return { padding: '11px 22px', borderRadius: 10, border: 'none', background: K.accent, color: '#fff', fontWeight: 800, fontSize: 14, cursor: disabled ? 'default' : 'pointer', fontFamily: 'inherit', opacity: disabled ? 0.7 : 1 }
 }
 
 const inputStyle: CSSProperties = {
