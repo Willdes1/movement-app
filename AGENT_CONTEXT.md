@@ -99,7 +99,54 @@
 
 ---
 
-## 4. What Was Built This Session (2026-06-30 → 07-01)
+## 4. What Was Built This Session (2026-07-02)
+
+**Polish + content-engine night — desktop layout overhaul, a from-scratch Library
+Builder content engine, name-emoji personalization, and YouTube quota reply prep.
+~11 commits, all deployed green. No new SQL migrations.**
+
+### 🖥️ Desktop "fill the screen" pass (b2876c7 → 61c0ffc)
+- Athlete tabs were capped narrow + centered (For You at 480px) — floating in the
+  middle on desktop; coach portal jammed left. Fixed app-wide: `.page-content`
+  860→1200; For You → 2-column feed grid; coach pages centered at 1280; My Coach /
+  Nutrition / Account / Profile widened to 1200. **Mobile untouched (all changes ≥768px).**
+- **Coached Calendar rebuilt** (`components/CoachedCalendar.tsx`) — was an abstract
+  week/day picker (480px, floated, overflowed mobile). Now a real month grid mapping
+  the coach program onto actual dates, using the SAME visual language as the AI-plan
+  calendar so switching off a coach → AI plan is seamless. Mobile cutoff fixed.
+- Memory: [[feedback_desktop_fill_screen]].
+
+### 😀 Profile-name emoji everywhere (4c50315)
+- Greetings used `name.split(' ')[0]`, dropping any emoji ("Wheel 💪" → "Wheel"). New
+  `lib/name.ts` (`displayName` keeps first name + emoji, `avatarInitials` strips emoji)
+  wired into account greeting, Home greeting, sidebar, mobile menu. Added a preloaded
+  emoji picker to the profile name field (tap to add/remove flair).
+
+### 🏗️ Library Builder — content pre-load engine (2bb6f6b → 1028d59)
+- New admin tab **Content → 🏗️ Library Builder** (`#seed`). Generates real exercises
+  WITH instructions for any sport/category via Claude, dedups against exercise_library,
+  inserts new rows → they flow into the Video Curator (video_url null) + TTS (how set).
+  Preloads the library so any athlete worldwide gets a zero-lag plan + keeps the YouTube
+  curator fed during the quota review. **No migration.**
+- Files: `app/api/admin/seed-library/route.ts`, `components/admin/LibrarySeedTab.tsx`.
+- Modes: single Generate · **🌍 Fill Every Category** (loops ~70 sports+focuses,
+  dedup-aware, progress+stop) · **⬆️ Upgrade seeded instructions** (regenerates cues on
+  existing seeds with a better model, nulls stale TTS to re-sync audio, cursor-paginated;
+  leaves video_url untouched). Models: Haiku/Sonnet(default)/Opus; VOICE section = human
+  coach tone. Collapsed ~50 `seed:*` curation lanes into ONE "Library Builder" lane.
+  Fixed missing NAV_GROUPS sidebar entry + derived hash-routing valid list from NAV_GROUPS
+  so `#seed` (and any future tab) persists on refresh. Memory: [[project-library-builder]],
+  [[feedback_human_voice_content]].
+
+### 📺 YouTube API quota reply (non-code, prepped)
+- Reviewer asked for a screencast of our YouTube API use case (7 BUSINESS days from Jun 24
+  → ~Jul 3; not too late). Full Loom script + email draft saved to memory
+  [[youtube-quota-reply-prep]] — surfaces on the magic words "give me those instructions
+  for the reply." Current pace fits the free 10k/day quota; finishing preserves the queue position.
+
+---
+
+## Previous Session (2026-06-30 → 07-01)
 
 **Marathon session — shipped the Coach Voice Cloning feature, fixed a launch-level
 coached-display bug, and completed the entire Coached Mode v2 epic (instructions +
@@ -780,18 +827,16 @@ return () => { supabase.removeChannel(channel) }
 
 ## 11. What to Work on Next (Priority Order)
 
-**NEXT MISSION (Will's pick, 2026-07-01): "loading up our internal library" — Will has a
-task about populating the internal library. Get the details from him at session start.**
-Likely relates to the exercise_library / knowledge store / the new onboarding-help KB idea
-(`to-do/onboarding-help-knowledge-base.md`). Ask before assuming.
+**NEXT MISSION: fill the library + curate.** The **Library Builder** (admin → Content → 🏗️
+Library Builder, `#seed`) is BUILT (2026-07-02). Next runs Will should do: **⬆️ Upgrade All
+Seeded → Sonnet** (brings last night's Haiku batch up to the human coach voice), then **🌍 Fill
+Every Category** on Sonnet for breadth, then curate the single **Library Builder** lane in Video
+Curation + run TTS daily. Goal: preload every sport so new users get a zero-lag plan + keep the
+YouTube curator fed. Memory: [[project-library-builder]].
 
-0. **⚠️ RUN THESE PENDING MIGRATIONS in Supabase** (all `IF NOT EXISTS`, safe; Will was running
-   them as we shipped — verify all done):
-   - `20260630_coach_exercise_instructions.sql` (coach_exercise_library how/breathing/core/tip/custom_fields)
-   - `20260630_coach_field_template.sql` (profiles.coach_field_template)
-   - `20260630_assignment_pending.sql` (status constraint + 'pending')
-   - `20260630_assignment_resume_week.sql` (coach_program_assignments.resume_week)
-   - `20260623_coach_voice_cloning.sql` + `20260624_assignment_status_replaced.sql`
+0. **SQL migrations — all confirmed run.** Will confirmed the 2026-06-30 batch + voice-cloning
+   migrations processed early this session ("all SQL codes processed successfully"). No pending
+   migrations. Library Builder needs none.
 1. **🎙 Coach voice cloning — go live + test.** Phase 1 is BUILT. Needs: `ELEVENLABS_API_KEY` in
    Vercel (free tier OK for testing; upgrade to $5 Starter before a PAYING customer hears a
    cloned voice) + run `20260623_coach_voice_cloning.sql`. Then test with a coached client
