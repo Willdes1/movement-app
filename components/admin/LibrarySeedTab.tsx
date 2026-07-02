@@ -41,7 +41,7 @@ type RunResult = { category: string; added: number; skipped: number; queued: num
 export default function LibrarySeedTab() {
   const [category, setCategory] = useState('')
   const [count, setCount] = useState(20)
-  const [model, setModel] = useState<Model>('haiku')
+  const [model, setModel] = useState<Model>('sonnet')
   const [busy, setBusy] = useState(false)
   const [filling, setFilling] = useState(false)
   const [fillProg, setFillProg] = useState<{ done: number; total: number; added: number } | null>(null)

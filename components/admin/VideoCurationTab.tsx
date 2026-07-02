@@ -202,8 +202,12 @@ export default function VideoCurationTab() {
     // Group by program name
     const progMap: Record<string, { id: string; name_display: string; video_url: string | null }[]> = {}
     for (const ex of (programExercises ?? []) as { id: string; name_display: string; source_program: string; video_url: string | null }[]) {
-      if (!progMap[ex.source_program]) progMap[ex.source_program] = []
-      progMap[ex.source_program].push(ex)
+      // Collapse every Library Builder seed (source_program 'seed:<category>') into
+      // ONE "Library Builder" lane — no per-sport lane clutter. Coach programs keep
+      // their own named lanes.
+      const laneKey = ex.source_program.startsWith('seed:') ? 'Library Builder' : ex.source_program
+      if (!progMap[laneKey]) progMap[laneKey] = []
+      progMap[laneKey].push(ex)
     }
 
     const { data: cands } = await supabase
