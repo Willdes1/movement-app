@@ -35,15 +35,16 @@ const K = {
 
 type Model = 'haiku' | 'sonnet' | 'opus'
 type Counts = { total: number; needVideo: number; needTts: number; seededTotal: number }
-type RunResult = { category: string; added: number; skipped: number; queued: number; generated: number }
+type RunResult = { category: string; added: number; skipped: number; queued: number; generated: number; voiced: number }
 
 export default function LibrarySeedTab() {
   const [category, setCategory] = useState('')
   const [count, setCount] = useState(20)
   const [model, setModel] = useState<Model>('sonnet')
+  const [autoAudio, setAutoAudio] = useState(true)
   const [busy, setBusy] = useState(false)
   const [filling, setFilling] = useState(false)
-  const [fillProg, setFillProg] = useState<{ done: number; total: number; added: number } | null>(null)
+  const [fillProg, setFillProg] = useState<{ done: number; total: number; added: number; voiced: number } | null>(null)
   const [upgrading, setUpgrading] = useState(false)
   const [upProg, setUpProg] = useState<{ done: number; total: number } | null>(null)
   const [counts, setCounts] = useState<Counts | null>(null)
@@ -67,10 +68,31 @@ export default function LibrarySeedTab() {
   useEffect(() => { loadCounts() }, [loadCounts])
 
   const pushLog = useCallback((cat: string, data: Record<string, number>) => {
-    setLog(l => [{ category: cat, added: data.added ?? 0, skipped: data.skipped ?? 0, queued: data.queued ?? 0, generated: data.generated ?? 0 }, ...l].slice(0, 40))
+    setLog(l => [{ category: cat, added: data.added ?? 0, skipped: data.skipped ?? 0, queued: data.queued ?? 0, generated: data.generated ?? 0, voiced: data.voiced ?? 0 }, ...l].slice(0, 40))
   }, [])
 
-  async function generateOne(cat: string): Promise<number> {
+  // Hand freshly-seeded exercises to the TTS route in small chunks so each
+  // serverless call stays under the Vercel 60s wall. Best-effort: audio failures
+  // never block the seed loop (the TTS tab can always backfill later).
+  const voiceNames = useCallback(async (names: string[]): Promise<number> => {
+    const CHUNK = 10
+    let voiced = 0
+    for (let i = 0; i < names.length; i += CHUNK) {
+      const targets = names.slice(i, i + CHUNK)
+      try {
+        const res = await fetch('/api/admin/generate-tts', {
+          method: 'POST',
+          headers: await authHeaders(),
+          body: JSON.stringify({ targets }),
+        })
+        if (res.ok) { const d = await res.json(); voiced += d.generated ?? 0 }
+      } catch { /* keep going — audio is best-effort */ }
+    }
+    return voiced
+  }, [authHeaders])
+
+  // Seed one category, then (if auto-audio is on) voice the exercises it just added.
+  async function generateOne(cat: string): Promise<{ added: number; voiced: number }> {
     const res = await fetch('/api/admin/seed-library', {
       method: 'POST',
       headers: await authHeaders(),
@@ -78,8 +100,11 @@ export default function LibrarySeedTab() {
     })
     const data = await res.json()
     if (!res.ok) throw new Error(data.error ?? 'Failed')
-    pushLog(cat, data)
-    return data.added ?? 0
+    const names: string[] = Array.isArray(data.insertedNames) ? data.insertedNames : []
+    let voiced = 0
+    if (autoAudio && names.length) voiced = await voiceNames(names)
+    pushLog(cat, { ...data, voiced })
+    return { added: data.added ?? 0, voiced }
   }
 
   async function run() {
@@ -98,12 +123,12 @@ export default function LibrarySeedTab() {
     if (busy || filling || upgrading) return
     stopRef.current = false
     setFilling(true); setError(null)
-    setFillProg({ done: 0, total: ALL_CATEGORIES.length, added: 0 })
-    let added = 0
+    setFillProg({ done: 0, total: ALL_CATEGORIES.length, added: 0, voiced: 0 })
+    let added = 0, voiced = 0
     for (let i = 0; i < ALL_CATEGORIES.length; i++) {
       if (stopRef.current) break
-      try { added += await generateOne(ALL_CATEGORIES[i]) } catch { /* skip, keep going */ }
-      setFillProg({ done: i + 1, total: ALL_CATEGORIES.length, added })
+      try { const r = await generateOne(ALL_CATEGORIES[i]); added += r.added; voiced += r.voiced } catch { /* skip, keep going */ }
+      setFillProg({ done: i + 1, total: ALL_CATEGORIES.length, added, voiced })
       if ((i + 1) % 3 === 0) loadCounts()
     }
     loadCounts()
@@ -206,6 +231,12 @@ export default function LibrarySeedTab() {
             {busy ? 'Building…' : '✨ Generate'}
           </button>
         </div>
+        {/* Auto-audio: hand every newly-seeded exercise straight to TTS (OpenAI) — one button, both steps. */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14, cursor: disabled ? 'default' : 'pointer' }}>
+          <input type="checkbox" checked={autoAudio} onChange={e => setAutoAudio(e.target.checked)} disabled={disabled} style={{ width: 16, height: 16, accentColor: K.green, cursor: disabled ? 'default' : 'pointer' }} />
+          <span style={{ fontSize: 13, color: K.text, fontWeight: 700 }}>🔊 Auto-generate audio</span>
+          <span style={{ fontSize: 12, color: K.textDim }}>Voice each new exercise (male + female) as it&apos;s added — no separate TTS run.</span>
+        </label>
         {error && <p style={{ color: K.amber, fontSize: 13, marginTop: 12, marginBottom: 0 }}>{error}</p>}
       </div>
 
@@ -214,13 +245,13 @@ export default function LibrarySeedTab() {
         <div style={{ fontSize: 14, fontWeight: 800, color: K.text, marginBottom: 4 }}>🌍 Fill every category</div>
         <p style={{ fontSize: 13, color: K.textMid, lineHeight: 1.5, marginBottom: 14 }}>
           Loops through all <strong style={{ color: K.text }}>{ALL_CATEGORIES.length}</strong> sports + focuses, <strong style={{ color: K.text }}>{count}</strong> each on <strong style={{ color: K.text }}>{modelLabel}</strong>,
-          skipping anything you already have. Runs one category at a time right here — leave the tab open, and stop anytime.
+          skipping anything you already have{autoAudio ? <> and <strong style={{ color: K.text }}>voicing each new one</strong></> : ''}. Runs one category at a time right here — leave the tab open, and stop anytime.
         </p>
         {filling && fillProg ? (
           <ProgressRow
             pct={Math.round((fillProg.done / fillProg.total) * 100)}
             label={`${fillProg.done}/${fillProg.total} categories · `}
-            strong={`+${fmt(fillProg.added)} added`}
+            strong={`+${fmt(fillProg.added)} added${autoAudio ? ` · 🔊 ${fmt(fillProg.voiced)} voiced` : ''}`}
             onStop={() => { stopRef.current = true }}
           />
         ) : (
@@ -290,6 +321,7 @@ export default function LibrarySeedTab() {
                 <span style={{ color: K.green, fontWeight: 700 }}>+{r.added} added</span>
                 {r.skipped > 0 && <span style={{ color: K.textDim }}>{r.skipped} dupe{r.skipped === 1 ? '' : 's'} skipped</span>}
                 <span style={{ color: K.amber }}>{r.queued} queued for video</span>
+                {r.voiced > 0 && <span style={{ color: K.purple }}>🔊 {r.voiced} voiced</span>}
               </div>
             ))}
           </div>

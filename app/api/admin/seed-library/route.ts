@@ -290,6 +290,7 @@ export async function POST(req: Request) {
 
   // Insert the new exercises (with instructions + a stable source tag)
   const insertedIds: string[] = []
+  let insertedNames: string[] = []
   if (toInsert.length) {
     const { data: inserted, error } = await supabase
       .from('exercise_library')
@@ -300,7 +301,12 @@ export async function POST(req: Request) {
         source_program: sourceLabel,
       })))
       .select('id')
-    if (!error && inserted) inserted.forEach(r => insertedIds.push(r.id as string))
+    if (!error && inserted) {
+      inserted.forEach(r => insertedIds.push(r.id as string))
+      // The new rows carry `how` + null TTS, so the Library Builder can hand these
+      // straight to the TTS route (auto-audio) without a separate scan.
+      insertedNames = toInsert.map(c => c.name_normalized)
+    }
   }
 
   // Queue the new rows for the Video Curator (they have no video_url yet)
@@ -319,5 +325,6 @@ export async function POST(req: Request) {
     added: insertedIds.length,
     skipped: candidates.length - toInsert.length,
     queued,
+    insertedNames,
   })
 }
