@@ -47,11 +47,14 @@ export default function LibrarySeedTab() {
   const [fillProg, setFillProg] = useState<{ done: number; total: number; added: number; voiced: number } | null>(null)
   const [upgrading, setUpgrading] = useState(false)
   const [upProg, setUpProg] = useState<{ done: number; total: number } | null>(null)
+  const [voicingAll, setVoicingAll] = useState(false)
+  const [voiceProg, setVoiceProg] = useState<{ done: number; total: number } | null>(null)
   const [counts, setCounts] = useState<Counts | null>(null)
   const [log, setLog] = useState<RunResult[]>([])
   const [error, setError] = useState<string | null>(null)
   const stopRef = useRef(false)
   const upStopRef = useRef(false)
+  const voiceStopRef = useRef(false)
 
   const authHeaders = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -109,7 +112,7 @@ export default function LibrarySeedTab() {
 
   async function run() {
     const cat = category.trim()
-    if (busy || filling || upgrading) return
+    if (busy || filling || upgrading || voicingAll) return
     if (!cat) { setError('Pick a sport or category first.'); return }
     setBusy(true); setError(null)
     try {
@@ -120,7 +123,7 @@ export default function LibrarySeedTab() {
   }
 
   async function runAll() {
-    if (busy || filling || upgrading) return
+    if (busy || filling || upgrading || voicingAll) return
     stopRef.current = false
     setFilling(true); setError(null)
     setFillProg({ done: 0, total: ALL_CATEGORIES.length, added: 0, voiced: 0 })
@@ -136,7 +139,7 @@ export default function LibrarySeedTab() {
   }
 
   async function runUpgrade() {
-    if (busy || filling || upgrading) return
+    if (busy || filling || upgrading || voicingAll) return
     upStopRef.current = false
     setUpgrading(true); setError(null)
     const total = counts?.seededTotal ?? 0
@@ -164,8 +167,41 @@ export default function LibrarySeedTab() {
     setUpgrading(false)
   }
 
+  // Voice the whole audio backlog — loops the TTS route (10 at a time, it
+  // auto-picks rows missing audio) until nothing's left. Covers exercises that
+  // were seeded before auto-audio, or had their audio cleared by an Upgrade.
+  async function runVoiceBacklog() {
+    if (busy || filling || upgrading || voicingAll) return
+    voiceStopRef.current = false
+    setVoicingAll(true); setError(null)
+    const total = counts?.needTts ?? 0
+    setVoiceProg({ done: 0, total })
+    let done = 0
+    let guard = 0
+    while (guard++ < 600) {
+      if (voiceStopRef.current) break
+      try {
+        const res = await fetch('/api/admin/generate-tts', {
+          method: 'POST',
+          headers: await authHeaders(),
+          body: JSON.stringify({}),
+        })
+        const data = await res.json()
+        if (!res.ok) { setError(data.error ?? 'Voicing failed.'); break }
+        const generated = data.generated ?? 0
+        done += generated
+        setVoiceProg({ done, total: Math.max(total, done) })
+        if ((data.remaining ?? 0) <= 0) break
+        if (generated === 0) break // no voiceable rows progressing — stop, don't spin
+      } catch { setError('Network error during voicing.'); break }
+      if (guard % 3 === 0) loadCounts()
+    }
+    loadCounts()
+    setVoicingAll(false)
+  }
+
   const fmt = (n: number) => n.toLocaleString()
-  const disabled = busy || filling || upgrading
+  const disabled = busy || filling || upgrading || voicingAll
   const modelLabel = model === 'haiku' ? 'Haiku' : model === 'opus' ? 'Opus' : 'Sonnet'
 
   return (
@@ -284,6 +320,33 @@ export default function LibrarySeedTab() {
             style={{ ...primaryBtn(disabled || !counts?.seededTotal), background: K.purple }}
           >
             ⬆️ Upgrade All Seeded to {modelLabel}
+          </button>
+        )}
+      </div>
+
+      {/* Voice the backlog */}
+      <div style={{ background: 'rgba(34,197,94,0.06)', border: `1px solid rgba(34,197,94,0.35)`, borderRadius: 14, padding: 18, maxWidth: 720, marginBottom: 24 }}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: K.text, marginBottom: 4 }}>🔊 Voice the backlog</div>
+        <p style={{ fontSize: 13, color: K.textMid, lineHeight: 1.5, marginBottom: 14 }}>
+          Generates male + female audio for all{' '}
+          <strong style={{ color: K.text }}>{counts ? fmt(counts.needTts) : '…'}</strong> exercises that have instructions but no audio yet
+          (OpenAI TTS). Auto-audio only voices brand-new exercises — use this for the existing library, or after an Upgrade clears audio.
+          Runs 10 at a time until done; leave the tab open, stop anytime. One-time cost, tracked in the Spend Tracker.
+        </p>
+        {voicingAll && voiceProg ? (
+          <ProgressRow
+            pct={voiceProg.total ? Math.round((voiceProg.done / voiceProg.total) * 100) : 0}
+            label={`Voicing… `}
+            strong={`${fmt(voiceProg.done)}${voiceProg.total ? ` / ${fmt(voiceProg.total)}` : ''}`}
+            onStop={() => { voiceStopRef.current = true }}
+          />
+        ) : (
+          <button
+            onClick={runVoiceBacklog}
+            disabled={disabled || !counts?.needTts}
+            style={{ ...primaryBtn(disabled || !counts?.needTts), background: K.green }}
+          >
+            🔊 Voice All Missing Audio{counts?.needTts ? ` (${fmt(counts.needTts)})` : ''}
           </button>
         )}
       </div>
