@@ -56,6 +56,11 @@ Each element must match this exact shape:
   "tip": "<1 sentence: the single most common mistake on THIS movement and exactly how to fix it — be concrete>"
 }
 
+VOICE — write like a real strength coach talking straight to the athlete, not an AI or a textbook:
+- Second person and imperative ("Brace hard and drive up," not "The lifter should brace").
+- Punchy and direct — every word earns its place. Cut AI filler: no "it's important to", "make sure to", "remember to", "in order to", "this exercise will", or "helps to".
+- Specific and concrete over generic. Confident coach-on-the-floor tone — never hedgy, listy, or robotic.
+
 Rules:
 - Every entry must be DISTINCT — no near-duplicates, no left/right variants of the same movement.
 - Use real, established movements only — never invent names.
@@ -74,6 +79,11 @@ Each element must match this exact shape:
   "core": "<1 sentence: the specific bracing or core-position cue that changes the outcome for THIS exercise — not generic>",
   "tip": "<1 sentence: the single most common mistake on THIS specific exercise and exactly how to fix it — be concrete>"
 }
+
+VOICE — write like a real strength coach talking straight to the athlete, not an AI or a textbook:
+- Second person and imperative ("Brace hard and drive up," not "The lifter should brace").
+- Punchy and direct — every word earns its place. Cut AI filler: no "it's important to", "make sure to", "remember to", "in order to", "this exercise will", or "helps to".
+- Specific and concrete over generic. Confident coach-on-the-floor tone — never hedgy, listy, or robotic.
 
 Generate one entry per exercise, in the EXACT same order as the input list. Return nothing but the raw JSON array.`
 
