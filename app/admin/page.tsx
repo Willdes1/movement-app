@@ -1559,7 +1559,7 @@ export default function AdminPage() {
   // Persist active tab in URL hash so refresh lands on the same tab
   useEffect(() => {
     const hash = window.location.hash.slice(1) as Tab
-    const valid: Tab[] = ['overview','users','activity','todos','ideas','promos','marketing','partners','launchpad','health','media','impersonation','retention','notes','billing','ceo','bugs','kb','study','access','spend','video','push','stripe','mie','tts','conversions']
+    const valid = NAV_GROUPS.flatMap(g => g.items).map(i => i.id)
     if (valid.includes(hash)) setTab(hash)
   }, [])
   useEffect(() => { window.location.hash = tab }, [tab])
