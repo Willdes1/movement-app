@@ -28,6 +28,8 @@ const FOCUS = [
 
 const ALL_CATEGORIES = [...SPORTS, ...FOCUS]
 
+const SAT_KEY = 'seed_saturated_v1'
+
 const K = {
   card: '#161b22', input: '#0d1117', border: '#30363d', accent: '#3b82f6',
   green: '#22c55e', amber: '#f59e0b', purple: '#a78bfa', text: '#e6edf3', textMid: '#b1bac4', textDim: '#6e7681',
@@ -44,7 +46,7 @@ export default function LibrarySeedTab() {
   const [autoAudio, setAutoAudio] = useState(true)
   const [busy, setBusy] = useState(false)
   const [filling, setFilling] = useState(false)
-  const [fillProg, setFillProg] = useState<{ done: number; total: number; added: number; voiced: number } | null>(null)
+  const [fillProg, setFillProg] = useState<{ done: number; total: number; added: number; voiced: number; skipped: number } | null>(null)
   const [upgrading, setUpgrading] = useState(false)
   const [upProg, setUpProg] = useState<{ done: number; total: number } | null>(null)
   const [voicingAll, setVoicingAll] = useState(false)
@@ -55,6 +57,27 @@ export default function LibrarySeedTab() {
   const stopRef = useRef(false)
   const upStopRef = useRef(false)
   const voiceStopRef = useRef(false)
+
+  // Saturation memory (token guard): once a category yields 0 new exercises at a
+  // given count, we remember it and skip it on future Fill runs WITHOUT calling
+  // Claude — so re-running Fill on an already-full library costs $0. We store the
+  // count it saturated at, so bumping the count higher re-probes it.
+  const [saturated, setSaturated] = useState<Record<string, number>>({})
+  useEffect(() => {
+    try { const raw = localStorage.getItem(SAT_KEY); if (raw) setSaturated(JSON.parse(raw)) } catch { /* ignore */ }
+  }, [])
+  const markSaturated = useCallback((cat: string, atCount: number) => {
+    setSaturated(prev => {
+      if ((prev[cat] ?? 0) >= atCount) return prev
+      const next = { ...prev, [cat]: atCount }
+      try { localStorage.setItem(SAT_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+      return next
+    })
+  }, [])
+  const clearSaturated = useCallback(() => {
+    setSaturated({})
+    try { localStorage.removeItem(SAT_KEY) } catch { /* ignore */ }
+  }, [])
 
   const authHeaders = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -103,11 +126,14 @@ export default function LibrarySeedTab() {
     })
     const data = await res.json()
     if (!res.ok) throw new Error(data.error ?? 'Failed')
+    const added = data.added ?? 0
+    // Nothing new at this count → remember it so Fill skips it next time (no tokens).
+    if (added === 0) markSaturated(cat, count)
     const names: string[] = Array.isArray(data.insertedNames) ? data.insertedNames : []
     let voiced = 0
     if (autoAudio && names.length) voiced = await voiceNames(names)
     pushLog(cat, { ...data, voiced })
-    return { added: data.added ?? 0, voiced }
+    return { added, voiced }
   }
 
   async function run() {
@@ -126,12 +152,18 @@ export default function LibrarySeedTab() {
     if (busy || filling || upgrading || voicingAll) return
     stopRef.current = false
     setFilling(true); setError(null)
-    setFillProg({ done: 0, total: ALL_CATEGORIES.length, added: 0, voiced: 0 })
-    let added = 0, voiced = 0
+    setFillProg({ done: 0, total: ALL_CATEGORIES.length, added: 0, voiced: 0, skipped: 0 })
+    let added = 0, voiced = 0, skipped = 0
     for (let i = 0; i < ALL_CATEGORIES.length; i++) {
       if (stopRef.current) break
-      try { const r = await generateOne(ALL_CATEGORIES[i]); added += r.added; voiced += r.voiced } catch { /* skip, keep going */ }
-      setFillProg({ done: i + 1, total: ALL_CATEGORIES.length, added, voiced })
+      const cat = ALL_CATEGORIES[i]
+      // Token guard: skip categories already proven full at this count — no server call.
+      if ((saturated[cat] ?? 0) >= count) {
+        skipped++
+      } else {
+        try { const r = await generateOne(cat); added += r.added; voiced += r.voiced } catch { /* skip, keep going */ }
+      }
+      setFillProg({ done: i + 1, total: ALL_CATEGORIES.length, added, voiced, skipped })
       if ((i + 1) % 3 === 0) loadCounts()
     }
     loadCounts()
@@ -281,12 +313,13 @@ export default function LibrarySeedTab() {
         <div style={{ fontSize: 14, fontWeight: 800, color: K.text, marginBottom: 4 }}>🌍 Fill every category</div>
         <p style={{ fontSize: 13, color: K.textMid, lineHeight: 1.5, marginBottom: 14 }}>
           Loops through all <strong style={{ color: K.text }}>{ALL_CATEGORIES.length}</strong> sports + focuses, <strong style={{ color: K.text }}>{count}</strong> each on <strong style={{ color: K.text }}>{modelLabel}</strong>,
-          skipping anything you already have{autoAudio ? <> and <strong style={{ color: K.text }}>voicing each new one</strong></> : ''}. Runs one category at a time right here — leave the tab open, and stop anytime.
+          skipping anything you already have{autoAudio ? <> and <strong style={{ color: K.text }}>voicing each new one</strong></> : ''}. Categories that already came up empty are
+          skipped <strong style={{ color: K.text }}>with no token cost</strong> — so re-running is safe. Runs one at a time right here; leave the tab open, and stop anytime.
         </p>
         {filling && fillProg ? (
           <ProgressRow
             pct={Math.round((fillProg.done / fillProg.total) * 100)}
-            label={`${fillProg.done}/${fillProg.total} categories · `}
+            label={`${fillProg.done}/${fillProg.total}${fillProg.skipped ? ` · ${fmt(fillProg.skipped)} skipped free` : ''} · `}
             strong={`+${fmt(fillProg.added)} added${autoAudio ? ` · 🔊 ${fmt(fillProg.voiced)} voiced` : ''}`}
             onStop={() => { stopRef.current = true }}
           />
@@ -294,6 +327,14 @@ export default function LibrarySeedTab() {
           <button onClick={runAll} disabled={disabled} style={primaryBtn(disabled)}>
             🌍 Fill Every Category ({count} each)
           </button>
+        )}
+        {Object.keys(saturated).length > 0 && !filling && (
+          <p style={{ fontSize: 12, color: K.textDim, marginTop: 12, marginBottom: 0 }}>
+            {fmt(Object.keys(saturated).length)} categor{Object.keys(saturated).length === 1 ? 'y' : 'ies'} remembered as full (skipped free).{' '}
+            <button onClick={clearSaturated} disabled={disabled} style={{ background: 'none', border: 'none', color: K.accent, cursor: disabled ? 'default' : 'pointer', fontFamily: 'inherit', fontSize: 12, padding: 0, textDecoration: 'underline' }}>
+              Reset & re-check all
+            </button>
+          </p>
         )}
       </div>
 
