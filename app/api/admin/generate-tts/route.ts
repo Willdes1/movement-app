@@ -86,8 +86,14 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 export async function POST(request: Request) {
   try {
     const supabase = getSupabase() as any
-    const BATCH = 10
-    const CONCURRENCY = 4
+    // Per server round: 20 exercises × 2 voices = 40 OpenAI calls, run 8
+    // exercises (16 calls) at a time. Higher concurrency finishes each round
+    // FASTER, which is what keeps us under Vercel's 60s wall while doing more
+    // per round (the old BATCH=20 @ CONCURRENCY=4 504'd because it ran too
+    // few in parallel; 8-wide clears 20 in ~3 chunks). Each call is capped at
+    // 10s by withTimeout, so worst case ≈ 3 × 10s + upload overhead < 60s.
+    const BATCH = 20
+    const CONCURRENCY = 8
 
     const body = await request.json().catch(() => ({}))
     const targets: string[] | undefined = body?.targets
