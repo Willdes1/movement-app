@@ -185,8 +185,9 @@ async function runUpgrade(supabase: SupabaseClient, userId: string, model: strin
       const d = details[i]
       if (!d.how) continue
       // Overwrite cues + null stale TTS so audio regenerates from the better text.
+      // Stamp updated_at so the write is auditable (no auto-trigger on this table).
       await supabase.from('exercise_library')
-        .update({ how: d.how, breathing: d.breathing, core: d.core, tip: d.tip, tts_url_male: null, tts_url_female: null })
+        .update({ how: d.how, breathing: d.breathing, core: d.core, tip: d.tip, tts_url_male: null, tts_url_female: null, updated_at: new Date().toISOString() })
         .eq('id', chunk[i].id)
       upgraded++
     }

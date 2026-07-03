@@ -29,6 +29,7 @@ const FOCUS = [
 const ALL_CATEGORIES = [...SPORTS, ...FOCUS]
 
 const SAT_KEY = 'seed_saturated_v1'
+const UP_KEY = 'seed_upgraded_v1'
 
 const K = {
   card: '#161b22', input: '#0d1117', border: '#30363d', accent: '#3b82f6',
@@ -77,6 +78,20 @@ export default function LibrarySeedTab() {
   const clearSaturated = useCallback(() => {
     setSaturated({})
     try { localStorage.removeItem(SAT_KEY) } catch { /* ignore */ }
+  }, [])
+
+  // Upgrade memory: remembers how far the Sonnet upgrade has progressed (by id
+  // cursor). Re-running RESUMES from where it left off — so once every seeded
+  // exercise is upgraded, clicking again fetches 0 rows and costs nothing.
+  // Switching model re-runs from scratch (you're upgrading to a new model).
+  type UpMem = { model: Model; lastId: string | null; done: number }
+  const [upgradeMem, setUpgradeMem] = useState<UpMem | null>(null)
+  useEffect(() => {
+    try { const raw = localStorage.getItem(UP_KEY); if (raw) setUpgradeMem(JSON.parse(raw)) } catch { /* ignore */ }
+  }, [])
+  const persistUpMem = useCallback((m: UpMem) => {
+    setUpgradeMem(m)
+    try { localStorage.setItem(UP_KEY, JSON.stringify(m)) } catch { /* ignore */ }
   }, [])
 
   const authHeaders = useCallback(async () => {
@@ -170,14 +185,17 @@ export default function LibrarySeedTab() {
     setFilling(false)
   }
 
-  async function runUpgrade() {
+  async function runUpgrade(fromScratch = false) {
     if (busy || filling || upgrading || voicingAll) return
     upStopRef.current = false
     setUpgrading(true); setError(null)
     const total = counts?.seededTotal ?? 0
-    setUpProg({ done: 0, total })
-    let done = 0
-    let afterId: string | null = null
+    // Resume from the last cursor if we're upgrading to the SAME model; a model
+    // switch (or an explicit re-run) means re-upgrade everything from the start.
+    const sameModel = !fromScratch && upgradeMem?.model === model
+    let afterId: string | null = sameModel ? (upgradeMem?.lastId ?? null) : null
+    let done = sameModel ? (upgradeMem?.done ?? 0) : 0
+    setUpProg({ done, total: Math.max(total, done) })
     let guard = 0
     while (guard++ < 400) {
       if (upStopRef.current) break
@@ -191,7 +209,8 @@ export default function LibrarySeedTab() {
         if (!res.ok) { setError(data.error ?? 'Upgrade failed.'); break }
         done += data.upgraded ?? 0
         afterId = data.lastId ?? afterId
-        setUpProg({ done, total })
+        persistUpMem({ model, lastId: afterId, done })
+        setUpProg({ done, total: Math.max(total, done) })
         if (data.done || !data.lastId) break
       } catch { setError('Network error during upgrade.'); break }
     }
@@ -235,6 +254,9 @@ export default function LibrarySeedTab() {
   const fmt = (n: number) => n.toLocaleString()
   const disabled = busy || filling || upgrading || voicingAll
   const modelLabel = model === 'haiku' ? 'Haiku' : model === 'opus' ? 'Opus' : 'Sonnet'
+  // How far the upgrade has gotten FOR THE CURRENTLY-SELECTED MODEL.
+  const upDoneForModel = upgradeMem?.model === model ? (upgradeMem.done ?? 0) : 0
+  const upComplete = !!counts?.seededTotal && upDoneForModel >= (counts?.seededTotal ?? 0)
 
   return (
     <div>
@@ -345,7 +367,8 @@ export default function LibrarySeedTab() {
           Regenerates the how / breathing / core / tip on all{' '}
           <strong style={{ color: K.text }}>{counts ? fmt(counts.seededTotal) : '…'}</strong> exercises you seeded with{' '}
           <strong style={{ color: K.text }}>{modelLabel}</strong>, overwriting older cues and re-syncing audio (it clears TTS so
-          it regenerates from the improved text). Use this to bring an earlier Haiku batch up to Sonnet quality.
+          it regenerates from the improved text). This number is your <em>total seeded</em> — it stays put; the upgrade rewrites
+          cues in place, it doesn&apos;t remove rows. Progress below shows how many are done.
         </p>
         {upgrading && upProg ? (
           <ProgressRow
@@ -354,13 +377,28 @@ export default function LibrarySeedTab() {
             strong={`${fmt(upProg.done)}${upProg.total ? ` / ${fmt(upProg.total)}` : ''}`}
             onStop={() => { upStopRef.current = true }}
           />
+        ) : upComplete ? (
+          <div>
+            <p style={{ fontSize: 13, color: K.green, fontWeight: 700, margin: '0 0 10px' }}>
+              ✓ All {fmt(counts?.seededTotal ?? 0)} seeded exercises upgraded to {modelLabel}.
+            </p>
+            <button
+              onClick={() => runUpgrade(true)}
+              disabled={disabled}
+              style={{ background: 'none', border: `1px solid ${K.border}`, color: K.textMid, cursor: disabled ? 'default' : 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, padding: '7px 14px', borderRadius: 8 }}
+            >
+              Re-run from scratch
+            </button>
+          </div>
         ) : (
           <button
-            onClick={runUpgrade}
+            onClick={() => runUpgrade()}
             disabled={disabled || !counts?.seededTotal}
             style={{ ...primaryBtn(disabled || !counts?.seededTotal), background: K.purple }}
           >
-            ⬆️ Upgrade All Seeded to {modelLabel}
+            {upDoneForModel > 0
+              ? `⬆️ Resume upgrade to ${modelLabel} (${fmt(upDoneForModel)}/${fmt(counts?.seededTotal ?? 0)})`
+              : `⬆️ Upgrade All Seeded to ${modelLabel}`}
           </button>
         )}
       </div>
