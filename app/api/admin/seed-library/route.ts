@@ -152,18 +152,21 @@ async function generateDetails(model: string, names: string[]) {
 const UPGRADE_CAP = 32
 const UPGRADE_CHUNK = 8
 
-// Regenerate instructions for the next page of seeded exercises (id-ordered).
-async function runUpgrade(supabase: SupabaseClient, userId: string, model: string, afterId: string | null) {
-  let query = supabase
+// Regenerate instructions for the STALEST seeded exercises not yet upgraded in
+// this session. Selecting by `updated_at < staleBefore` (instead of an id
+// cursor) means rows an AI batch skips keep their old timestamp and get RETRIED
+// on the next page — so the loop always converges to zero, and it only touches
+// rows that still need it (already-upgraded rows sort out via their fresh stamp).
+async function runUpgrade(supabase: SupabaseClient, userId: string, model: string, staleBefore: string) {
+  const { data: rows } = await supabase
     .from('exercise_library')
     .select('id, name_display')
     .like('source_program', 'seed:%')
-    .order('id', { ascending: true })
+    .lt('updated_at', staleBefore)
+    .order('updated_at', { ascending: true })
     .limit(UPGRADE_CAP)
-  if (afterId) query = query.gt('id', afterId)
-  const { data: rows } = await query
   const list = (rows ?? []) as { id: string; name_display: string }[]
-  if (!list.length) return { upgraded: 0, lastId: null as string | null, done: true }
+  if (!list.length) return { upgraded: 0, remaining: 0, done: true }
 
   const chunks: { id: string; name_display: string }[][] = []
   for (let i = 0; i < list.length; i += UPGRADE_CHUNK) chunks.push(list.slice(i, i + UPGRADE_CHUNK))
@@ -196,7 +199,15 @@ async function runUpgrade(supabase: SupabaseClient, userId: string, model: strin
   if (inTok || outTok) {
     await logTokens({ operation: 'upgrade_library', route: 'seed-library', input_tokens: inTok, output_tokens: outTok, user_id: userId })
   }
-  return { upgraded, lastId: list[list.length - 1].id, done: list.length < UPGRADE_CAP }
+
+  // How many seeded rows still need this session's upgrade (DB is the source of truth).
+  const { count } = await supabase
+    .from('exercise_library')
+    .select('id', { count: 'exact', head: true })
+    .like('source_program', 'seed:%')
+    .lt('updated_at', staleBefore)
+  const remaining = count ?? 0
+  return { upgraded, remaining, done: remaining === 0 }
 }
 
 // GET — live pipeline counters for the panel dashboard.
@@ -224,13 +235,15 @@ export async function POST(req: Request) {
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const { supabase, userId } = auth
 
-  const body = await req.json().catch(() => ({})) as { category?: string; count?: number; model?: string; mode?: string; afterId?: string | null }
+  const body = await req.json().catch(() => ({})) as { category?: string; count?: number; model?: string; mode?: string; staleBefore?: string }
   const model = MODEL_IDS[body.model ?? ''] ?? MODEL_IDS.haiku
 
   // Upgrade mode — regenerate instructions for already-seeded exercises.
   if (body.mode === 'upgrade') {
     try {
-      const result = await runUpgrade(supabase, userId, model, body.afterId ?? null)
+      // Only rows last touched before this session start get (re)upgraded.
+      const staleBefore = typeof body.staleBefore === 'string' ? body.staleBefore : new Date().toISOString()
+      const result = await runUpgrade(supabase, userId, model, staleBefore)
       return NextResponse.json(result)
     } catch (err) {
       console.error('seed-library upgrade failed:', err)

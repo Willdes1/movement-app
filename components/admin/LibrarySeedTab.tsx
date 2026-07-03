@@ -84,10 +84,23 @@ export default function LibrarySeedTab() {
   // cursor). Re-running RESUMES from where it left off — so once every seeded
   // exercise is upgraded, clicking again fetches 0 rows and costs nothing.
   // Switching model re-runs from scratch (you're upgrading to a new model).
-  type UpMem = { model: Model; lastId: string | null; done: number }
+  type UpMem = { model: Model; staleBefore: string; complete?: boolean }
   const [upgradeMem, setUpgradeMem] = useState<UpMem | null>(null)
   useEffect(() => {
-    try { const raw = localStorage.getItem(UP_KEY); if (raw) setUpgradeMem(JSON.parse(raw)) } catch { /* ignore */ }
+    try {
+      const raw = localStorage.getItem(UP_KEY)
+      if (!raw) return
+      const p = JSON.parse(raw)
+      if (p && typeof p.staleBefore === 'string') { setUpgradeMem(p); return }
+      // Migrate old cursor-format memory → target only rows not upgraded yet
+      // today (the stragglers a prior run skipped); leave today's done rows be.
+      if (p && p.model) {
+        const d = new Date(); d.setUTCHours(0, 0, 0, 0)
+        const migrated: UpMem = { model: p.model, staleBefore: d.toISOString(), complete: false }
+        setUpgradeMem(migrated)
+        try { localStorage.setItem(UP_KEY, JSON.stringify(migrated)) } catch { /* ignore */ }
+      }
+    } catch { /* ignore */ }
   }, [])
   const persistUpMem = useCallback((m: UpMem) => {
     setUpgradeMem(m)
@@ -190,12 +203,13 @@ export default function LibrarySeedTab() {
     upStopRef.current = false
     setUpgrading(true); setError(null)
     const total = counts?.seededTotal ?? 0
-    // Resume from the last cursor if we're upgrading to the SAME model; a model
-    // switch (or an explicit re-run) means re-upgrade everything from the start.
-    const sameModel = !fromScratch && upgradeMem?.model === model
-    let afterId: string | null = sameModel ? (upgradeMem?.lastId ?? null) : null
-    let done = sameModel ? (upgradeMem?.done ?? 0) : 0
-    setUpProg({ done, total: Math.max(total, done) })
+    // Resume an unfinished session (same model) or start a new full sweep.
+    // staleBefore = the session's start time; only rows last touched before it
+    // get (re)upgraded, and the server retries any it skips until zero remain.
+    const resume = !fromScratch && upgradeMem?.model === model && !!upgradeMem?.staleBefore && !upgradeMem?.complete
+    const staleBefore = resume ? upgradeMem!.staleBefore : new Date().toISOString()
+    persistUpMem({ model, staleBefore, complete: false })
+    setUpProg({ done: 0, total })
     let guard = 0
     while (guard++ < 400) {
       if (upStopRef.current) break
@@ -203,15 +217,14 @@ export default function LibrarySeedTab() {
         const res: Response = await fetch('/api/admin/seed-library', {
           method: 'POST',
           headers: await authHeaders(),
-          body: JSON.stringify({ mode: 'upgrade', model, afterId }),
+          body: JSON.stringify({ mode: 'upgrade', model, staleBefore }),
         })
-        const data: { upgraded?: number; lastId?: string | null; done?: boolean; error?: string } = await res.json()
+        const data: { upgraded?: number; remaining?: number; done?: boolean; error?: string } = await res.json()
         if (!res.ok) { setError(data.error ?? 'Upgrade failed.'); break }
-        done += data.upgraded ?? 0
-        afterId = data.lastId ?? afterId
-        persistUpMem({ model, lastId: afterId, done })
-        setUpProg({ done, total: Math.max(total, done) })
-        if (data.done || !data.lastId) break
+        const remaining = data.remaining ?? 0
+        setUpProg({ done: Math.max(0, total - remaining), total })
+        if (data.done || remaining <= 0) { persistUpMem({ model, staleBefore, complete: true }); break }
+        if ((data.upgraded ?? 0) === 0) break // stuck tail (rows that won't parse) — stop, don't spin
       } catch { setError('Network error during upgrade.'); break }
     }
     loadCounts()
@@ -254,9 +267,9 @@ export default function LibrarySeedTab() {
   const fmt = (n: number) => n.toLocaleString()
   const disabled = busy || filling || upgrading || voicingAll
   const modelLabel = model === 'haiku' ? 'Haiku' : model === 'opus' ? 'Opus' : 'Sonnet'
-  // How far the upgrade has gotten FOR THE CURRENTLY-SELECTED MODEL.
-  const upDoneForModel = upgradeMem?.model === model ? (upgradeMem.done ?? 0) : 0
-  const upComplete = !!counts?.seededTotal && upDoneForModel >= (counts?.seededTotal ?? 0)
+  // Upgrade session state for the currently-selected model.
+  const upComplete = upgradeMem?.model === model && upgradeMem?.complete === true
+  const upHasPartial = upgradeMem?.model === model && !!upgradeMem?.staleBefore && !upgradeMem?.complete
 
   return (
     <div>
@@ -396,9 +409,7 @@ export default function LibrarySeedTab() {
             disabled={disabled || !counts?.seededTotal}
             style={{ ...primaryBtn(disabled || !counts?.seededTotal), background: K.purple }}
           >
-            {upDoneForModel > 0
-              ? `⬆️ Resume upgrade to ${modelLabel} (${fmt(upDoneForModel)}/${fmt(counts?.seededTotal ?? 0)})`
-              : `⬆️ Upgrade All Seeded to ${modelLabel}`}
+            {upHasPartial ? `⬆️ Finish upgrade to ${modelLabel}` : `⬆️ Upgrade All Seeded to ${modelLabel}`}
           </button>
         )}
       </div>
