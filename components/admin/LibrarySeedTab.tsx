@@ -392,16 +392,12 @@ export default function LibrarySeedTab() {
           />
         ) : upComplete ? (
           <div>
-            <p style={{ fontSize: 13, color: K.green, fontWeight: 700, margin: '0 0 10px' }}>
+            <p style={{ fontSize: 13, color: K.green, fontWeight: 700, margin: '0 0 4px' }}>
               ✓ All {fmt(counts?.seededTotal ?? 0)} seeded exercises upgraded to {modelLabel}.
             </p>
-            <button
-              onClick={() => runUpgrade(true)}
-              disabled={disabled}
-              style={{ background: 'none', border: `1px solid ${K.border}`, color: K.textMid, cursor: disabled ? 'default' : 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, padding: '7px 14px', borderRadius: 8 }}
-            >
-              Re-run from scratch
-            </button>
+            <p style={{ fontSize: 12, color: K.textDim, margin: 0 }}>
+              Nothing more to do here. Pick a different model above if you ever want to re-upgrade.
+            </p>
           </div>
         ) : (
           <button
