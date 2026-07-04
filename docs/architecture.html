@@ -1,0 +1,950 @@
+<title>Atlas Prime — System Architecture</title>
+<style>
+  :root {
+    --bg: #0b0f16;
+    --surface: #121a24;
+    --surface2: #18222f;
+    --border: #26313f;
+    --border-soft: #1d2732;
+    --text: #e7edf5;
+    --text-mid: #b3bece;
+    --text-dim: #808fa3;
+    --accent: #3b82f6;
+    --accent-soft: rgba(59,130,246,0.14);
+    --claude: #a78bfa;
+    --claude-soft: rgba(167,139,250,0.13);
+    --openai: #34d399;
+    --openai-soft: rgba(52,211,153,0.12);
+    --money: #f5a623;
+    --money-soft: rgba(245,166,35,0.12);
+    --data: #22d3ee;
+    --data-soft: rgba(34,211,238,0.12);
+    --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, 'Cascadia Code', 'SF Mono', 'Menlo', 'Consolas', monospace;
+    --maxw: 1120px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(59,130,246,0.08), transparent 60%),
+      var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 0 28px 120px;
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 56px;
+    align-items: start;
+  }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
+  /* ── Masthead ── */
+  header.masthead {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 64px 28px 40px;
+  }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  h1 {
+    font-size: clamp(30px, 5vw, 46px);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    font-weight: 800;
+    margin: 16px 0 14px;
+    text-wrap: balance;
+  }
+  .lead {
+    font-size: 18px;
+    color: var(--text-mid);
+    max-width: 64ch;
+    margin: 0 0 28px;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; }
+  .chip {
+    display: flex; flex-direction: column;
+    padding: 10px 15px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    min-width: 116px;
+  }
+  .chip b {
+    font-family: var(--font-mono);
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+  }
+  .chip span {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+  .stamp {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 26px;
+    border-top: 1px solid var(--border-soft);
+    padding-top: 16px;
+  }
+
+  /* ── Nav rail ── */
+  nav.toc {
+    position: sticky;
+    top: 28px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.5;
+  }
+  nav.toc ol { list-style: none; margin: 0; padding: 0; counter-reset: sec; }
+  nav.toc li { counter-increment: sec; margin: 0 0 3px; }
+  nav.toc a {
+    display: block;
+    color: var(--text-dim);
+    padding: 5px 10px 5px 34px;
+    border-radius: 7px;
+    border-left: 2px solid transparent;
+    position: relative;
+  }
+  nav.toc a::before {
+    content: counter(sec, decimal-leading-zero);
+    position: absolute; left: 10px;
+    color: var(--border);
+  }
+  nav.toc a:hover { color: var(--text); background: var(--surface); text-decoration: none; }
+
+  main { min-width: 0; }
+
+  section { padding-top: 30px; margin-top: 30px; border-top: 1px solid var(--border-soft); }
+  section:first-child { border-top: none; margin-top: 0; padding-top: 8px; }
+  .sec-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  h2 {
+    font-size: 26px;
+    letter-spacing: -0.015em;
+    font-weight: 750;
+    margin: 8px 0 14px;
+    text-wrap: balance;
+  }
+  h3 {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 26px 0 8px;
+    color: var(--text);
+  }
+  p { margin: 0 0 14px; max-width: 68ch; }
+  .muted { color: var(--text-mid); }
+  strong { color: #fff; font-weight: 650; }
+
+  code, .mono { font-family: var(--font-mono); }
+  p code, li code, td code {
+    font-size: 0.86em;
+    background: var(--surface2);
+    border: 1px solid var(--border-soft);
+    padding: 1px 6px;
+    border-radius: 5px;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  /* ── Flow diagrams ── */
+  .flow-wrap { overflow-x: auto; padding: 4px 2px 12px; margin: 8px 0 6px; }
+  .flow {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    min-width: min-content;
+  }
+  .flow.vert { flex-direction: column; align-items: stretch; gap: 0; }
+  .node {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 10px;
+    padding: 12px 15px;
+    min-width: 158px;
+    flex: 0 0 auto;
+  }
+  .node.claude { border-left-color: var(--claude); }
+  .node.openai { border-left-color: var(--openai); }
+  .node.data   { border-left-color: var(--data); }
+  .node.money  { border-left-color: var(--money); }
+  .node.plain  { border-left-color: var(--border); }
+  .node .nlabel {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.03em;
+    color: var(--text);
+    font-weight: 600;
+    display: block;
+  }
+  .node .ndesc {
+    font-size: 11.5px;
+    color: var(--text-dim);
+    line-height: 1.4;
+    margin-top: 4px;
+  }
+  .node .ntag {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 7px;
+    display: inline-block;
+  }
+  .t-claude { color: var(--claude); }
+  .t-openai { color: var(--openai); }
+  .t-data   { color: var(--data); }
+  .t-money  { color: var(--money); }
+  .t-accent { color: var(--accent); }
+  .arrow {
+    flex: 0 0 auto;
+    align-self: center;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 16px;
+    padding: 0 10px;
+    user-select: none;
+  }
+  .flow.vert .arrow { padding: 6px 0; text-align: left; margin-left: 22px; }
+
+  /* stacked layer diagram */
+  .stack { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 4px; }
+  .layer {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    padding: 13px 16px;
+    display: grid;
+    grid-template-columns: 132px 1fr;
+    gap: 16px;
+    align-items: center;
+  }
+  .layer .lname {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    line-height: 1.35;
+  }
+  .layer .litems { display: flex; flex-wrap: wrap; gap: 7px; }
+  .pill {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text-mid);
+    white-space: nowrap;
+  }
+  .pill.accent { border-color: rgba(59,130,246,0.4); color: #cfe0ff; background: var(--accent-soft); }
+  .pill.claude { border-color: rgba(167,139,250,0.4); color: #ddd2ff; background: var(--claude-soft); }
+  .pill.openai { border-color: rgba(52,211,153,0.4); color: #c4f5e4; background: var(--openai-soft); }
+  .pill.money  { border-color: rgba(245,166,35,0.4); color: #ffe3b3; background: var(--money-soft); }
+  .pill.data   { border-color: rgba(34,211,238,0.4); color: #bff0f8; background: var(--data-soft); }
+
+  /* ── Callout ── */
+  .note {
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 14px 17px;
+    margin: 18px 0;
+  }
+  .note.warn { border-left-color: var(--money); }
+  .note .nt {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 5px;
+  }
+  .note p { margin: 0; font-size: 14.5px; color: var(--text-mid); max-width: none; }
+
+  /* ── Tables ── */
+  .table-wrap { overflow-x: auto; margin: 12px 0 6px; border: 1px solid var(--border); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; min-width: 540px; font-size: 13.5px; }
+  th, td { text-align: left; padding: 10px 15px; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+  thead th {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    background: var(--surface2);
+    font-weight: 600;
+    position: sticky; top: 0;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: rgba(255,255,255,0.015); }
+  td.k { font-family: var(--font-mono); color: var(--text); white-space: nowrap; font-size: 12.5px; }
+  td .dim { color: var(--text-dim); }
+
+  /* domain grid */
+  .domains { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin: 10px 0 4px; }
+  .domain {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    padding: 15px 16px;
+  }
+  .domain h4 {
+    margin: 0 0 4px;
+    font-size: 13.5px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .domain h4 .dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+  .domain p { font-size: 12.5px; color: var(--text-dim); margin: 0 0 10px; max-width: none; }
+  .domain ul { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+  .domain li {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-mid);
+    background: var(--surface2);
+    border: 1px solid var(--border-soft);
+    padding: 3px 8px;
+    border-radius: 6px;
+  }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; margin: 14px 0 2px; font-family: var(--font-mono); font-size: 12px; }
+  .legend span { display: flex; align-items: center; gap: 7px; color: var(--text-mid); }
+  .legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+
+  @media (max-width: 860px) {
+    .wrap { grid-template-columns: 1fr; gap: 8px; }
+    nav.toc { position: static; margin-bottom: 8px; border: 1px solid var(--border); border-radius: 12px; padding: 8px; background: var(--surface); }
+    nav.toc ol { columns: 2; }
+    header.masthead { padding-top: 44px; }
+    .layer { grid-template-columns: 1fr; gap: 8px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<header class="masthead">
+  <div class="eyebrow">Atlas Prime · Backend Reference</div>
+  <h1>System Architecture &amp; Data Flow</h1>
+  <p class="lead">
+    How the Atlas Prime platform is wired end to end — from a tap in the athlete app, through the
+    API layer and database, out to the AI services that generate plans and voices, and back. One
+    codebase serves three surfaces: the <strong>Athlete app</strong>, the <strong>Coach Portal</strong>,
+    and the <strong>Admin Portal</strong>.
+  </p>
+  <div class="chips">
+    <div class="chip"><b>52</b><span>API routes</span></div>
+    <div class="chip"><b>1</b><span>Postgres DB</span></div>
+    <div class="chip"><b>~40</b><span>Tables</span></div>
+    <div class="chip"><b>4</b><span>AI / pay providers</span></div>
+    <div class="chip"><b>3</b><span>App surfaces</span></div>
+    <div class="chip"><b>5</b><span>User roles</span></div>
+  </div>
+  <div class="stamp">Mapped 2026-07-03 · Next.js 16 + Supabase + Vercel · production: atlasprime.app</div>
+</header>
+
+<div class="wrap">
+  <nav class="toc" aria-label="Sections">
+    <ol>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#stack">The Stack</a></li>
+      <li><a href="#lifecycle">Request Lifecycle</a></li>
+      <li><a href="#identity">Identity &amp; Roles</a></li>
+      <li><a href="#surfaces">Three Surfaces</a></li>
+      <li><a href="#apie">AI Plan Engine</a></li>
+      <li><a href="#coached">Coached Mode</a></li>
+      <li><a href="#content">Content Engine</a></li>
+      <li><a href="#cost">Cost Tracking</a></li>
+      <li><a href="#database">The Database</a></li>
+      <li><a href="#services">External Services</a></li>
+      <li><a href="#security">Security Model</a></li>
+      <li><a href="#deploy">Deploy &amp; Ops</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <!-- 1 -->
+    <section id="overview">
+      <div class="sec-label">01 — Orientation</div>
+      <h2>What the system is</h2>
+      <p class="muted">
+        Atlas Prime is a single <strong>Next.js</strong> application. The same codebase renders the
+        user-facing pages <em>and</em> hosts the backend as serverless <strong>API routes</strong> —
+        there is no separate backend server. Everything persistent lives in one <strong>Supabase</strong>
+        project (a Postgres database with authentication, file storage, and realtime built in). The
+        heavy thinking — writing training plans, coaching cues, and voices — is delegated to outside
+        AI providers and paid per use.
+      </p>
+      <p class="muted">
+        The mental model: <strong>the browser holds a login token, the API routes are the gatekeepers,
+        Postgres is the single source of truth, and the AI providers are contractors</strong> the routes
+        hire job-by-job. The rest of this document follows the data through each of those.
+      </p>
+      <div class="legend" aria-hidden="true">
+        <span><i style="background:var(--accent)"></i>Atlas / core</span>
+        <span><i style="background:var(--claude)"></i>Claude (Anthropic)</span>
+        <span><i style="background:var(--openai)"></i>OpenAI</span>
+        <span><i style="background:var(--data)"></i>Data / Postgres</span>
+        <span><i style="background:var(--money)"></i>Money / external</span>
+      </div>
+    </section>
+
+    <!-- 2 -->
+    <section id="stack">
+      <div class="sec-label">02 — Layers</div>
+      <h2>The stack, top to bottom</h2>
+      <p class="muted">Four layers. A request falls straight down through them and the response climbs back up.</p>
+      <div class="stack">
+        <div class="layer">
+          <div class="lname">Client<br>Browser / PWA</div>
+          <div class="litems">
+            <span class="pill accent">React 19</span>
+            <span class="pill">Next.js App Router</span>
+            <span class="pill">Inline-styled components</span>
+            <span class="pill">Installable PWA</span>
+            <span class="pill">Web Push</span>
+          </div>
+        </div>
+        <div class="layer">
+          <div class="lname">Edge<br>API Routes</div>
+          <div class="litems">
+            <span class="pill accent">Vercel serverless</span>
+            <span class="pill">Node runtime</span>
+            <span class="pill">60s max / call</span>
+            <span class="pill">JWT verification</span>
+            <span class="pill">Batch chunking</span>
+          </div>
+        </div>
+        <div class="layer">
+          <div class="lname">Data<br>Supabase</div>
+          <div class="litems">
+            <span class="pill data">Postgres + RLS</span>
+            <span class="pill data">Auth (email · Google · Apple)</span>
+            <span class="pill data">Storage (audio, receipts)</span>
+            <span class="pill data">Realtime (messaging)</span>
+            <span class="pill data">pgvector (RAG)</span>
+          </div>
+        </div>
+        <div class="layer">
+          <div class="lname">Providers<br>AI &amp; Payments</div>
+          <div class="litems">
+            <span class="pill claude">Anthropic · Claude</span>
+            <span class="pill openai">OpenAI · TTS / Embeddings / Whisper</span>
+            <span class="pill">ElevenLabs · voice clone</span>
+            <span class="pill money">Stripe · RevenueCat</span>
+            <span class="pill">YouTube Data API</span>
+          </div>
+        </div>
+      </div>
+      <div class="note">
+        <div class="nt">Hard constraint</div>
+        <p>Vercel's Hobby plan kills any function at <strong>60 seconds</strong>. Every bulk job (voicing,
+        library fill, video curation) is therefore chunked into small parallel batches and looped from the
+        client — never one long server call.</p>
+      </div>
+    </section>
+
+    <!-- 3 -->
+    <section id="lifecycle">
+      <div class="sec-label">03 — The core pattern</div>
+      <h2>How one request actually flows</h2>
+      <p class="muted">
+        This is the single most important pattern in the backend. Every coach and admin route follows it.
+        There are <strong>two</strong> database connections, used for two different jobs:
+      </p>
+      <div class="flow-wrap">
+        <div class="flow">
+          <div class="node plain">
+            <span class="nlabel">Browser</span>
+            <span class="ndesc">Holds the user's login token (JWT)</span>
+            <span class="ntag t-accent">anon client</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node">
+            <span class="nlabel">API route</span>
+            <span class="ndesc">Receives the token in the request header</span>
+            <span class="ntag t-accent">/api/…</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node">
+            <span class="nlabel">① Verify caller</span>
+            <span class="ndesc">anon client + getUser() proves who they are</span>
+            <span class="ntag t-accent">identity</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node data">
+            <span class="nlabel">② Service role</span>
+            <span class="ndesc">Trusted key that bypasses row security</span>
+            <span class="ntag t-data">server only</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node data">
+            <span class="nlabel">Postgres</span>
+            <span class="ndesc">Reads / writes the actual data</span>
+            <span class="ntag t-data">source of truth</span>
+          </div>
+        </div>
+      </div>
+      <h3>Why two clients?</h3>
+      <p class="muted">
+        The <strong>anon client</strong> (<code>lib/supabase.ts</code>) runs in the browser and is bound by
+        Row-Level Security (RLS) — it can only touch rows the logged-in user owns. The <strong>service-role
+        client</strong> only ever exists inside an API route, after the caller's identity is proven; it holds
+        a secret key that bypasses RLS so the route can do trusted work (read another user's program, write
+        cost logs, run an admin job). The rule: <strong>verify with the anon key, then act with the service
+        key</strong>. Mixing them up is the classic security mistake this pattern prevents.
+      </p>
+      <div class="note warn">
+        <div class="nt">Real example from this codebase</div>
+        <p>Cost logging silently failed for months because <code>logTokens()</code> wrote with the
+        <em>anon</em> key to an RLS-locked table — every insert was rejected and swallowed. The fix was to
+        use the service-role key. Same pattern, correctly applied.</p>
+      </div>
+    </section>
+
+    <!-- 4 -->
+    <section id="identity">
+      <div class="sec-label">04 — Who is who</div>
+      <h2>Identity, roles &amp; impersonation</h2>
+      <p class="muted">
+        Every account is a row in <code>profiles</code>. A single <code>role</code> column decides which
+        surface a person sees. Sign-up sets it: the <strong>athlete</strong> path defaults to a normal user,
+        the <strong>coach</strong> path (<code>/coaches</code>) stamps <code>role = coach</code>, and promo
+        codes can grant any role.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Role</th><th>Gets</th><th>Set by</th></tr></thead>
+          <tbody>
+            <tr><td class="k t-accent">admin</td><td>Everything + Admin Portal (<code>/admin</code>)</td><td class="k"><span class="dim">manual / owner</span></td></tr>
+            <tr><td class="k">coach</td><td>Coach Portal (<code>/coach/*</code>) + athlete app</td><td class="k"><span class="dim">/coaches link · promo</span></td></tr>
+            <tr><td class="k">beta</td><td>Full athlete app (early access)</td><td class="k"><span class="dim">promo code</span></td></tr>
+            <tr><td class="k">ff</td><td>Athlete app (friends &amp; family)</td><td class="k"><span class="dim">promo code</span></td></tr>
+            <tr><td class="k">free</td><td>Athlete app (default)</td><td class="k"><span class="dim">signup default</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>The <code>effectiveUserId</code> rule</h3>
+      <p class="muted">
+        <code>AuthContext</code> exposes two identities: <code>user</code> (the real logged-in account) and
+        <code>effectiveUserId</code> (whose data to read/write). They're normally the same. When an admin uses
+        <strong>Zoom In</strong> to support a client, <code>effectiveUserId</code> swaps to that client so the
+        admin sees exactly their experience — while <code>user</code> stays the admin, and every action is
+        written to an audit log. <strong>All data reads use <code>effectiveUserId</code>, never <code>user.id</code>.</strong>
+      </p>
+    </section>
+
+    <!-- 5 -->
+    <section id="surfaces">
+      <div class="sec-label">05 — Three surfaces</div>
+      <h2>One codebase, three products</h2>
+      <div class="domains">
+        <div class="domain">
+          <h4><span class="dot" style="background:var(--accent)"></span>Athlete app</h4>
+          <p>The consumer product. Daily workout, AI plans, logging, recovery, mindset feed.</p>
+          <ul><li>/today</li><li>/calendar</li><li>/log</li><li>/recovery</li><li>/for-you</li><li>/my-coach</li></ul>
+        </div>
+        <div class="domain">
+          <h4><span class="dot" style="background:var(--claude)"></span>Coach Portal</h4>
+          <p>For trainers. Build programs, manage clients, message, analyze compliance, clone voice.</p>
+          <ul><li>/coach/dashboard</li><li>/coach/builder</li><li>/coach/clients</li><li>/coach/programs</li><li>/coach/messages</li><li>/coach/analytics</li></ul>
+        </div>
+        <div class="domain">
+          <h4><span class="dot" style="background:var(--money)"></span>Admin Portal</h4>
+          <p>Owner control room. Content engine, curation, spend, health, access control. Stays private at launch.</p>
+          <ul><li>#seed</li><li>#video</li><li>#tts</li><li>#spend</li><li>#health</li><li>#access</li></ul>
+        </div>
+      </div>
+      <p class="muted" style="margin-top:16px">
+        Access is enforced at the layout level: the Coach Portal redirects anyone who isn't a coach or admin
+        back to <code>/today</code>; the Admin Portal gates on <code>is_admin</code> (owner) or a granted
+        partner permission. The surface a person lands on is purely a function of their <code>role</code>.
+      </p>
+    </section>
+
+    <!-- 6 -->
+    <section id="apie">
+      <div class="sec-label">06 — Flagship flow</div>
+      <h2>The AI Plan Engine (APIE)</h2>
+      <p class="muted">
+        When an athlete generates a plan, <code>/api/generate-plan</code> runs a multi-agent pipeline. It first
+        <strong>retrieves</strong> relevant coaching knowledge from a vector search, then passes a draft plan
+        through a chain of specialist <strong>Claude</strong> agents, each rewriting its own slice. Any agent
+        that fails is skipped — the plan still returns.
+      </p>
+      <div class="flow-wrap">
+        <div class="flow">
+          <div class="node openai">
+            <span class="nlabel">RAG retrieval</span>
+            <span class="ndesc">Embed the athlete's profile, search the 784-item knowledge store (pgvector)</span>
+            <span class="ntag t-openai">embeddings</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node claude">
+            <span class="nlabel">S&amp;C Agent</span>
+            <span class="ndesc">Drafts the 7-day plan from retrieved knowledge</span>
+            <span class="ntag t-claude">Claude</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node claude">
+            <span class="nlabel">PT / Rehab</span>
+            <span class="ndesc">Safety pass — swaps contraindicated moves. Has veto</span>
+            <span class="ntag t-claude">Claude</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node claude">
+            <span class="nlabel">Sports Specialist</span>
+            <span class="ndesc">Rewrites warmups + coaching to the sport</span>
+            <span class="ntag t-claude">Claude</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node claude">
+            <span class="nlabel">Mobility</span>
+            <span class="ndesc">Owns morning / cooldown / evening blocks</span>
+            <span class="ntag t-claude">Claude</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node claude">
+            <span class="nlabel">Mindset</span>
+            <span class="ndesc">Adds the warrior-philosophy layer</span>
+            <span class="ntag t-claude">Claude</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node claude">
+            <span class="nlabel">Recovery</span>
+            <span class="ndesc">Rest-day programming</span>
+            <span class="ntag t-claude">Claude</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node data">
+            <span class="nlabel">7-day plan</span>
+            <span class="ndesc">Saved to training_programs</span>
+            <span class="ntag t-data">Postgres</span>
+          </div>
+        </div>
+      </div>
+      <p class="muted">
+        The knowledge store is the differentiator: real coaching principles, sport protocols, and rehab
+        guidance embedded as vectors, retrieved by similarity so the agents write from grounded material
+        rather than guesswork. Every agent call is metered (see <a href="#cost">Cost Tracking</a>).
+      </p>
+    </section>
+
+    <!-- 7 -->
+    <section id="coached">
+      <div class="sec-label">07 — Coach ↔ athlete</div>
+      <h2>Coached Mode</h2>
+      <p class="muted">
+        When a coach takes on an athlete, the coach's program <em>takes over</em> the athlete's app — the AI
+        plan pauses and the coach's calendar becomes the main experience. The handoff is explicit and reversible.
+      </p>
+      <div class="flow-wrap">
+        <div class="flow">
+          <div class="node claude">
+            <span class="nlabel">Coach builds</span>
+            <span class="ndesc">Manual or AI builder → coach_programs + weeks</span>
+            <span class="ntag t-accent">Coach Portal</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node">
+            <span class="nlabel">Assign</span>
+            <span class="ndesc">Creates a <em>pending</em> assignment + push prompt</span>
+            <span class="ntag t-accent">assignment</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node">
+            <span class="nlabel">Athlete activates</span>
+            <span class="ndesc">Taps Activate → status active</span>
+            <span class="ntag t-accent">consent</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node data">
+            <span class="nlabel">Coached calendar</span>
+            <span class="ndesc">CoachedContext serves the program app-wide</span>
+            <span class="ntag t-data">takeover</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node data">
+            <span class="nlabel">Athlete logs</span>
+            <span class="ndesc">Sets → workout_logs · day complete</span>
+            <span class="ntag t-data">Postgres</span>
+          </div>
+        </div>
+      </div>
+      <p class="muted">
+        Layered on top: real-time <strong>messaging</strong> (Supabase Realtime), per-client <strong>notes</strong>,
+        compliance <strong>analytics</strong>, in-person session logging by the coach, and optional
+        <strong>voice cloning</strong> — the coach records a sample, ElevenLabs mints a voice, and the athlete's
+        read-aloud button speaks cues in the coach's own voice (cached per exercise). Pausing coaching resurfaces
+        the athlete's AI plan; nothing is lost.
+      </p>
+    </section>
+
+    <!-- 8 -->
+    <section id="content">
+      <div class="sec-label">08 — Filling the library</div>
+      <h2>The content engine</h2>
+      <p class="muted">
+        The exercise library is preloaded so any athlete worldwide gets a zero-lag plan. One admin tool feeds
+        two downstream pipelines — text is written by <strong>Claude</strong>, then voiced by
+        <strong>OpenAI</strong> and matched to video.
+      </p>
+      <div class="flow-wrap">
+        <div class="flow">
+          <div class="node claude">
+            <span class="nlabel">Library Builder</span>
+            <span class="ndesc">Generates real exercises + cues per sport, dedupes</span>
+            <span class="ntag t-claude">Claude</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node data">
+            <span class="nlabel">exercise_library</span>
+            <span class="ndesc">One row per movement: name, how, breathing, core, tip</span>
+            <span class="ntag t-data">Postgres</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node claude">
+            <span class="nlabel">Video Curation</span>
+            <span class="ndesc">Claude scores YouTube clips from whitelisted channels</span>
+            <span class="ntag t-claude">Claude + YouTube</span>
+          </div>
+        </div>
+      </div>
+      <div class="flow-wrap" style="margin-top:-2px">
+        <div class="flow">
+          <div class="node data" style="visibility:hidden"><span class="nlabel">exercise_library</span></div>
+          <div class="arrow" style="visibility:hidden">→</div>
+          <div class="node openai">
+            <span class="nlabel">TTS voicing</span>
+            <span class="ndesc">Male (onyx) + female (nova) MP3s per exercise</span>
+            <span class="ntag t-openai">OpenAI</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node data">
+            <span class="nlabel">Storage + CDN</span>
+            <span class="ndesc">Cached audio served free to every athlete</span>
+            <span class="ntag t-data">Supabase Storage</span>
+          </div>
+        </div>
+      </div>
+      <p class="muted">
+        Built-in guards keep it cheap: the builder <strong>remembers saturated categories</strong> and skips
+        them with zero token cost; voicing runs a <strong>hands-free loop</strong> (batches of 20, 8-wide) until
+        the whole backlog is done; the upgrade pass finds stragglers by <strong>staleness</strong> so it never
+        re-charges for finished rows.
+      </p>
+    </section>
+
+    <!-- 9 -->
+    <section id="cost">
+      <div class="sec-label">09 — Following the money</div>
+      <h2>Cost tracking</h2>
+      <p class="muted">
+        Every route that spends money on an AI provider logs the exact dollar cost. Because providers bill
+        differently — Claude per <em>token</em>, OpenAI per <em>character</em> (TTS), per <em>token</em>
+        (embeddings) or per <em>minute</em> (Whisper) — each route computes its own cost and stores the dollar
+        figure. The Spend Tracker just sums the stored amounts, so mixed providers roll up accurately.
+      </p>
+      <div class="flow-wrap">
+        <div class="flow">
+          <div class="node claude">
+            <span class="nlabel">Any AI route</span>
+            <span class="ndesc">Plan gen, TTS, embeddings, Whisper…</span>
+            <span class="ntag t-accent">spends money</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node">
+            <span class="nlabel">lib/ai-costs.ts</span>
+            <span class="ndesc">Per-provider pricing → exact $ for this call</span>
+            <span class="ntag t-accent">pricing</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node data">
+            <span class="nlabel">logTokens()</span>
+            <span class="ndesc">Service-role insert → token_usage row</span>
+            <span class="ntag t-data">Postgres</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node money">
+            <span class="nlabel">Spend Tracker</span>
+            <span class="ndesc">Sums stored $, badges each row by provider</span>
+            <span class="ntag t-money">Admin</span>
+          </div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Service</th><th>Provider</th><th>Billed by</th><th>Rate</th></tr></thead>
+          <tbody>
+            <tr><td>Plan gen · curation · Library Builder</td><td class="k t-claude">Claude</td><td>input + output tokens</td><td class="k">$3 / $15 per 1M</td></tr>
+            <tr><td>Read-aloud voices (TTS)</td><td class="k t-openai">OpenAI</td><td>characters</td><td class="k">$15 / 1M chars</td></tr>
+            <tr><td>Knowledge search (embeddings)</td><td class="k t-openai">OpenAI</td><td>tokens</td><td class="k">$0.02 / 1M</td></tr>
+            <tr><td>Voice-note transcription (Whisper)</td><td class="k t-openai">OpenAI</td><td>audio minutes</td><td class="k">$0.006 / min</td></tr>
+            <tr><td>Coach voice cloning</td><td class="k">ElevenLabs</td><td>characters</td><td class="k"><span class="dim">gated</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 10 -->
+    <section id="database">
+      <div class="sec-label">10 — The single source of truth</div>
+      <h2>The database, by domain</h2>
+      <p class="muted">
+        One Postgres database, ~40 tables. Grouped by what they do. Every table has Row-Level Security; joined
+        relations always come back as arrays (a Supabase quirk the code accounts for everywhere).
+      </p>
+      <div class="domains">
+        <div class="domain">
+          <h4><span class="dot" style="background:var(--accent)"></span>Identity &amp; access</h4>
+          <p>Who people are and what they can touch.</p>
+          <ul><li>profiles</li><li>promo_codes</li><li>admin_permissions</li><li>impersonation_log</li></ul>
+        </div>
+        <div class="domain">
+          <h4><span class="dot" style="background:var(--accent)"></span>Plans &amp; programs</h4>
+          <p>AI plans and imported / converted programs.</p>
+          <ul><li>training_programs</li><li>user_imported_programs</li><li>user_imported_program_weeks</li><li>plan_conversion_requests</li></ul>
+        </div>
+        <div class="domain">
+          <h4><span class="dot" style="background:var(--data)"></span>Exercises &amp; media</h4>
+          <p>The movement library and its video / audio.</p>
+          <ul><li>exercise_library</li><li>exercise_media</li><li>exercise_video_candidates</li><li>approved_yt_channels</li><li>exercise_set_logs</li></ul>
+        </div>
+        <div class="domain">
+          <h4><span class="dot" style="background:var(--claude)"></span>Coaching</h4>
+          <p>Programs, rosters, messaging, and coach-owned content.</p>
+          <ul><li>coach_programs</li><li>coach_program_weeks</li><li>coach_program_assignments</li><li>coach_clients</li><li>coach_invite_codes</li><li>coach_messages</li><li>coach_client_notes</li><li>coach_exercise_library</li><li>coach_day_completions</li><li>coach_voices</li></ul>
+        </div>
+        <div class="domain">
+          <h4><span class="dot" style="background:var(--openai)"></span>Knowledge &amp; study</h4>
+          <p>The RAG vector store and cert-prep material.</p>
+          <ul><li>knowledge_items</li><li>study_kbs</li><li>study_entries</li></ul>
+        </div>
+        <div class="domain">
+          <h4><span class="dot" style="background:var(--data)"></span>Tracking</h4>
+          <p>What athletes actually did.</p>
+          <ul><li>workout_logs</li><li>day_completions</li><li>streaks</li><li>recovery</li></ul>
+        </div>
+        <div class="domain">
+          <h4><span class="dot" style="background:var(--money)"></span>Money &amp; ops</h4>
+          <p>Costs, expenses, and support signals.</p>
+          <ul><li>token_usage</li><li>project_expenses</li><li>bug_reports</li><li>account_deletion_feedback</li></ul>
+        </div>
+      </div>
+      <p class="muted" style="margin-top:16px">
+        Schema changes ship as timestamped SQL migrations in <code>supabase/migrations/</code> (29 to date) and
+        are applied by hand in the Supabase SQL editor.
+      </p>
+    </section>
+
+    <!-- 11 -->
+    <section id="services">
+      <div class="sec-label">11 — The contractors</div>
+      <h2>External services</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Provider</th><th>Used for</th><th>Where</th></tr></thead>
+          <tbody>
+            <tr><td class="k t-claude">Anthropic</td><td>Plan agents, coaching cues, video scoring, study material</td><td class="k"><span class="dim">Haiku · Sonnet · Opus</span></td></tr>
+            <tr><td class="k t-openai">OpenAI</td><td>Read-aloud voices, knowledge embeddings, voice-note transcription</td><td class="k"><span class="dim">tts-1 · embed-3 · whisper</span></td></tr>
+            <tr><td class="k">ElevenLabs</td><td>Coach voice cloning (premium, flag-gated)</td><td class="k"><span class="dim">needs API key</span></td></tr>
+            <tr><td class="k money">Stripe + RevenueCat</td><td>Subscriptions — web via Stripe, iOS via RevenueCat</td><td class="k"><span class="dim">not live yet</span></td></tr>
+            <tr><td class="k">YouTube Data API</td><td>Sourcing demo clips for curation</td><td class="k"><span class="dim">quota-limited</span></td></tr>
+            <tr><td class="k">Web Push (VAPID)</td><td>Notifications — assignments, coach nudges</td><td class="k"><span class="dim">/api/notifications</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note warn">
+        <div class="nt">Billing status</div>
+        <p>Payments are wired but <strong>off</strong> (<code>BILLING_LIVE = false</code> in <code>lib/flags.ts</code>).
+        iOS requires RevenueCat — Stripe alone would be rejected by Apple. One flag flips every billing-gated
+        feature on at go-live.</p>
+      </div>
+    </section>
+
+    <!-- 12 -->
+    <section id="security">
+      <div class="sec-label">12 — Guardrails</div>
+      <h2>Security model</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Guardrail</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Row-Level Security</td><td>Postgres enforces per-row ownership on every table — the browser's anon key can't read another user's data.</td></tr>
+            <tr><td class="k">Service-role split</td><td>Trusted writes happen only inside API routes, after the caller's JWT is verified. The secret key never reaches the browser.</td></tr>
+            <tr><td class="k">protect_admin_role</td><td>A database trigger blocks any update that would change an admin's role away from admin — even the coach-signup flow can't demote an admin.</td></tr>
+            <tr><td class="k">SECURITY DEFINER fns</td><td>Cross-role reads go through controlled functions instead of recursive RLS policies (which once caused an admin lockout).</td></tr>
+            <tr><td class="k">admin_permissions</td><td>Partner admins get scoped, per-section grants — they are not <code>is_admin</code> and can't see owner-only data.</td></tr>
+            <tr><td class="k">Impersonation audit</td><td>Every admin Zoom-In action is written to an audit trail; the real actor is always recorded.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 13 -->
+    <section id="deploy">
+      <div class="sec-label">13 — From keyboard to production</div>
+      <h2>Deploy &amp; ops</h2>
+      <div class="flow-wrap">
+        <div class="flow">
+          <div class="node plain">
+            <span class="nlabel">git push</span>
+            <span class="ndesc">Commit to master</span>
+            <span class="ntag t-accent">GitHub</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node">
+            <span class="nlabel">Vercel build</span>
+            <span class="ndesc">Auto-triggered · type-checked · Turbopack</span>
+            <span class="ntag t-accent">CI</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node data">
+            <span class="nlabel">Production</span>
+            <span class="ndesc">atlasprime.app (+ .fit / .health redirects)</span>
+            <span class="ntag t-data">live</span>
+          </div>
+        </div>
+      </div>
+      <p class="muted">
+        There is no staging environment — <code>master</code> is production. Database changes are the one manual
+        step: SQL migrations are run by hand in Supabase. Secrets (API keys, service-role key) live only in Vercel
+        environment variables, never in the repo. Health and spend are watched from the Admin Portal.
+      </p>
+      <div class="stamp" style="border-top:1px solid var(--border-soft); margin-top:34px; max-width:none">
+        Atlas Prime · System Architecture — a living map. When the backend changes, this changes with it.
+      </div>
+    </section>
+  </main>
+</div>
