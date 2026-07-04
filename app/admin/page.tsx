@@ -787,6 +787,7 @@ function PromosTab({ promos, onRefresh }: { promos: PromoRow[]; onRefresh: () =>
         <select value={role} onChange={e => setRole(e.target.value)} style={{ ...inputSt, width: 120 }}>
           <option value="ff">F&F Beta</option>
           <option value="beta">Beta Access</option>
+          <option value="coach">Coach</option>
           <option value="admin">Admin</option>
         </select>
         <input value={maxUses} onChange={e => setMaxUses(e.target.value)} placeholder="Max uses (blank = 10)" type="number" style={{ ...inputSt, flex: 1, minWidth: 140 }} />

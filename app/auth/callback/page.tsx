@@ -20,6 +20,16 @@ export default function AuthCallbackPage() {
         return
       }
 
+      // Coach signup via /coaches → assign role and land in the Coach Portal.
+      try {
+        if (sessionStorage.getItem('pendingCoach')) {
+          await supabase.from('profiles').upsert({ id: data.user.id, role: 'coach' })
+          sessionStorage.removeItem('pendingCoach')
+          router.replace('/coach/dashboard')
+          return
+        }
+      } catch { /* silent — session storage unavailable */ }
+
       // Apply promo code stored before the OAuth redirect (signup flow)
       try {
         const pending = sessionStorage.getItem('pendingPromo')

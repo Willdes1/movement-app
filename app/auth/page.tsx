@@ -29,12 +29,22 @@ export default function AuthPage() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
   const [mode, setMode] = useState<Mode>('login')
+  // Coach signup mode — /coaches redirects here with ?as=coach. New accounts
+  // created in this mode get role='coach' and land in the Coach Portal.
+  const [asCoach, setAsCoach] = useState(false)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('as') === 'coach') {
+      setAsCoach(true)
+      setMode('signup')
+    }
+  }, [])
 
   useEffect(() => {
     if (!authLoading && user) {
-      router.replace('/today')
+      router.replace(asCoach ? '/coach/dashboard' : '/today')
     }
-  }, [user, authLoading, router])
+  }, [user, authLoading, router, asCoach])
 
   // Show error if returning from a failed OAuth redirect
   const oauthError = typeof window !== 'undefined'
@@ -57,7 +67,10 @@ export default function AuthPage() {
     }
     setLoading(true)
 
-    if (mode === 'signup') {
+    // Coach signup link → stamp the intent so the callback assigns role=coach.
+    if (asCoach) sessionStorage.setItem('pendingCoach', '1')
+
+    if (mode === 'signup' && !asCoach) {
       const code = promoCode.trim().toUpperCase()
       if (code) {
         const { data: promo } = await supabase
@@ -96,10 +109,10 @@ export default function AuthPage() {
     setLoading(true)
 
     if (mode === 'signup') {
-      // Validate promo code before creating account
+      // Validate promo code before creating account (coach mode skips codes).
       const code = promoCode.trim().toUpperCase()
       let validatedPromo: { id: string; role: string; uses: number; max_uses: number } | null = null
-      if (code) {
+      if (code && !asCoach) {
         const { data: promo } = await supabase
           .from('promo_codes')
           .select('id, role, uses, max_uses')
@@ -125,6 +138,21 @@ export default function AuthPage() {
         return
       }
 
+      // Coach signup: stamp the intent, and apply role immediately if we got a
+      // session (no email confirmation); otherwise apply on first login.
+      if (asCoach) {
+        sessionStorage.setItem('pendingCoach', '1')
+        if (signUpData.session && signUpData.user) {
+          await supabase.from('profiles').upsert({ id: signUpData.user.id, role: 'coach' })
+          sessionStorage.removeItem('pendingCoach')
+          router.push('/coach/dashboard')
+          return
+        }
+        setConfirmSent(true)
+        setLoading(false)
+        return
+      }
+
       // If email confirmation is required, stash the promo code so we can apply it after login
       if (validatedPromo) {
         sessionStorage.setItem('pendingPromo', JSON.stringify({ id: validatedPromo.id, role: validatedPromo.role }))
@@ -143,6 +171,15 @@ export default function AuthPage() {
       if (error) {
         setError(error.message)
       } else {
+        // Coach confirming after email signup, or logging in via the coach link.
+        const pendingCoach = sessionStorage.getItem('pendingCoach')
+        if ((pendingCoach || asCoach) && data.user) {
+          if (pendingCoach) await supabase.from('profiles').update({ role: 'coach' }).eq('id', data.user.id)
+          sessionStorage.removeItem('pendingCoach')
+          router.push('/coach/dashboard')
+          setLoading(false)
+          return
+        }
         // Apply any pending promo code from signup
         const pending = sessionStorage.getItem('pendingPromo')
         if (pending && data.user) {
@@ -183,11 +220,20 @@ export default function AuthPage() {
   return (
     <div style={{ padding: '48px 24px', maxWidth: 400, margin: '0 auto' }}>
       <div style={{ marginBottom: 32 }}>
+        {asCoach && (
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 8 }}>
+            Atlas Prime for Coaches
+          </div>
+        )}
         <h1 style={{ fontSize: 26, fontWeight: 700, marginBottom: 4 }}>
-          {mode === 'login' ? 'Welcome back' : 'Create account'}
+          {asCoach
+            ? (mode === 'login' ? 'Coach sign in' : 'Set up your Coach Portal')
+            : (mode === 'login' ? 'Welcome back' : 'Create account')}
         </h1>
         <p style={{ color: 'var(--text-dim)', fontSize: 14 }}>
-          {mode === 'login' ? 'Sign in to your Atlas Prime account' : 'Start your personalized movement journey'}
+          {asCoach
+            ? 'Build AI programs, manage your clients, and coach in their ears — free to start.'
+            : (mode === 'login' ? 'Sign in to your Atlas Prime account' : 'Start your personalized movement journey')}
         </p>
       </div>
 
@@ -279,7 +325,7 @@ export default function AuthPage() {
           />
         </div>
 
-        {mode === 'signup' && (
+        {mode === 'signup' && !asCoach && (
           <div>
             <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-mid)', display: 'block', marginBottom: 6 }}>
               Promo Code <span style={{ fontWeight: 400, color: 'var(--text-dim)' }}>(optional)</span>
