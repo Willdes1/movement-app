@@ -1,6 +1,6 @@
 # Agent Context — Atlas Prime
 > Full briefing for a new agent to continue this project without any prior conversation history.
-> Last updated: 2026-07-01 | Current branch: master | 348 commits
+> Last updated: 2026-07-07 | Current branch: master | 380 commits
 
 ---
 
@@ -99,7 +99,77 @@
 
 ---
 
-## 4. What Was Built This Session (2026-07-02)
+## 4. What Was Built This Session (2026-07-03 → 07-07)
+
+**Big content-ops + reliability + monetization night — ~20 commits, all deployed
+green. Two NEW SQL migrations created (see ⚠️ PENDING below — NOT yet run by Will).**
+
+### 🔊 Library Builder / TTS content engine hardening
+- **Auto-generate audio** (79cb6c6): toggle on the Library Builder — every newly-seeded
+  exercise is handed straight to the TTS route (OpenAI onyx+nova) as it's added, chunked
+  under the 60s wall. One "Fill Every Category" run now preloads text + video-queue + voice.
+- **"Voice the backlog"** (2a31c9c): hands-free loop button that voices ALL rows missing
+  audio (auto-audio only covers new rows). Resilient loop w/ retry.
+- **Fill saturation guard** (fc1a0be): remembers categories that yield 0 new (localStorage,
+  per count) and skips them on re-runs with ZERO token cost. "Reset & re-check all" link.
+- **Upgrade rebuilt** (c9514ff → 5e0da2d): real N/total progress + resume + a ✓ done state;
+  selects the STALEST not-yet-upgraded rows by `updated_at` (stamps updated_at on write, no
+  trigger on the table) and retries skips → always converges to 1,064, never re-charges done
+  rows. "Re-run from scratch" hidden once complete (2e6e55d) to prevent accidental re-charge.
+- **TTS 504 fix** (8f92338): the round is now TIME-BUDGETED (process 6-wide, stop launching
+  chunks past 38s) instead of a fixed batch — can't 504 no matter how slow calls get. OpenAI
+  call + previously-unbounded Supabase upload both timeout-bounded. Backlog loop retries
+  transient failures instead of stranding.
+
+### 💰 Cost tracking (Spend Tracker) — big fixes
+- **logTokens fixed** (18de56b): was writing with the anon key to an RLS-locked table + a
+  non-existent `route` column → every server-side AI cost silently 400'd for months. Now
+  service-role key + real column `api_route`.
+- **OpenAI spend tracking** (196d504): `lib/ai-costs.ts` — per-provider pricing (TTS per-char,
+  embeddings per-token, Whisper per-minute); SpendTab sums stored `estimated_cost_usd` +
+  provider badges (Claude purple / OpenAI green).
+- **Spend Tracker resilience** (a70f3c2): Stage-1 verified `.insert().select()` broke on
+  token_usage (service_role has INSERT but not SELECT → RETURNING fails). `verifiedInsert`
+  now FALLS BACK to a plain insert (cause-agnostic, can't double-write). ⚠️ optional migration
+  `20260707_token_usage_grants.sql` restores full read-back.
+- **Receipts + tax features** (6e127d9, 3d15a41): receipt upload was the ONLY client-side
+  upload (failed on storage RLS, swallowed) + there was no `receipts` bucket. Now server-side
+  `/api/admin/upload-receipt` (service role) + ⚠️ migration `20260707_receipts_bucket.sql`.
+  Added: **Edit** button on expenses (fix date / attach receipt without re-logging), **📦 Tax
+  Package** zip (JSZip: CSV + all receipt files, cross-referenced), AI-cost **date ranges**
+  (fetch created_at resiliently), **fmtDate timezone fix** (date-only was a day early),
+  **↻ Refresh** button. NOTE: receipts logged before this were never stored — re-upload needed.
+
+### 📋 Coach acquisition — /coaches QR signup (cf9e2e0)
+- `atlasprime.app/coaches` → coach-branded signup, auto `role=coach`, lands in Coach Portal.
+  The **coach business-card QR** target (athlete QR = root domain). Admin Promos dropdown gains
+  a "Coach" option. Decided pricing (memory `coach-pricing-tiers`): 5 free AI programs, then
+  monthly tiers with included AI credits + overage charges. Signup differentiates profile type.
+
+### 🗺️ System Architecture docs (2a3d08b, 402f765)
+- `ARCHITECTURE.md` (dev) + `docs/architecture.html` (visual) + **Admin → Dev Tools → 🗺️
+  Architecture** tab (native React port). Full data-flow map. "Living map" — keep the three in sync.
+
+### 🔧 Harness Engineering — STAGE 1 DONE (2810f28) — user-driven staged spec
+- Read-after-write verification on money/state writes. `lib/verified-write.ts`
+  (verifiedInsert/Update/Upsert — write, read back, assert; loud [VERIFY_FAIL] + harness_events
+  + throw on failure) + `lib/harness-events.ts` (logHarnessEvent, safe before the Stage-2 table
+  exists). Retrofitted: logTokens (loud-but-contained), activate/pause-assignment, log-session.
+  `/api/admin/harness-selftest` + a "Run harness self-test" button on the Architecture tab.
+- **Stages 2–4 NOT started** (paused for confirmation per the spec). Stage 2 = `harness_events`
+  migration + Sentry + a **Telemetry tab**; Stage 3 = staging DB + migration drift; Stage 4 =
+  smoke tests. Full spec was pasted by Will — re-request it before starting Stage 2.
+
+### ⚠️ PENDING SQL MIGRATIONS (Will runs by hand — surface immediately next session)
+1. `supabase/migrations/20260707_receipts_bucket.sql` — **REQUIRED** before receipts upload
+   (creates/ensures a public `receipts` storage bucket).
+2. `supabase/migrations/20260707_token_usage_grants.sql` — **OPTIONAL** (GRANT SELECT on
+   token_usage to service_role) — restores full read-back verification; Spend Tracker already
+   works via the fallback without it.
+
+---
+
+## Previous Session (2026-07-02)
 
 **Polish + content-engine night — desktop layout overhaul, a from-scratch Library
 Builder content engine, name-emoji personalization, and YouTube quota reply prep.
@@ -827,16 +897,31 @@ return () => { supabase.removeChannel(channel) }
 
 ## 11. What to Work on Next (Priority Order)
 
-**NEXT MISSION: fill the library + curate.** The **Library Builder** (admin → Content → 🏗️
-Library Builder, `#seed`) is BUILT (2026-07-02). Next runs Will should do: **⬆️ Upgrade All
-Seeded → Sonnet** (brings last night's Haiku batch up to the human coach voice), then **🌍 Fill
-Every Category** on Sonnet for breadth, then curate the single **Library Builder** lane in Video
-Curation + run TTS daily. Goal: preload every sport so new users get a zero-lag plan + keep the
-YouTube curator fed. Memory: [[project-library-builder]].
+**IMMEDIATE (start of next session): finish the Spend Tracker test, then resume Harness Stage 2.**
+Will ended 2026-07-07 about to test the receipt/tax-package work. Surface the two pending
+migrations FIRST (see below), then walk the test, then continue the harness.
 
-0. **SQL migrations — all confirmed run.** Will confirmed the 2026-06-30 batch + voice-cloning
-   migrations processed early this session ("all SQL codes processed successfully"). No pending
-   migrations. Library Builder needs none.
+0. **⚠️ PENDING SQL MIGRATIONS (surface immediately).**
+   - `supabase/migrations/20260707_receipts_bucket.sql` — **REQUIRED** for receipt uploads.
+   - `supabase/migrations/20260707_token_usage_grants.sql` — **OPTIONAL** (full read-back on
+     token_usage; Spend Tracker works without it via the fallback).
+   All earlier migrations confirmed run.
+1. **Test the Spend Tracker receipt flow** (after Will runs the receipts migration): Edit an
+   expense → attach a PDF → confirm the 📎 link + the CSV "Receipt File" column + the 📦 Tax
+   Package zip. Also re-upload the receipts that were lost (old uploads never stored). Also fix
+   the mis-dated "Anthropic tokens" expense (April not June) via the new Edit button.
+2. **🔧 Harness Engineering — resume at STAGE 2.** Stage 1 (verified writes) is DONE + deployed.
+   Will has the full 4-stage spec (he pasted it; re-request it). Stage 2 = `harness_events`
+   migration (show SQL first — do NOT auto-apply) + Sentry (needs a Sentry project + DSN in
+   Vercel; build graceful-without-it like COACH_VOICE_CLONING) + a **Telemetry tab** (recent
+   harness_events, severity badges mirroring the Spend Tracker's provider badges). Ground rules:
+   work in stages, STOP for confirmation after each, show every migration SQL before applying.
+3. **📊 Product telemetry** — Will also wants customer click-through tracking in the admin portal
+   (a `Product` view alongside `System Health` in the same Telemetry tab; its own `product_events`
+   table). Agreed to build AFTER the harness stands up the tab. Separate data model from harness_events.
+4. **🎙 Coach voice cloning — go live + test.** Phase 1 is BUILT. Needs: `ELEVENLABS_API_KEY` in
+   Vercel (free tier OK for testing; upgrade to $5 Starter before a PAYING customer hears a
+   cloned voice) + run `20260623_coach_voice_cloning.sql`. Then test with a coached client.
 1. **🎙 Coach voice cloning — go live + test.** Phase 1 is BUILT. Needs: `ELEVENLABS_API_KEY` in
    Vercel (free tier OK for testing; upgrade to $5 Starter before a PAYING customer hears a
    cloned voice) + run `20260623_coach_voice_cloning.sql`. Then test with a coached client
