@@ -82,7 +82,21 @@ export async function verifiedInsert<T extends Record<string, any> = any>(
   const context = opts.context ?? 'insert'
   const { data: written, error } = await supabase.from(table).insert(row).select().single()
   if (error || !written) {
-    return fail(table, context, `insert rejected: ${error?.message ?? 'no row returned'}`, { row: summarize(row) }, opts.effectiveUserId)
+    // The INSERT…RETURNING failed. Two possibilities: a GENUINE rejected write
+    // (bad column, constraint, RLS) — or merely a missing SELECT grant that
+    // blocks the RETURNING on an otherwise-valid insert (token_usage is locked
+    // down exactly this way: service_role has INSERT but not SELECT). Distinguish
+    // by retrying a plain insert with no RETURNING. Postgres rolled back the
+    // failed RETURNING statement, so this cannot double-write.
+    const { error: plainErr } = await supabase.from(table).insert(row)
+    if (plainErr) {
+      // Genuinely can't write → loud + throw (the whole point of the harness).
+      return fail(table, context, `insert rejected: ${plainErr.message}`, { row: summarize(row) }, opts.effectiveUserId)
+    }
+    // Row landed; we just couldn't read it back (no SELECT grant). Not silent —
+    // a visible warning — but don't fail the write or spam telemetry per call.
+    console.warn(`[VERIFY_DEGRADED] ${table} (${context}): write ok, read-back unavailable — grant SELECT to service_role to restore full verification (${error?.message ?? 'no row returned'})`)
+    return row as T
   }
   const id = (written as Record<string, unknown>).id
   if (id == null) return written as T // no id PK — trust the RETURNING row
