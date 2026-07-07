@@ -2,6 +2,7 @@ export const runtime = 'nodejs'
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { verifiedUpdate } from '@/lib/verified-write'
 
 const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -54,16 +55,18 @@ export async function POST(req: Request) {
     if (active && active.id === target.id) {
       if (mode === 'fresh') {
         await supabase.from('coach_day_completions').delete().eq('assignment_id', target.id).eq('user_id', user.id)
-        await supabase.from('coach_program_assignments').update({ start_date: today(), resume_week: null }).eq('id', target.id)
+        await verifiedUpdate(supabase, 'coach_program_assignments', target.id,
+          { start_date: today(), resume_week: null },
+          { context: 'assignment-restart', expect: ['start_date', 'resume_week'], effectiveUserId: user.id })
       }
       return NextResponse.json({ success: true, restarted: mode === 'fresh' })
     }
 
     // Switching away — stamp resume_week on the outgoing active program, retire it.
     if (active) {
-      await supabase.from('coach_program_assignments')
-        .update({ status: 'replaced', resume_week: programWeek(active.start_date, weeksTotalOf(active)) })
-        .eq('id', active.id)
+      await verifiedUpdate(supabase, 'coach_program_assignments', active.id,
+        { status: 'replaced', resume_week: programWeek(active.start_date, weeksTotalOf(active)) },
+        { context: 'assignment-replace', expect: ['status'], effectiveUserId: user.id })
     }
 
     // Activate the target.
@@ -73,10 +76,9 @@ export async function POST(req: Request) {
     } else if (mode === 'fresh') {
       await supabase.from('coach_day_completions').delete().eq('assignment_id', target.id).eq('user_id', user.id)
     }
-    const { error } = await supabase.from('coach_program_assignments')
-      .update({ status: 'active', start_date: startDate, resume_week: null })
-      .eq('id', target.id)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    await verifiedUpdate(supabase, 'coach_program_assignments', target.id,
+      { status: 'active', start_date: startDate, resume_week: null },
+      { context: 'assignment-activate', expect: ['status', 'start_date'], effectiveUserId: user.id })
 
     return NextResponse.json({ success: true })
   } catch (err) {

@@ -1,5 +1,6 @@
 'use client'
-import type { CSSProperties, ReactNode } from 'react'
+import { useState, type CSSProperties, type ReactNode } from 'react'
+import { supabase } from '@/lib/supabase'
 
 // System architecture reference, rendered natively in the Admin Portal.
 // Mirrors ARCHITECTURE.md + docs/architecture.html — keep the three in sync
@@ -136,6 +137,39 @@ function Layer({ name, items }: { name: ReactNode; items: { label: string; tone?
           <span key={i} style={{ ...pillBase, ...(it.tone ? { borderColor: TONE[it.tone] + '66', color: '#dfe8f5' } : {}) }}>{it.label}</span>
         ))}
       </div>
+    </div>
+  )
+}
+
+// Harness self-test — proves read-after-write verification fails loud, not silent.
+// (Moves to the dedicated Telemetry tab in Stage 2.)
+function SelfTest() {
+  const [result, setResult] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  async function run() {
+    setBusy(true); setResult(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/admin/harness-selftest', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
+      })
+      const d = await res.json()
+      if (d.ok && d.threwAsExpected) setResult('✓ Safety net works — the broken write threw loudly. Check the server logs for [VERIFY_FAIL].')
+      else setResult('✗ ' + (d.note || d.error || 'Unexpected — verification may not be firing.'))
+    } catch { setResult('✗ Could not run the self-test.') }
+    setBusy(false)
+  }
+  return (
+    <div style={{ border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.accent}`, background: C.surface, borderRadius: 10, padding: '13px 16px', margin: '16px 0', maxWidth: '76ch' }}>
+      <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: C.textDim, marginBottom: 6 }}>Harness · read-after-write verification</div>
+      <div style={{ fontSize: 14, color: C.textMid, lineHeight: 1.6, marginBottom: 10 }}>
+        Money + critical-state writes now confirm they persisted. Run the self-test — it fires a deliberately broken write and proves it fails <strong style={{ color: '#fff' }}>loud</strong>, not silent (writes nothing; Postgres rejects it).
+      </div>
+      <button onClick={run} disabled={busy} style={{ fontFamily: MONO, fontSize: 12.5, fontWeight: 700, padding: '8px 14px', borderRadius: 8, border: 'none', background: C.accent, color: '#fff', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.7 : 1 }}>
+        {busy ? 'Running…' : '🔧 Run harness self-test'}
+      </button>
+      {result && <div style={{ marginTop: 10, fontFamily: MONO, fontSize: 12.5, lineHeight: 1.5, color: result.startsWith('✓') ? C.openai : C.money }}>{result}</div>}
     </div>
   )
 }
@@ -372,6 +406,7 @@ export default function ArchitectureTab() {
           <strong style={{ color: '#fff' }}>master is production</strong> — no staging. Database changes are the one manual step (SQL run by hand
           in Supabase). Secrets live only in Vercel env vars, never in the repo. Health and spend are watched from this portal.
         </P>
+        <SelfTest />
         <div style={{ fontFamily: MONO, fontSize: 12, color: C.textDim, marginTop: 22, paddingTop: 14, borderTop: `1px solid ${C.borderSoft}` }}>
           A living map — kept in sync with ARCHITECTURE.md &amp; docs/architecture.html when the backend changes.
         </div>

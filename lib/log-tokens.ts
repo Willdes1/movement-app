@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { claudeCostUsd } from './ai-costs'
+import { verifiedInsert, VerifyError } from './verified-write'
 
 // Server-only AI-cost logger. Writes to the `token_usage` table that the admin
 // Spend Tracker + Health Monitor read from.
@@ -48,17 +49,24 @@ export async function logTokens({
     // migration (to-do/user-token-usage-tracking.md) is run.
     void user_id
 
-    const { error } = await supabase.from('token_usage').insert({
+    // Read-after-write verified: a rejected/mismatched insert now logs [VERIFY_FAIL]
+    // + a harness_events row and throws — exactly the failure that was silent before.
+    await verifiedInsert(supabase, 'token_usage', {
       operation,
       api_route: route,
       input_tokens,
       output_tokens,
       estimated_cost_usd,
       metadata: { provider, ...(model ? { model } : {}) },
+    }, {
+      context: `logTokens:${operation}`,
+      expect: ['operation', 'api_route', 'input_tokens', 'output_tokens'],
     })
-    if (error) console.warn('logTokens insert failed:', error.message)
   } catch (err) {
-    // Never let cost-logging break the actual request.
-    console.warn('logTokens threw:', err)
+    // CONTAINMENT (deliberate): the verify helper already logged the failure
+    // LOUD (console.error [VERIFY_FAIL] + harness_events). We swallow the throw
+    // here ONLY so ancillary cost-logging can't 500 a user's plan/voice request.
+    // The failure is visible in logs + the Telemetry tab — not silent.
+    if (!(err instanceof VerifyError)) console.error('[TOKENS] logTokens failed:', err)
   }
 }

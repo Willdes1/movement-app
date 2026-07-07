@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
+import { verifiedInsert, verifiedUpdate, verifiedUpsert } from '@/lib/verified-write'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -56,25 +57,33 @@ export async function POST(request: Request) {
     ])
     if (!roster || !assignment) return Response.json({ error: 'Client not in your roster' }, { status: 403 })
 
-    // 1. Workout logs — update the client's existing entry or insert a new one
+    // 1. Workout logs — update the client's existing entry or insert a new one.
+    // Verified writes: a rejected/lost write now logs [VERIFY_FAIL] + a
+    // harness_events row (loud) instead of being swallowed by `if (!error)`.
+    // We keep the loop resilient — one bad entry doesn't lose the others — and
+    // surface a `failed` count in the response so the coach knows.
     let logged = 0
+    let failed = 0
     for (const e of entries) {
       const hasValues = e.sets != null || e.reps != null || e.weight != null
       if (!hasValues) continue
-      if (e.existingLogId) {
-        const { error } = await supabase.from('workout_logs')
-          .update({ sets: e.sets ?? null, reps: e.reps ?? null, weight: e.weight ?? null, logged_by: coach.id })
-          .eq('id', e.existingLogId).eq('user_id', clientId)
-        if (!error) logged++
-      } else {
-        const { error } = await supabase.from('workout_logs').insert({
-          user_id: clientId,
-          exercise_normalized: e.exerciseNormalized,
-          sets: e.sets ?? null, reps: e.reps ?? null, weight: e.weight ?? null,
-          weight_unit: 'lbs',
-          logged_by: coach.id,
-        })
-        if (!error) logged++
+      try {
+        if (e.existingLogId) {
+          await verifiedUpdate(supabase, 'workout_logs', e.existingLogId,
+            { sets: e.sets ?? null, reps: e.reps ?? null, weight: e.weight ?? null, logged_by: coach.id },
+            { context: 'coach-log-session:update', match: { user_id: clientId }, expect: ['logged_by'], effectiveUserId: clientId })
+        } else {
+          await verifiedInsert(supabase, 'workout_logs', {
+            user_id: clientId,
+            exercise_normalized: e.exerciseNormalized,
+            sets: e.sets ?? null, reps: e.reps ?? null, weight: e.weight ?? null,
+            weight_unit: 'lbs',
+            logged_by: coach.id,
+          }, { context: 'coach-log-session:insert', expect: ['user_id', 'exercise_normalized', 'logged_by'], effectiveUserId: clientId })
+        }
+        logged++
+      } catch {
+        failed++ // already logged loud by the verify helper
       }
     }
 
@@ -92,16 +101,25 @@ export async function POST(request: Request) {
       })
     }
 
-    // 3. Day completion
+    // 3. Day completion — verified so a lost completion write is loud, not silent.
+    let completionFailed = false
     if (completeDay) {
-      await supabase.from('coach_day_completions').upsert(
-        {
-          user_id: clientId, assignment_id: assignmentId,
-          week_number: weekNumber, day_name: dayName,
-          skipped: false, completed_by: coach.id,
-        },
-        { onConflict: 'user_id,assignment_id,week_number,day_name' }
-      )
+      try {
+        await verifiedUpsert(supabase, 'coach_day_completions',
+          {
+            user_id: clientId, assignment_id: assignmentId,
+            week_number: weekNumber, day_name: dayName,
+            skipped: false, completed_by: coach.id,
+          },
+          {
+            onConflict: 'user_id,assignment_id,week_number,day_name',
+            context: 'coach-day-completion',
+            expect: ['user_id', 'assignment_id', 'week_number', 'day_name', 'completed_by'],
+            effectiveUserId: clientId,
+          })
+      } catch {
+        completionFailed = true // already logged loud by the verify helper
+      }
     }
 
     // 4. Push notification — only when the coach completed the day for them
@@ -138,7 +156,7 @@ export async function POST(request: Request) {
       } catch { /* push is best-effort — never fail the log */ }
     }
 
-    return Response.json({ success: true, logged, pushed })
+    return Response.json({ success: true, logged, failed, pushed, completionFailed })
   } catch (err) {
     return Response.json({ error: err instanceof Error ? err.message : 'Failed' }, { status: 500 })
   }

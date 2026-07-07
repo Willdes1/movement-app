@@ -2,6 +2,7 @@ export const runtime = 'nodejs'
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { verifiedUpdate } from '@/lib/verified-write'
 
 const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -35,10 +36,9 @@ export async function POST(req: Request) {
     const cp = active.coach_programs as unknown as { weeks_total?: number }[] | { weeks_total?: number } | null
     const weeksTotal = (Array.isArray(cp) ? cp[0]?.weeks_total : cp?.weeks_total) ?? 1
 
-    const { error } = await supabase.from('coach_program_assignments')
-      .update({ status: 'paused', resume_week: programWeek(active.start_date, weeksTotal) })
-      .eq('id', active.id)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    await verifiedUpdate(supabase, 'coach_program_assignments', active.id,
+      { status: 'paused', resume_week: programWeek(active.start_date, weeksTotal) },
+      { context: 'assignment-pause', expect: ['status'], effectiveUserId: user.id })
 
     return NextResponse.json({ success: true, paused: true })
   } catch (err) {
