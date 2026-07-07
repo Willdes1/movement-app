@@ -32,6 +32,16 @@ type TokenRow = {
   output_tokens: number | null
   estimated_cost_usd: number | null
   metadata: { provider?: string; model?: string } | null
+  created_at?: string | null
+}
+
+// Compact date range for an operation's activity (for tax context).
+function fmtRange(min?: string | null, max?: string | null): string {
+  if (!min && !max) return ''
+  const a = min ? fmtDate(min) : ''
+  const b = max ? fmtDate(max) : ''
+  if (a && b && a !== b) return `${a} – ${b}`
+  return a || b
 }
 
 const INPUT_RATE  = 3 / 1_000_000   // $3 per 1M input tokens (Claude fallback)
@@ -109,12 +119,16 @@ export default function SpendTab() {
 
   async function load() {
     setLoading(true)
-    const [{ data: exp }, { data: tok }] = await Promise.all([
-      supabase.from('project_expenses').select('*').order('expense_date', { ascending: false }),
-      supabase.from('token_usage').select('operation, input_tokens, output_tokens, estimated_cost_usd, metadata'),
-    ])
+    const expPromise = supabase.from('project_expenses').select('*').order('expense_date', { ascending: false })
+    // Fetch token_usage WITH created_at; if that column doesn't exist, retry
+    // without it so the AI table never breaks (just loses the date range).
+    let tok = await supabase.from('token_usage').select('operation, input_tokens, output_tokens, estimated_cost_usd, metadata, created_at')
+    if (tok.error) {
+      tok = await supabase.from('token_usage').select('operation, input_tokens, output_tokens, estimated_cost_usd, metadata')
+    }
+    const { data: exp } = await expPromise
     setExpenses((exp ?? []) as Expense[])
-    setTokenRows((tok ?? []) as TokenRow[])
+    setTokenRows((tok.data ?? []) as TokenRow[])
     setLoading(false)
   }
 
@@ -132,11 +146,30 @@ export default function SpendTab() {
     let receipt_url: string | null = null
 
     if (fFile) {
+      // Upload SERVER-SIDE via the service role (bypasses storage RLS, which is
+      // why the old client-side upload failed silently). If it fails, we STOP —
+      // a tax record must not be saved without its receipt.
       setUploading(true)
-      const path = `${Date.now()}-${fFile.name.replace(/\s+/g, '_')}`
-      const { data: up, error: upErr } = await supabase.storage.from('receipts').upload(path, fFile, { contentType: fFile.type })
-      if (!upErr && up) {
-        receipt_url = supabase.storage.from('receipts').getPublicUrl(up.path).data.publicUrl
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const fd = new FormData()
+        fd.append('file', fFile)
+        const res = await fetch('/api/admin/upload-receipt', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session?.access_token}` },
+          body: fd,
+        })
+        const d = await res.json().catch(() => ({}))
+        if (!res.ok || !d.url) {
+          setUploading(false); setSaving(false)
+          showFlash(d.error ? `Receipt failed: ${d.error}` : 'Receipt upload failed — nothing saved. Try again.')
+          return
+        }
+        receipt_url = d.url
+      } catch {
+        setUploading(false); setSaving(false)
+        showFlash('Receipt upload failed — nothing saved. Try again.')
+        return
       }
       setUploading(false)
     }
@@ -178,16 +211,19 @@ export default function SpendTab() {
     .reduce((s, e) => s + Number(e.amount_usd), 0)
 
   // Token breakdown by operation
-  const opMap = new Map<string, { count: number; input: number; output: number; cost: number; provider: string }>()
+  const opMap = new Map<string, { count: number; input: number; output: number; cost: number; provider: string; minDate: string | null; maxDate: string | null }>()
   for (const r of tokenRows) {
     const key = r.operation ?? 'unknown'
-    const cur = opMap.get(key) ?? { count: 0, input: 0, output: 0, cost: 0, provider: '' }
+    const cur = opMap.get(key) ?? { count: 0, input: 0, output: 0, cost: 0, provider: '', minDate: null, maxDate: null }
+    const d = r.created_at ?? null
     opMap.set(key, {
       count: cur.count + 1,
       input: cur.input + (r.input_tokens ?? 0),
       output: cur.output + (r.output_tokens ?? 0),
       cost: cur.cost + tokenCost(r),
       provider: cur.provider || (r.metadata?.provider ?? ''),
+      minDate: d && (!cur.minDate || d < cur.minDate) ? d : cur.minDate,
+      maxDate: d && (!cur.maxDate || d > cur.maxDate) ? d : cur.maxDate,
     })
   }
   const opStats = [...opMap.entries()]
@@ -247,10 +283,15 @@ export default function SpendTab() {
             </div>
             {opStats.map((s, i) => (
               <div key={s.op} style={{ display: 'grid', gridTemplateColumns: '2fr 60px 80px 80px 80px', padding: '10px 16px', borderBottom: i < opStats.length - 1 ? `1px solid ${C.border}` : 'none', alignItems: 'center' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: C.text, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.op}</span>
-                  {s.provider && (
-                    <span style={{ flexShrink: 0, fontSize: 9, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', padding: '2px 6px', borderRadius: 10, color: s.provider === 'openai' ? C.green : C.purple, background: s.provider === 'openai' ? C.greenDim : 'rgba(167,139,250,0.12)' }}>{providerLabel(s.provider)}</span>
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: C.text, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.op}</span>
+                    {s.provider && (
+                      <span style={{ flexShrink: 0, fontSize: 9, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', padding: '2px 6px', borderRadius: 10, color: s.provider === 'openai' ? C.green : C.purple, background: s.provider === 'openai' ? C.greenDim : 'rgba(167,139,250,0.12)' }}>{providerLabel(s.provider)}</span>
+                    )}
+                  </span>
+                  {fmtRange(s.minDate, s.maxDate) && (
+                    <span style={{ fontSize: 10.5, color: C.textDim, fontFamily: 'monospace' }}>{fmtRange(s.minDate, s.maxDate)}</span>
                   )}
                 </span>
                 <span style={{ fontSize: 12, color: C.textMid, fontFamily: 'monospace' }}>{s.count}</span>
