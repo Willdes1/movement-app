@@ -66,7 +66,11 @@ function fmtUSD(n: number) {
 }
 
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  // Date-only strings (YYYY-MM-DD) must parse as LOCAL, not UTC — otherwise they
+  // render a day early in negative-UTC timezones (a tax-date accuracy bug).
+  // Timestamps (with a 'T') parse normally.
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(iso + 'T00:00:00') : new Date(iso)
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function thisMonth() {
@@ -78,20 +82,35 @@ function catCfg(id: string) {
   return CATS.find(c => c.id === id) ?? { label: id, color: C.textDim }
 }
 
-function exportCSV(expenses: Expense[], aiRows: TokenRow[]) {
+function buildCSV(expenses: Expense[], aiRows: TokenRow[]): string {
   const aiTotal = aiRows.reduce((s, r) => s + tokenCost(r), 0)
   const lines = [
-    'Date,Category,Description,Vendor,Amount USD,Receipt URL,Notes',
+    'Date,Category,Description,Vendor,Amount USD,Receipt File,Receipt URL,Notes',
     ...expenses.map(e => [
       e.expense_date, e.category, `"${e.description}"`, e.vendor ?? '',
-      e.amount_usd.toFixed(2), e.receipt_url ?? '', `"${e.notes ?? ''}"`,
+      e.amount_usd.toFixed(2), e.receipt_url ? `"${receiptFileName(e)}"` : '', e.receipt_url ?? '', `"${e.notes ?? ''}"`,
     ].join(',')),
-    `${new Date().toISOString().slice(0, 10)},ai,AI / Token Usage (auto-calculated),,${aiTotal.toFixed(4)},,`,
+    `${new Date().toISOString().slice(0, 10)},ai,AI / Token Usage (auto-calculated),,${aiTotal.toFixed(4)},,,`,
   ]
-  const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
+  return '﻿' + lines.join('\n')
+}
+
+function triggerDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
-  const a = document.createElement('a'); a.href = url; a.download = 'project_spend.csv'; a.click()
+  const a = document.createElement('a'); a.href = url; a.download = filename; a.click()
   URL.revokeObjectURL(url)
+}
+
+function exportCSV(expenses: Expense[], aiRows: TokenRow[]) {
+  triggerDownload(new Blob([buildCSV(expenses, aiRows)], { type: 'text/csv;charset=utf-8;' }), 'project_spend.csv')
+}
+
+// Stable, human-readable filename for a receipt inside the tax-package zip, so
+// the CSV's "Receipt File" column points at the matching file.
+function receiptFileName(e: Expense): string {
+  const ext = (e.receipt_url ?? '').split('?')[0].split('.').pop()?.toLowerCase() || 'pdf'
+  const desc = (e.description || 'receipt').replace(/[^\w.\-]+/g, '_').slice(0, 40)
+  return `${e.expense_date}_${desc}.${ext.length <= 5 ? ext : 'pdf'}`
 }
 
 export default function SpendTab() {
@@ -103,7 +122,10 @@ export default function SpendTab() {
   const [saving, setSaving]         = useState(false)
   const [flash, setFlash]           = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [editingId, setEditingId]   = useState<string | null>(null)
+  const [packaging, setPackaging]   = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const formRef = useRef<HTMLDivElement>(null)
 
   // Form state
   const [fDate, setFDate]     = useState(new Date().toISOString().slice(0, 10))
@@ -174,20 +196,78 @@ export default function SpendTab() {
       setUploading(false)
     }
 
-    const { error } = await supabase.from('project_expenses').insert({
+    const base = {
       category: fCat,
       description: fDesc.trim(),
       amount_usd: parseFloat(fAmount),
       vendor: fVendor.trim() || null,
       notes: fNotes.trim() || null,
-      receipt_url,
       expense_date: fDate,
-      added_by: user?.id,
-    })
+    }
 
-    if (!error) { resetForm(); setShowForm(false); showFlash('Expense logged.'); await load() }
-    else showFlash('Failed to save.')
+    let error = null
+    if (editingId) {
+      // Only overwrite the receipt when a new file was attached (so you can edit
+      // the date/amount without losing the existing receipt).
+      const patch = fFile ? { ...base, receipt_url } : base
+      const res = await supabase.from('project_expenses').update(patch).eq('id', editingId)
+      error = res.error
+    } else {
+      const res = await supabase.from('project_expenses').insert({ ...base, receipt_url, added_by: user?.id })
+      error = res.error
+    }
+
+    if (!error) {
+      resetForm(); setEditingId(null); setShowForm(false)
+      showFlash(editingId ? 'Expense updated.' : 'Expense logged.')
+      await load()
+    } else {
+      showFlash('Failed to save — ' + error.message)
+    }
     setSaving(false)
+  }
+
+  function startEdit(e: Expense) {
+    setEditingId(e.id)
+    setFDate(e.expense_date)
+    setFCat(e.category)
+    setFDesc(e.description)
+    setFAmount(String(e.amount_usd))
+    setFVendor(e.vendor ?? '')
+    setFNotes(e.notes ?? '')
+    setFFile(null)
+    if (fileRef.current) fileRef.current.value = ''
+    setShowForm(true)
+    setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)
+  }
+
+  // Tax package — a single zip with the CSV + every receipt file, named so the
+  // CSV's "Receipt File" column matches. Everything a preparer needs in one file.
+  async function downloadTaxPackage() {
+    setPackaging(true)
+    try {
+      const JSZip = (await import('jszip')).default
+      const zip = new JSZip()
+      zip.file('expenses.csv', buildCSV(expenses, tokenRows))
+      const folder = zip.folder('receipts')
+      let got = 0
+      for (const e of expenses) {
+        if (!e.receipt_url) continue
+        try {
+          const resp = await fetch(e.receipt_url)
+          if (!resp.ok) continue
+          folder?.file(receiptFileName(e), await resp.blob())
+          got++
+        } catch { /* skip an unreachable receipt, keep going */ }
+      }
+      const blob = await zip.generateAsync({ type: 'blob' })
+      triggerDownload(blob, `atlas-prime-tax-${new Date().toISOString().slice(0, 10)}.zip`)
+      const missing = expenses.filter(e => e.receipt_url).length - got
+      showFlash(`Tax package ready — ${expenses.length} expenses, ${got} receipts${missing > 0 ? ` (${missing} unreachable)` : ''}.`)
+    } catch {
+      showFlash('Could not build the tax package.')
+    }
+    setPackaging(false)
   }
 
   async function deleteExpense(id: string) {
@@ -243,9 +323,19 @@ export default function SpendTab() {
 
   return (
     <div style={{ maxWidth: 760 }}>
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 800, color: C.text, marginBottom: 4 }}>Spend Tracker</h2>
-        <p style={{ fontSize: 13, color: C.textDim }}>All project costs — AI tokens auto-calculated, manual expenses logged here.</p>
+      <div style={{ marginBottom: 24, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+        <div>
+          <h2 style={{ fontSize: 20, fontWeight: 800, color: C.text, marginBottom: 4 }}>Spend Tracker</h2>
+          <p style={{ fontSize: 13, color: C.textDim }}>All project costs — AI tokens auto-calculated, manual expenses logged here.</p>
+        </div>
+        <button
+          onClick={() => load()}
+          disabled={loading}
+          title="Reload latest AI costs + expenses"
+          style={{ flexShrink: 0, padding: '7px 13px', borderRadius: 7, border: `1px solid ${C.border}`, background: 'transparent', color: C.textDim, fontSize: 12, fontWeight: 600, cursor: loading ? 'default' : 'pointer' }}
+        >
+          {loading ? '↻ …' : '↻ Refresh'}
+        </button>
       </div>
 
       {flash && (
@@ -313,9 +403,9 @@ export default function SpendTab() {
 
       {/* ── Manual Expenses ── */}
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
           <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: C.textDim }}>Manual Expenses</p>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button
               onClick={() => exportCSV(expenses, tokenRows)}
               style={{ padding: '6px 12px', borderRadius: 7, border: `1px solid ${C.border}`, background: 'transparent', color: C.textDim, fontSize: 12, cursor: 'pointer' }}
@@ -323,7 +413,14 @@ export default function SpendTab() {
               ↓ CSV
             </button>
             <button
-              onClick={() => { setShowForm(f => !f); resetForm() }}
+              onClick={downloadTaxPackage}
+              disabled={packaging}
+              style={{ padding: '6px 12px', borderRadius: 7, border: `1px solid ${C.accentBorder}`, background: C.accentDim, color: C.accent, fontSize: 12, fontWeight: 700, cursor: packaging ? 'default' : 'pointer', opacity: packaging ? 0.7 : 1 }}
+            >
+              {packaging ? 'Packaging…' : '📦 Tax Package (zip)'}
+            </button>
+            <button
+              onClick={() => { setShowForm(f => !f); setEditingId(null); resetForm() }}
               style={{ padding: '6px 14px', borderRadius: 7, border: 'none', background: C.accent, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
             >
               {showForm ? 'Cancel' : '+ Log Expense'}
@@ -331,9 +428,12 @@ export default function SpendTab() {
           </div>
         </div>
 
-        {/* Add Form */}
+        {/* Add / Edit Form */}
         {showForm && (
-          <div style={{ background: C.surface, border: `1px solid ${C.accentBorder}`, borderRadius: 10, padding: '18px 20px', marginBottom: 16 }}>
+          <div ref={formRef} style={{ background: C.surface, border: `1px solid ${C.accentBorder}`, borderRadius: 10, padding: '18px 20px', marginBottom: 16 }}>
+            {editingId && (
+              <p style={{ fontSize: 12, fontWeight: 700, color: C.accent, margin: '0 0 12px', fontFamily: 'monospace' }}>✎ Editing expense — fix the date or attach a receipt</p>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
               <div><label style={lbl}>Date</label><input type="date" value={fDate} onChange={e => setFDate(e.target.value)} style={inp} /></div>
               <div><label style={lbl}>Category</label>
@@ -358,11 +458,11 @@ export default function SpendTab() {
               <input value={fNotes} onChange={e => setFNotes(e.target.value)} placeholder="Optional notes" style={inp} />
             </div>
             <div style={{ marginBottom: 16 }}>
-              <label style={lbl}>Receipt Photo</label>
+              <label style={lbl}>Receipt (PDF or photo)</label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8, border: `1px dashed ${fFile ? C.green : C.border}`, cursor: 'pointer', background: fFile ? C.greenDim : 'transparent' }}>
                 <input ref={fileRef} type="file" accept="image/*,application/pdf" capture="environment" style={{ display: 'none' }} onChange={e => setFFile(e.target.files?.[0] ?? null)} />
                 <span style={{ fontSize: 16 }}>{fFile ? '✓' : '📎'}</span>
-                <span style={{ fontSize: 13, color: fFile ? C.green : C.textDim }}>{fFile ? fFile.name : 'Tap to attach receipt (photo or file)'}</span>
+                <span style={{ fontSize: 13, color: fFile ? C.green : C.textDim }}>{fFile ? fFile.name : (editingId ? 'Attach a receipt (or replace the current one)' : 'Tap to attach receipt (photo or file)')}</span>
               </label>
             </div>
             <button
@@ -370,7 +470,7 @@ export default function SpendTab() {
               disabled={saving || !fDesc.trim() || !fAmount}
               style={{ width: '100%', padding: '11px', borderRadius: 8, border: 'none', background: saving || !fDesc.trim() || !fAmount ? C.surface2 : C.accent, color: saving || !fDesc.trim() || !fAmount ? C.textDim : '#fff', fontSize: 14, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
             >
-              {uploading ? 'Uploading receipt…' : saving ? 'Saving…' : 'Save Expense →'}
+              {uploading ? 'Uploading receipt…' : saving ? 'Saving…' : editingId ? 'Save Changes →' : 'Save Expense →'}
             </button>
           </div>
         )}
@@ -404,12 +504,17 @@ export default function SpendTab() {
                       <div style={{ paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
                         {e.vendor && <p style={{ fontSize: 12, color: C.textMid }}><span style={{ color: C.textDim }}>Vendor: </span>{e.vendor}</p>}
                         {e.notes  && <p style={{ fontSize: 12, color: C.textMid }}><span style={{ color: C.textDim }}>Notes: </span>{e.notes}</p>}
-                        {e.receipt_url && (
-                          <a href={e.receipt_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: C.accent }}>📎 View receipt</a>
-                        )}
-                        <button onClick={() => deleteExpense(e.id)} style={{ alignSelf: 'flex-start', marginTop: 6, padding: '5px 12px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.06)', color: C.red, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-                          Delete
-                        </button>
+                        {e.receipt_url
+                          ? <a href={e.receipt_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: C.accent }}>📎 View receipt</a>
+                          : <span style={{ fontSize: 12, color: C.amber }}>⚠ No receipt attached — tap Edit to add one</span>}
+                        <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                          <button onClick={(ev) => { ev.stopPropagation(); startEdit(e) }} style={{ padding: '5px 14px', borderRadius: 6, border: `1px solid ${C.accentBorder}`, background: C.accentDim, color: C.accent, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                            ✎ Edit
+                          </button>
+                          <button onClick={(ev) => { ev.stopPropagation(); deleteExpense(e.id) }} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.06)', color: C.red, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                            Delete
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}
