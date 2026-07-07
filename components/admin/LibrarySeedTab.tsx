@@ -231,9 +231,10 @@ export default function LibrarySeedTab() {
     setUpgrading(false)
   }
 
-  // Voice the whole audio backlog — loops the TTS route (10 at a time, it
-  // auto-picks rows missing audio) until nothing's left. Covers exercises that
-  // were seeded before auto-audio, or had their audio cleared by an Upgrade.
+  // Voice the whole audio backlog — loops the time-budgeted TTS route (it
+  // auto-picks rows missing audio) until nothing's left. Covers exercises seeded
+  // before auto-audio, or whose audio an Upgrade cleared. Resilient: a single
+  // timed-out/failed round is retried rather than stranding the whole run.
   async function runVoiceBacklog() {
     if (busy || filling || upgrading || voicingAll) return
     voiceStopRef.current = false
@@ -242,22 +243,42 @@ export default function LibrarySeedTab() {
     setVoiceProg({ done: 0, total })
     let done = 0
     let guard = 0
-    while (guard++ < 600) {
+    let failStreak = 0   // consecutive network/timeout failures
+    let zeroStreak = 0   // consecutive rounds that fetched rows but voiced none
+    while (guard++ < 900) {
       if (voiceStopRef.current) break
+
+      let data: { generated?: number; remaining?: number; fetched?: number } | null = null
       try {
         const res = await fetch('/api/admin/generate-tts', {
           method: 'POST',
           headers: await authHeaders(),
           body: JSON.stringify({}),
         })
-        const data = await res.json()
-        if (!res.ok) { setError(data.error ?? 'Voicing failed.'); break }
-        const generated = data.generated ?? 0
-        done += generated
-        setVoiceProg({ done, total: Math.max(total, done) })
-        if ((data.remaining ?? 0) <= 0) break
-        if (generated === 0) break // no voiceable rows progressing — stop, don't spin
-      } catch { setError('Network error during voicing.'); break }
+        if (res.ok) data = await res.json()
+      } catch { /* network / timeout — treated as a failed round below */ }
+
+      if (!data) {
+        // Transient failure (rare now the route is time-budgeted). Back off and
+        // retry a few times before giving up, so one blip doesn't strand the run.
+        if (++failStreak >= 4) { setError('Voicing kept timing out — stopped. Press it again to resume where it left off.'); break }
+        await new Promise(r => setTimeout(r, 1500))
+        continue
+      }
+      failStreak = 0
+
+      const generated = data.generated ?? 0
+      const fetched = data.fetched ?? 0
+      done += generated
+      setVoiceProg({ done, total: Math.max(total, done) })
+
+      if ((data.remaining ?? 0) <= 0) break        // whole backlog done
+      if (fetched === 0) break                      // nothing voiceable left (any remainder lacks instructions)
+      if (generated === 0) {                        // fetched rows but voiced none — retry, then give up if stuck
+        if (++zeroStreak >= 5) { setError('Some exercises could not be voiced and were skipped. Stopped.'); break }
+      } else {
+        zeroStreak = 0
+      }
       if (guard % 3 === 0) loadCounts()
     }
     loadCounts()

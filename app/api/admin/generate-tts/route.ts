@@ -48,14 +48,19 @@ async function generateAndUpload(
         input: sent,
         speed: 0.92,
       }),
-      10000
+      8000
     )
     const buffer = Buffer.from(await response.arrayBuffer())
     const path = `${voice}/${ex.name_normalized}.mp3`
 
-    const { error: uploadErr } = await supabase.storage
-      .from('exercise-tts')
-      .upload(path, buffer, { contentType: 'audio/mpeg', upsert: true })
+    // Upload is bounded too — an unbounded storage hang would stall the whole
+    // chunk (upsert makes a retry next round idempotent).
+    const { error: uploadErr } = await withTimeout<{ error: unknown }>(
+      supabase.storage
+        .from('exercise-tts')
+        .upload(path, buffer, { contentType: 'audio/mpeg', upsert: true }),
+      6000
+    )
 
     if (uploadErr) { console.warn(`Upload failed for ${ex.name_normalized}:`, uploadErr); return { ok: false, chars: sent.length } }
 
@@ -86,14 +91,16 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 export async function POST(request: Request) {
   try {
     const supabase = getSupabase() as any
-    // Per server round: 20 exercises × 2 voices = 40 OpenAI calls, run 8
-    // exercises (16 calls) at a time. Higher concurrency finishes each round
-    // FASTER, which is what keeps us under Vercel's 60s wall while doing more
-    // per round (the old BATCH=20 @ CONCURRENCY=4 504'd because it ran too
-    // few in parallel; 8-wide clears 20 in ~3 chunks). Each call is capped at
-    // 10s by withTimeout, so worst case ≈ 3 × 10s + upload overhead < 60s.
-    const BATCH = 20
-    const CONCURRENCY = 8
+    // TIME-BUDGETED, not fixed-size. A fixed batch (e.g. 20×2 = 40 OpenAI calls)
+    // 504s whenever real latency (slow Supabase uploads / slow TTS) pushes a
+    // round past Vercel's 60s wall. Instead we fetch a generous candidate set
+    // and process 6 exercises at a time, stopping the moment we're within margin
+    // of the wall — returning what we finished + the remaining count so the
+    // client loop just continues. This can't 504 no matter how slow calls get.
+    const BATCH = 24            // max candidates fetched per round
+    const CONCURRENCY = 6       // exercises processed in parallel (× 2 voices)
+    const DEADLINE_MS = 38_000  // stop launching new chunks past this (leaves room for the in-flight chunk + logging under 60s)
+    const roundStart = Date.now()
 
     const body = await request.json().catch(() => ({}))
     const targets: string[] | undefined = body?.targets
@@ -129,6 +136,9 @@ export async function POST(request: Request) {
     let billedChars = 0
 
     for (let i = 0; i < typedExercises.length; i += CONCURRENCY) {
+      // Time budget: never launch a new chunk once we're near the wall. Whatever
+      // is unprocessed stays null and the next round (or loop iteration) gets it.
+      if (Date.now() - roundStart > DEADLINE_MS) break
       const chunk = typedExercises.slice(i, i + CONCURRENCY)
       const results = await Promise.all(
         chunk.map((ex) => Promise.all([
@@ -165,6 +175,7 @@ export async function POST(request: Request) {
       message: `Generated ${maleOk} male + ${femaleOk} female audio files. ${failed} failed. ${count ?? '?'} exercises remaining.`,
       generated: maleOk,
       remaining: count ?? 0,
+      fetched: typedExercises.length, // rows this round pulled (all voiceable); 0 = nothing left to voice
     })
   } catch (err) {
     console.error('TTS batch generation error:', err)
