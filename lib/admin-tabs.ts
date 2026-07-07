@@ -47,6 +47,7 @@ export const TAB_CATALOG: AdminTab[] = [
   { id: 'seed',          label: 'Library Builder',    group: 'Content',    sensitive: false },
   // Dev Tools — sensitive (cost/infra data)
   { id: 'health',        label: 'Health Monitor',     group: 'Dev Tools',  sensitive: true },
+  { id: 'architecture',  label: 'Architecture',       group: 'Dev Tools',  sensitive: false },
 ]
 
 // The master key — manages everyone's permissions. Owner-only, never grantable.
