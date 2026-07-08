@@ -195,7 +195,8 @@
       "PowerShell(curl.exe -s -o NUL -w \"%{http_code} \\(final: %{url_effective}\\)`n\" -L https://atlasprime.app/api/coach/my-program)",
       "PowerShell(\"harness-events:\")",
       "PowerShell(\"my-program:\")",
-      "PowerShell(gh api repos/Willdes1/movement-app/commits/a50a85e/status --jq '.state, \\(.statuses[]?.description\\)')"
+      "PowerShell(gh api repos/Willdes1/movement-app/commits/a50a85e/status --jq '.state, \\(.statuses[]?.description\\)')",
+      "PowerShell(gh api repos/Willdes1/movement-app/commits/50ebb0e/status --jq '.state, \\(.statuses[]?.description\\)')"
     ],
     "additionalDirectories": [
       "c:\\Dev\\movement-app\\app\\coach\\programs"

@@ -270,6 +270,8 @@ flipping it turns on every billing-gated feature at once.
 | **`SECURITY DEFINER` functions** | Cross-role reads go through controlled functions instead of recursive RLS policies (which once caused an admin lockout). |
 | **`admin_permissions`** | Partner admins get scoped, per-section grants; they are not `is_admin` and can't see owner-only data. |
 | **Impersonation audit** | Every admin Zoom-In action is written to an audit trail; the real actor is always recorded (`lib/impersonation-logger.ts`). |
+| **Verified writes** | Money / critical-state writes read the row back and assert it persisted. A rejected or mismatched write logs a loud `[VERIFY_FAIL]` + a `harness_events` row and throws — instead of failing silently (`lib/verified-write.ts`). This exists because a cost-logging write silently failed for months. |
+| **Telemetry (`harness_events`)** | The app's own safety checks (`verify_fail`, `route_error`, `migration_drift`, `smoke_fail`/`smoke_run`) are recorded and surfaced in Admin → Telemetry with severity badges. Thrown route errors are additionally forwarded to Sentry when a `SENTRY_DSN` is configured (`lib/observability.ts`, `withHarness()`); it no-ops cleanly without one. |
 
 ---
 
@@ -279,12 +281,28 @@ flipping it turns on every billing-gated feature at once.
 git push (master)  →  Vercel build (auto, type-checked, Turbopack)  →  atlasprime.app
 ```
 
-- **`master` is production** — there is no staging environment.
-- **Database changes are manual** — SQL migrations are run by hand in the Supabase SQL editor.
+- **`master` is production** — no staging environment yet. A staging setup is documented in
+  `docs/harness-staging.md` and deliberately deferred until post-launch (its real value is protecting
+  real user data from a bad migration); the harness tooling degrades gracefully without it.
+- **Database changes are manual but tracked.** SQL migrations are run by hand in the Supabase SQL
+  editor — and each migration self-registers in the `applied_migrations` ledger when it runs. The
+  Admin → Telemetry **Migrations panel** (and `npm run migration-drift`) flags any file you forgot to
+  run, so a missed migration can't hide. Safe dry-run order is in `docs/harness-migrations.md`.
 - **Secrets** (API keys, service-role key) live only in Vercel environment variables, never in the repo.
 - **Verify deploys** via `gh api repos/Willdes1/movement-app/commits/<sha>/status` — the Vercel webhook
   occasionally drops; an empty commit re-fires it.
-- **Health & spend** are watched from the Admin Portal (`#health`, `#spend`).
+- **Smoke-test critical paths** after a deploy: `npm run smoke-test` (or the ▶ button in Admin →
+  Telemetry) exercises db/auth/ledger + a real `token_usage` verified write→read-back→cleanup and the
+  auth gates, asserting DB side effects. Failures log a `smoke_fail` event. See `docs/harness-smoke.md`.
+- **Monitoring** is watched from the Admin Portal: **Telemetry** (`#telemetry` — harness events,
+  migration drift, last smoke run) plus **Health** (`#health`) and **Spend** (`#spend`).
+
+### The harness (verification → monitoring → tracking → testing)
+A four-layer safety net added because a silent write bug hid for months:
+1. **Verify** — `lib/verified-write.ts` reads every money/state write back and throws loudly on mismatch.
+2. **Monitor** — `harness_events` + the Telemetry tab + optional Sentry (`lib/observability.ts`).
+3. **Track** — the `applied_migrations` ledger + drift check catch a forgotten migration.
+4. **Test** — `/api/admin/smoke-test` exercises the critical paths and asserts real DB effects.
 
 ---
 

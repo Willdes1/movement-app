@@ -907,6 +907,8 @@
             <tr><td class="k">SECURITY DEFINER fns</td><td>Cross-role reads go through controlled functions instead of recursive RLS policies (which once caused an admin lockout).</td></tr>
             <tr><td class="k">admin_permissions</td><td>Partner admins get scoped, per-section grants — they are not <code>is_admin</code> and can't see owner-only data.</td></tr>
             <tr><td class="k">Impersonation audit</td><td>Every admin Zoom-In action is written to an audit trail; the real actor is always recorded.</td></tr>
+            <tr><td class="k">Verified writes</td><td>Money/state writes read the row back and assert it persisted; a failed write logs a loud <code>[VERIFY_FAIL]</code> + a <code>harness_events</code> row and throws — never silent (<code>lib/verified-write.ts</code>).</td></tr>
+            <tr><td class="k">Telemetry</td><td>The app's own safety checks (verify / route / migration / smoke) are recorded to <code>harness_events</code> and surfaced in the Telemetry tab; route errors forward to Sentry when a DSN is configured.</td></tr>
           </tbody>
         </table>
       </div>
@@ -938,9 +940,12 @@
         </div>
       </div>
       <p class="muted">
-        There is no staging environment — <code>master</code> is production. Database changes are the one manual
-        step: SQL migrations are run by hand in Supabase. Secrets (API keys, service-role key) live only in Vercel
-        environment variables, never in the repo. Health and spend are watched from the Admin Portal.
+        <code>master</code> is production — no staging yet (documented in <code>docs/harness-staging.md</code>, deferred until
+        post-launch). Database changes are the one manual step (SQL run by hand in Supabase) — but now <strong>tracked</strong>:
+        every migration self-registers in the <code>applied_migrations</code> ledger, and the Telemetry Migrations panel flags
+        any file you forgot to run. After a deploy, the smoke suite (Telemetry ▶ Run, or <code>npm run smoke-test</code>) exercises
+        the critical paths and asserts real DB side effects. Secrets live only in Vercel env vars, never in the repo.
+        Health, spend &amp; telemetry are watched from the Admin Portal.
       </p>
       <div class="stamp" style="border-top:1px solid var(--border-soft); margin-top:34px; max-width:none">
         Atlas Prime · System Architecture — a living map. When the backend changes, this changes with it.

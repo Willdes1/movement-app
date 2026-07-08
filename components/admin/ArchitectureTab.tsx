@@ -392,6 +392,8 @@ export default function ArchitectureTab() {
             [<K>SECURITY DEFINER fns</K>, <>Cross-role reads go through controlled functions, not recursive RLS policies (which once caused an admin lockout).</>],
             [<K>admin_permissions</K>, <>Partner admins get scoped, per-section grants; they are not <Mono>is_admin</Mono> and can&apos;t see owner-only data.</>],
             [<K>Impersonation audit</K>, <>Every admin Zoom-In action is written to an audit trail; the real actor is always recorded.</>],
+            [<K>Verified writes</K>, <>Money/state writes read the row back and assert it persisted; a failed write logs a loud <Mono>[VERIFY_FAIL]</Mono> + a <Mono>harness_events</Mono> row and throws — never silent (<Mono>lib/verified-write.ts</Mono>).</>],
+            [<K>Telemetry</K>, <>The app&apos;s own safety checks (verify/route/migration/smoke) are recorded to <Mono>harness_events</Mono> and shown in the Telemetry tab; route errors forward to Sentry when a DSN is set.</>],
           ]}
         />
       </Section>
@@ -403,8 +405,11 @@ export default function ArchitectureTab() {
           { tone: 'data', label: 'Production', desc: 'atlasprime.app (+ redirects)', tag: 'live' },
         ]} />
         <P>
-          <strong style={{ color: '#fff' }}>master is production</strong> — no staging. Database changes are the one manual step (SQL run by hand
-          in Supabase). Secrets live only in Vercel env vars, never in the repo. Health and spend are watched from this portal.
+          <strong style={{ color: '#fff' }}>master is production</strong> — no staging yet (documented, deferred). Database changes are the one
+          manual step (SQL run by hand in Supabase) — but now <strong style={{ color: '#fff' }}>tracked</strong>: every migration self-registers in the
+          <Mono>applied_migrations</Mono> ledger, and the Telemetry Migrations panel flags any you forgot to run. After a deploy, the
+          smoke suite (<Mono>#telemetry</Mono> ▶ Run, or <Mono>npm run smoke-test</Mono>) exercises the critical paths and asserts real DB
+          side effects. Secrets live only in Vercel env vars, never in the repo. Health, spend &amp; telemetry are watched from this portal.
         </P>
         <SelfTest />
         <div style={{ fontFamily: MONO, fontSize: 12, color: C.textDim, marginTop: 22, paddingTop: 14, borderTop: `1px solid ${C.borderSoft}` }}>
