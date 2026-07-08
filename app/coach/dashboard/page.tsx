@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { trackEvent } from '@/lib/track'
 import { useAuth } from '@/contexts/AuthContext'
 import OnboardingOverlay from '@/components/coach/OnboardingOverlay'
 import VoiceCloneCard from '@/components/coach/VoiceCloneCard'
@@ -102,7 +103,7 @@ export default function CoachDashboardPage() {
     await supabase.from('coach_invite_codes').update({ active: false }).eq('coach_id', user!.id)
     const code = (Math.random().toString(36).substring(2, 6) + Math.random().toString(36).substring(2, 6)).toUpperCase()
     const { error } = await supabase.from('coach_invite_codes').insert({ coach_id: user!.id, code, active: true })
-    if (!error) setInviteCode(code)
+    if (!error) { setInviteCode(code); trackEvent('coach_client_invited', { method: 'invite_code' }) }
     setGenLoading(false)
   }
 

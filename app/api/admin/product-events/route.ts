@@ -46,6 +46,7 @@ export async function GET(req: Request) {
     uniqueUsers: new Set(rows.map(r => r.user_id).filter(Boolean)).size,
     pageViewsToday: rows.filter(r => r.event_name === 'page_view' && dayKey(r.created_at) === todayKey).length,
     byEvent: tally(rows.map(r => r.event_name)).slice(0, 12),
+    conversions: tally(rows.filter(r => r.event_name !== 'page_view').map(r => r.event_name)).slice(0, 12),
     byPath: tally(rows.filter(r => r.event_name === 'page_view').map(r => r.path)).slice(0, 12),
     byRole: tally(rows.map(r => r.role)),
     daily: [...byDay.entries()].map(([day, count]) => ({ day, count })),

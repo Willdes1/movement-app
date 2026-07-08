@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { trackEvent } from '@/lib/track'
 import { useAuth } from '@/contexts/AuthContext'
 
 interface ParsedDay {
@@ -156,6 +157,7 @@ export default function ImportProgramPage() {
         .from('profiles')
         .update({ active_imported_program_id: prog.id, imported_program_current_week: 1 })
         .eq('id', user.id)
+      trackEvent('program_activated', { source: 'import' })
     }
 
     setStep('done')

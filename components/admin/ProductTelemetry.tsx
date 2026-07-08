@@ -16,6 +16,7 @@ type ProductData = {
   uniqueUsers: number
   pageViewsToday: number
   byEvent: Tally[]
+  conversions: Tally[]
   byPath: Tally[]
   byRole: Tally[]
   daily: { day: string; count: number }[]
@@ -94,10 +95,15 @@ export default function ProductTelemetry() {
         </div>
       </div>
 
+      {/* Conversion funnel events (excludes page_view) — where customers act. */}
+      <div style={{ marginBottom: 20 }}>
+        <TallyCard title="⭐ Conversion events (signups · plans · programs · completions)" rows={data.conversions} color={C.amber} empty="No conversion events yet — sign up, generate a plan, or complete a workout to see them." />
+      </div>
+
       {/* Two columns: top pages + top events */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 20 }}>
         <TallyCard title="Top pages (click-through)" rows={data.byPath} color={C.accent} empty="No page views yet." />
-        <TallyCard title="Top events" rows={data.byEvent} color={C.purple} empty="No events yet." />
+        <TallyCard title="Top events (all)" rows={data.byEvent} color={C.purple} empty="No events yet." />
       </div>
 
       {data.byRole.length > 0 && (

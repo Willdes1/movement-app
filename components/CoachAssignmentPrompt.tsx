@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { trackEvent } from '@/lib/track'
 import { useCoached } from '@/contexts/CoachedContext'
 
 // Chunk 5a — when a coach assigns a program, the athlete sees this prompt and
@@ -23,7 +24,7 @@ export default function CoachAssignmentPrompt() {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
       body: JSON.stringify({ assignmentId: p.id }),
     })
-    if (res.ok) { await refresh(); setDismissed(true) }
+    if (res.ok) { trackEvent('program_activated', { source: 'coach' }); await refresh(); setDismissed(true) }
     else setActivating(false)
   }
 

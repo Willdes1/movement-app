@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { trackEvent } from '@/lib/track'
 import { useAuth } from '@/contexts/AuthContext'
 
 type Mode = 'login' | 'signup'
@@ -137,6 +138,7 @@ export default function AuthPage() {
         setLoading(false)
         return
       }
+      trackEvent(asCoach ? 'coach_signup' : 'signup', { method: 'email' })
 
       // Coach signup: stamp the intent, and apply role immediately if we got a
       // session (no email confirmation); otherwise apply on first login.

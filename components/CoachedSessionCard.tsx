@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import { trackEvent } from '@/lib/track'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCoached } from '@/contexts/CoachedContext'
 import { useTTS } from '@/hooks/useTTS'
@@ -283,7 +284,7 @@ export default function CoachedSessionCard(
           { user_id: userId, assignment_id: assignment.id, week_number: weekNum, day_name: today, skipped: false },
           { onConflict: 'user_id,assignment_id,week_number,day_name' }
         )
-      if (!error) setCompleted(true)
+      if (!error) { setCompleted(true); trackEvent('workout_complete', { source: 'coached' }) }
     }
     setCompleting(false)
   }

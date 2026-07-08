@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { supabase } from '@/lib/supabase'
+import { trackEvent } from '@/lib/track'
 import LoopPreview from '@/components/ui/LoopPreview'
 import { inferEquipment, REST_GUIDANCE } from '@/lib/workout-display'
 import ExerciseDetailModal from '@/components/ui/ExerciseDetailModal'
@@ -427,6 +428,7 @@ function CalendarInner() {
       { onConflict: 'user_id,program_id,week_number,day_index' }
     )
     setCompletions(prev => new Set([...prev, `${weekNum}-${dayIdx}`]))
+    trackEvent('workout_complete', { source: 'ai_plan' })
     setCompleting(false)
     setShowLogPrompt(true)
   }

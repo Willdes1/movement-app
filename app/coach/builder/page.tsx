@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { trackEvent } from '@/lib/track'
 import { useAuth } from '@/contexts/AuthContext'
 import ManualProgramBuilder from '@/components/coach/ManualProgramBuilder'
 
@@ -175,6 +176,7 @@ export default function CoachBuilderPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Generation failed')
+      trackEvent('coach_ai_program_generated', { level: brief.level })
       setProgram(data.program)
       setProgramTitle(data.program.title)
       setExpandedWeeks(new Set([1]))
@@ -261,6 +263,7 @@ export default function CoachBuilderPage() {
       return
     }
 
+    trackEvent('coach_program_created', { source: source === 'ai' ? 'ai_generated' : 'import' })
     setStep('saved')
   }
 

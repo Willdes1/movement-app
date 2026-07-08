@@ -1,6 +1,7 @@
 'use client'
 import { createContext, useContext, useRef, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import { trackEvent } from '@/lib/track'
 
 type DayPlan = { day: string; label: string; type: string; movements: string[]; duration: string; focus?: string; coaching?: string }
 type Program = { id: string; startDate: string; totalWeeks: number; status: string }
@@ -109,6 +110,7 @@ export function PlanGenerationProvider({ children }: { children: React.ReactNode
     isRunningRef.current = true
     setIsGenerating(true)
     setShowDoneNotification(false)
+    trackEvent('generate_plan_click', { numWeeks: config.numWeeks })
 
     // Load library once up front — maintained in memory throughout generation
     // so each week only generates coaching details for exercises not yet saved.
@@ -152,6 +154,7 @@ export function PlanGenerationProvider({ children }: { children: React.ReactNode
 
     setProgress(null)
     setIsGenerating(false)
+    trackEvent('plan_generated', { numWeeks: config.numWeeks })
     setShowDoneNotification(true)
     isRunningRef.current = false
   }, [])
