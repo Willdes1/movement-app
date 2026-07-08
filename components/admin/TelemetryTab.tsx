@@ -21,6 +21,13 @@ type HarnessEvent = {
   metadata: Record<string, unknown> | null
   effective_user_id: string | null
 }
+type MigrationStatus = {
+  ledgerReady: boolean
+  total: number
+  appliedCount?: number
+  pending?: string[]
+  orphan?: string[]
+}
 
 // Severity → badge colors (mirrors the Spend Tracker's provider-badge pattern).
 function sevStyle(sev: string): { color: string; bg: string } {
@@ -57,21 +64,26 @@ export default function TelemetryTab() {
   const [flash, setFlash]       = useState('')
   const [err, setErr]           = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [migration, setMigration] = useState<MigrationStatus | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true); setErr('')
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch('/api/admin/harness-events', {
-        headers: { Authorization: `Bearer ${session?.access_token}` },
-      })
-      const d = await res.json().catch(() => ({}))
-      if (!res.ok) { setErr(d.error || 'Failed to load telemetry.'); setEvents([]) }
+      const headers = { Authorization: `Bearer ${session?.access_token}` }
+      const [evRes, mgRes] = await Promise.all([
+        fetch('/api/admin/harness-events', { headers }),
+        fetch('/api/admin/migration-drift', { headers }),
+      ])
+      const d = await evRes.json().catch(() => ({}))
+      if (!evRes.ok) { setErr(d.error || 'Failed to load telemetry.'); setEvents([]) }
       else {
         setEvents((d.events ?? []) as HarnessEvent[])
         setPending(!!d.pendingMigration)
         setSentry(!!d.sentryConfigured)
       }
+      const m = await mgRes.json().catch(() => null)
+      setMigration(mgRes.ok ? (m as MigrationStatus) : null)
     } catch {
       setErr('Failed to load telemetry.')
     }
@@ -158,6 +170,40 @@ export default function TelemetryTab() {
       {err && (
         <div style={{ padding: '12px 16px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 10, fontSize: 13, color: C.red, marginBottom: 16 }}>
           {err}
+        </div>
+      )}
+
+      {/* ── Migrations panel — are any SQL files unrun? ── */}
+      {migration && (
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '14px 16px', marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: C.text }}>🗄 Migrations</p>
+            {!migration.ledgerReady ? (
+              <span style={{ fontSize: 11.5, color: C.amber, fontFamily: 'monospace' }}>ledger not created — run 20260708_applied_migrations.sql</span>
+            ) : (migration.pending?.length || migration.orphan?.length) ? (
+              <span style={{ fontSize: 11.5, color: C.amber, fontFamily: 'monospace', fontWeight: 700 }}>
+                ⚠ {migration.pending?.length || 0} pending{(migration.orphan?.length || 0) > 0 ? `, ${migration.orphan?.length} orphan` : ''}
+              </span>
+            ) : (
+              <span style={{ fontSize: 11.5, color: C.green, fontFamily: 'monospace', fontWeight: 700 }}>✓ all {migration.appliedCount}/{migration.total} applied</span>
+            )}
+          </div>
+          {migration.ledgerReady && !!migration.pending?.length && (
+            <div style={{ marginTop: 10 }}>
+              <p style={{ fontSize: 11, color: C.textDim, marginBottom: 6 }}>Pending — you haven&apos;t run these yet:</p>
+              {migration.pending.map(f => (
+                <div key={f} style={{ fontSize: 11.5, color: C.amber, fontFamily: 'monospace', padding: '3px 0' }}>• {f}</div>
+              ))}
+            </div>
+          )}
+          {migration.ledgerReady && !!migration.orphan?.length && (
+            <div style={{ marginTop: 10 }}>
+              <p style={{ fontSize: 11, color: C.textDim, marginBottom: 6 }}>Orphan — recorded applied but the file is gone:</p>
+              {migration.orphan.map(f => (
+                <div key={f} style={{ fontSize: 11.5, color: C.textMid, fontFamily: 'monospace', padding: '3px 0' }}>• {f}</div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

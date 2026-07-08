@@ -185,7 +185,10 @@
       "Bash(node -e \"console.log\\('jszip', require\\('jszip/package.json'\\).version\\)\")",
       "PowerShell(if \\($?\\) { \"TYPECHECK CLEAN\" } else { \"TYPECHECK FAILED\" })",
       "PowerShell(gh api repos/Willdes1/movement-app/commits/f572226/status --jq '.state, \\(.statuses[]?.description\\)')",
-      "PowerShell(npm run build 2>&1)"
+      "PowerShell(npm run build 2>&1)",
+      "PowerShell(gh api repos/Willdes1/movement-app/commits/4d94650/status --jq '.state, \\(.statuses[]?.description\\)')",
+      "PowerShell(node scripts/migrations-manifest.js)",
+      "PowerShell(npm run migration-drift; \"exit code: $LASTEXITCODE\")"
     ],
     "additionalDirectories": [
       "c:\\Dev\\movement-app\\app\\coach\\programs"

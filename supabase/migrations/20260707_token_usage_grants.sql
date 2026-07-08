@@ -10,3 +10,9 @@
 --   REVOKE SELECT, UPDATE, DELETE ON public.token_usage FROM service_role;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.token_usage TO service_role;
+
+-- Self-register in the migration ledger (no-op if the ledger doesn't exist yet).
+DO $$ BEGIN
+  INSERT INTO public.applied_migrations (filename)
+  VALUES ('20260707_token_usage_grants.sql') ON CONFLICT (filename) DO NOTHING;
+EXCEPTION WHEN undefined_table THEN NULL; END $$;

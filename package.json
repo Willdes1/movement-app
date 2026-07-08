@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "prebuild": "node scripts/git-stats.js",
+    "prebuild": "node scripts/git-stats.js && node scripts/migrations-manifest.js",
+    "migration-drift": "node scripts/migration-drift.js",
     "dev": "next dev",
     "build": "next build",
     "start": "next start"

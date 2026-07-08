@@ -12,3 +12,9 @@
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('receipts', 'receipts', true)
 ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- Self-register in the migration ledger (no-op if the ledger doesn't exist yet).
+DO $$ BEGIN
+  INSERT INTO public.applied_migrations (filename)
+  VALUES ('20260707_receipts_bucket.sql') ON CONFLICT (filename) DO NOTHING;
+EXCEPTION WHEN undefined_table THEN NULL; END $$;
