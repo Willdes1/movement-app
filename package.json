@@ -5,6 +5,7 @@
   "scripts": {
     "prebuild": "node scripts/git-stats.js && node scripts/migrations-manifest.js",
     "migration-drift": "node scripts/migration-drift.js",
+    "smoke-test": "node scripts/smoke-test.js",
     "dev": "next dev",
     "build": "next build",
     "start": "next start"

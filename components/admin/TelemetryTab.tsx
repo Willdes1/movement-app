@@ -28,6 +28,8 @@ type MigrationStatus = {
   pending?: string[]
   orphan?: string[]
 }
+type SmokeCheck = { name: string; ok: boolean; detail: string; skipped?: boolean }
+type SmokeResult = { ok: boolean; ranAt: string; passed: number; total: number; checks: SmokeCheck[] }
 
 // Severity → badge colors (mirrors the Spend Tracker's provider-badge pattern).
 function sevStyle(sev: string): { color: string; bg: string } {
@@ -65,6 +67,8 @@ export default function TelemetryTab() {
   const [err, setErr]           = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [migration, setMigration] = useState<MigrationStatus | null>(null)
+  const [smokeRunning, setSmokeRunning] = useState(false)
+  const [smoke, setSmoke] = useState<SmokeResult | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true); setErr('')
@@ -113,11 +117,32 @@ export default function TelemetryTab() {
     setFiring(false)
   }
 
+  async function runSmoke() {
+    setSmokeRunning(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/admin/smoke-test', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      })
+      const d = await res.json().catch(() => null)
+      if (d && Array.isArray(d.checks)) setSmoke(d as SmokeResult)
+      else showFlash('Smoke run returned no results.')
+      await load() // refresh events so the last-run marker updates
+    } catch {
+      showFlash('Could not run the smoke tests.')
+    }
+    setSmokeRunning(false)
+  }
+
   const counts = {
     critical: events.filter(e => e.severity === 'critical').length,
     error:    events.filter(e => e.severity === 'error').length,
     warn:     events.filter(e => e.severity === 'warn').length,
   }
+
+  // Last persisted smoke run (from the events feed) — shows even before you click Run.
+  const lastSmoke = events.find(e => e.event_type === 'smoke_run' || e.event_type === 'smoke_fail')
 
   return (
     <div style={{ maxWidth: 860 }}>
@@ -206,6 +231,41 @@ export default function TelemetryTab() {
           )}
         </div>
       )}
+
+      {/* ── Smoke tests panel ── */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '14px 16px', marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div>
+            <p style={{ fontSize: 13, fontWeight: 700, color: C.text }}>🧪 Smoke tests</p>
+            {lastSmoke
+              ? <p style={{ fontSize: 11, color: C.textDim, marginTop: 2, fontFamily: 'monospace' }}>
+                  Last run: <span style={{ color: lastSmoke.event_type === 'smoke_fail' ? C.red : C.green, fontWeight: 700 }}>{lastSmoke.event_type === 'smoke_fail' ? 'FAIL' : 'PASS'}</span> · {fmtWhen(lastSmoke.created_at)}
+                </p>
+              : <p style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>Never run. Click to verify the critical paths.</p>}
+          </div>
+          <button
+            onClick={runSmoke}
+            disabled={smokeRunning}
+            style={{ padding: '7px 13px', borderRadius: 7, border: `1px solid ${C.accentBorder}`, background: C.accentDim, color: C.accent, fontSize: 12, fontWeight: 700, cursor: smokeRunning ? 'default' : 'pointer', opacity: smokeRunning ? 0.7 : 1 }}
+          >
+            {smokeRunning ? 'Running…' : '▶ Run smoke tests'}
+          </button>
+        </div>
+        {smoke && (
+          <div style={{ marginTop: 12, borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: smoke.ok ? C.green : C.red, fontFamily: 'monospace', marginBottom: 8 }}>
+              {smoke.ok ? '✓ PASS' : '✗ FAIL'} — {smoke.passed}/{smoke.total} checks
+            </p>
+            {smoke.checks.map(c => (
+              <div key={c.name} style={{ display: 'flex', gap: 8, padding: '3px 0', fontSize: 11.5, fontFamily: 'monospace' }}>
+                <span style={{ color: c.skipped ? C.textDim : c.ok ? C.green : C.red, flexShrink: 0 }}>{c.skipped ? '–' : c.ok ? '✓' : '✗'}</span>
+                <span style={{ color: C.textMid }}>{c.name}</span>
+                {c.detail && <span style={{ color: C.textDim, overflow: 'hidden', textOverflow: 'ellipsis' }}>— {c.detail}</span>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {loading ? (
         <p style={{ fontSize: 13, color: C.textDim, padding: '40px 0', textAlign: 'center', fontFamily: 'monospace' }}>Loading telemetry…</p>

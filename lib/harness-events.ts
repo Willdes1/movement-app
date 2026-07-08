@@ -7,7 +7,7 @@ import { createClient } from '@supabase/supabase-js'
 // simply no-ops on "table does not exist" — the caller's console.error is still
 // the loud signal. This writer NEVER throws: telemetry must not break a request.
 
-export type HarnessEventType = 'verify_fail' | 'route_error' | 'smoke_fail' | 'migration_drift'
+export type HarnessEventType = 'verify_fail' | 'route_error' | 'smoke_fail' | 'migration_drift' | 'smoke_run'
 export type HarnessSeverity = 'info' | 'warn' | 'error' | 'critical'
 
 export async function logHarnessEvent(ev: {

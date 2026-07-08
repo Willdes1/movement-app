@@ -188,7 +188,8 @@
       "PowerShell(npm run build 2>&1)",
       "PowerShell(gh api repos/Willdes1/movement-app/commits/4d94650/status --jq '.state, \\(.statuses[]?.description\\)')",
       "PowerShell(node scripts/migrations-manifest.js)",
-      "PowerShell(npm run migration-drift; \"exit code: $LASTEXITCODE\")"
+      "PowerShell(npm run migration-drift; \"exit code: $LASTEXITCODE\")",
+      "PowerShell(gh api repos/Willdes1/movement-app/commits/2862ff4/status --jq '.state, \\(.statuses[]?.description\\)')"
     ],
     "additionalDirectories": [
       "c:\\Dev\\movement-app\\app\\coach\\programs"
