@@ -124,6 +124,7 @@ export default function SpendTab() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [editingId, setEditingId]   = useState<string | null>(null)
   const [packaging, setPackaging]   = useState(false)
+  const [aiVisible, setAiVisible]   = useState(50) // AI-ops rows shown; grows +50 on scroll
   const fileRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLDivElement>(null)
 
@@ -308,7 +309,15 @@ export default function SpendTab() {
   }
   const opStats = [...opMap.entries()]
     .map(([op, s]) => ({ op, ...s }))
-    .sort((a, b) => b.cost - a.cost)
+    // Freshest activity on top: sort by most-recent date descending. ISO date
+    // strings compare correctly lexicographically; null dates (legacy rows with
+    // no created_at) sink to the bottom. Ties break by cost, then name.
+    .sort((a, b) => {
+      const ad = a.maxDate ?? '', bd = b.maxDate ?? ''
+      if (ad !== bd) return ad < bd ? 1 : -1
+      if (a.cost !== b.cost) return b.cost - a.cost
+      return a.op.localeCompare(b.op)
+    })
 
   const inp: React.CSSProperties = {
     width: '100%', padding: '9px 11px', borderRadius: 7, border: `1px solid ${C.border}`,
@@ -371,7 +380,18 @@ export default function SpendTab() {
                 <span key={h} style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: C.textDim }}>{h}</span>
               ))}
             </div>
-            {opStats.map((s, i) => (
+            {/* Scrollable window — 50 rows per page, loads 50 more as you near the
+                bottom (freshest operations already sorted on top). */}
+            <div
+              onScroll={ev => {
+                const el = ev.currentTarget
+                if (el.scrollHeight - el.scrollTop - el.clientHeight < 80 && aiVisible < opStats.length) {
+                  setAiVisible(v => Math.min(v + 50, opStats.length))
+                }
+              }}
+              style={{ maxHeight: 520, overflowY: 'auto' }}
+            >
+            {opStats.slice(0, aiVisible).map((s, i) => (
               <div key={s.op} style={{ display: 'grid', gridTemplateColumns: '2fr 60px 80px 80px 80px', padding: '10px 16px', borderBottom: i < opStats.length - 1 ? `1px solid ${C.border}` : 'none', alignItems: 'center' }}>
                 <span style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
@@ -390,6 +410,12 @@ export default function SpendTab() {
                 <span style={{ fontSize: 12, fontWeight: 700, color: s.cost >= 0.01 ? C.purple : C.textDim, fontFamily: 'monospace' }}>{fmtUSD(s.cost)}</span>
               </div>
             ))}
+            {aiVisible < opStats.length && (
+              <div style={{ padding: '8px 16px', textAlign: 'center', fontSize: 10.5, color: C.textDim, fontFamily: 'monospace', borderTop: `1px solid ${C.border}` }}>
+                Showing {aiVisible} of {opStats.length} — scroll for more
+              </div>
+            )}
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 60px 80px 80px 80px', padding: '10px 16px', background: C.surface2, borderTop: `1px solid ${C.border}` }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Total</span>
               <span style={{ fontSize: 12, color: C.textMid, fontFamily: 'monospace' }}>{tokenRows.length}</span>
