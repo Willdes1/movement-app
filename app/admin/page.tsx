@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import LaunchpadTab from '@/components/admin/LaunchpadTab'
 import HealthTab from '@/components/admin/HealthTab'
 import ArchitectureTab from '@/components/admin/ArchitectureTab'
+import TelemetryTab from '@/components/admin/TelemetryTab'
 import ImpersonationActivityTab from '@/components/admin/ImpersonationActivityTab'
 import RetentionTab from '@/components/admin/RetentionTab'
 import NotesTab from '@/components/admin/NotesTab'
@@ -47,7 +48,7 @@ const C = {
 }
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
-type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad' | 'health' | 'media' | 'impersonation' | 'retention' | 'notes' | 'billing' | 'ceo' | 'bugs' | 'kb' | 'study' | 'access' | 'spend' | 'video' | 'push' | 'stripe' | 'mie' | 'tts' | 'conversions' | 'seed' | 'architecture'
+type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad' | 'health' | 'media' | 'impersonation' | 'retention' | 'notes' | 'billing' | 'ceo' | 'bugs' | 'kb' | 'study' | 'access' | 'spend' | 'video' | 'push' | 'stripe' | 'mie' | 'tts' | 'conversions' | 'seed' | 'architecture' | 'telemetry'
 type TodoRow = { id: string; content: string; category: string; status: string; priority: string; created_at: string; updated_at: string }
 type IdeaRow = { id: string; content: string; category: string; created_at: string }
 type PromoRow = { id: string; code: string; role: string; max_uses: number; uses: number; created_at: string }
@@ -1540,6 +1541,7 @@ const NAV_GROUPS = [
     items: [
       { id: 'health' as Tab, label: 'Health Monitor' },
       { id: 'architecture' as Tab, label: '🗺️ Architecture' },
+      { id: 'telemetry' as Tab, label: '📡 Telemetry' },
     ],
   },
 ]
@@ -1880,6 +1882,7 @@ export default function AdminPage() {
           {tab === 'media' && <MediaLibraryTab />}
           {tab === 'health' && <><TokenUsageCard /><LibraryBackfillCard /><ExerciseLibraryCard /><HealthTab /></>}
           {tab === 'architecture' && <ArchitectureTab />}
+          {tab === 'telemetry' && <TelemetryTab />}
           </>
           )}
         </main>
