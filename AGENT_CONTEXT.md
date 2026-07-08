@@ -1,6 +1,6 @@
 # Agent Context — Atlas Prime
 > Full briefing for a new agent to continue this project without any prior conversation history.
-> Last updated: 2026-07-07 | Current branch: master | 380 commits
+> Last updated: 2026-07-08 | Current branch: master | 386 commits
 
 ---
 
@@ -99,7 +99,62 @@
 
 ---
 
-## 4. What Was Built This Session (2026-07-03 → 07-07)
+## 4. What Was Built This Session (2026-07-08)
+
+**Harness Engineering — ALL 4 STAGES COMPLETE + each verified green — plus a Spend
+Tracker sort fix. ~7 commits, all deployed green. Migrations `20260707_harness_events`
++ `20260708_applied_migrations` RUN by Will; the two long-pending 07-07 migrations
+(`receipts_bucket` + `token_usage_grants`) ALSO RUN → ledger shows 33/33. Only the
+"After all stages" wrap-up remains: update `ARCHITECTURE.md` (Deploy/Ops + Security)
++ a one-paragraph coverage summary.**
+
+### 🔧 Harness Stage 2 — Production error + event monitoring (verified)
+- `harness_events` table (`20260707_harness_events.sql`, RUN). `lib/observability.ts` —
+  DSN-gated **Sentry forwarder** (no-ops without `SENTRY_DSN`) + `withHarness()` route
+  wrapper → Sentry + `logHarnessEvent('route_error')`. New **Telemetry admin tab**
+  (`/admin#telemetry`, Dev Tools): severity badges, Sentry-status chip, 🔥 Fire-test-error
+  button. Verified: fired test error → `route_error` row appeared. Sentry chip reads
+  "not configured" until Will adds a DSN; full `@sentry/nextjs` client+edge deferred until
+  then. `withHarness` proven on the test route only — NOT yet retrofitted across all routes.
+
+### 🔧 Harness Stage 3 — Migration ledger + drift check (verified)
+- `applied_migrations` ledger (`20260708_applied_migrations.sql`, RUN → 33/33). Every
+  migration self-registers on run (guarded `DO $$…undefined_table…$$` block).
+  `scripts/migration-drift.js` (fs vs ledger; `--staging/--backfill/--record/--json`; needs
+  `SUPABASE_SERVICE_ROLE_KEY`, which is NOT in `.env.local`). Build-time
+  `lib/migrations-manifest.json` (prebuild) powers a live **Migrations panel** in the
+  Telemetry tab + `/api/admin/migration-drift`. Backfill intentionally excluded the 2
+  then-pending files → panel correctly showed "2 pending"; Will ran both → 33/33. Docs:
+  `docs/harness-staging.md` + `docs/harness-migrations.md`. **STAGING DEFERRED** (Will's
+  call): revisit post-launch, or if smoke tests want a non-prod target. Proactively
+  recommend it when it's genuinely needed.
+
+### 🔧 Harness Stage 4 — Smoke tests (verified)
+- Server-side `/api/admin/smoke-test` runs 7 checks reusing the REAL helpers: db
+  connectivity, auth identity, `harness_events` present, `migration_ledger` drift,
+  **`token_usage` verifiedInsert write→read-back→cleanup** (the money path — self-cleaning,
+  no cost), + 2 auth-gate 401 checks. Logs `smoke_run` (pass) / `smoke_fail` (fail) →
+  persistent last-run in the tab. `scripts/smoke-test.js` CLI (post-deploy via `CRON_SECRET`).
+  Smoke panel + last-run in Telemetry. Docs `docs/harness-smoke.md`. **Bug caught + fixed
+  same session:** gate checks first fetched `VERCEL_URL` (behind Vercel Deployment Protection
+  → a 200 interstitial masked the real 401 = false failure). Confirmed via `curl` both routes
+  401 correctly; fixed to hit the canonical domain (`SMOKE_BASE_URL` override for staging).
+  `generate-plan` E2E intentionally NOT run against prod (token spend + real `training_programs`
+  writes) — deferred to staging; suite verifies its dependencies instead.
+
+### 💰 Spend Tracker — freshest-first sort + paginated scroll (f572226)
+- The AI Token Costs "By Operation" table sorted by cost, so date ranges looked scrambled.
+  Now sorts by most-recent activity (maxDate desc; null dates sink; ties break by cost then
+  name). Rows live in a 520px scroll window that loads 50 more as you near the bottom.
+
+### 📎 Non-code
+- Confirmed **Fable 5 is NOT free** in Claude Code (promo ended ~June 22) and costs **2× Opus
+  4.8** — so stay on Opus 4.8 (already the session model). The **full 4-stage Harness spec was
+  saved VERBATIM to memory** so it's never lost again.
+
+---
+
+## Previous Session (2026-07-03 → 07-07)
 
 **Big content-ops + reliability + monetization night — ~20 commits, all deployed
 green. Two NEW SQL migrations created (see ⚠️ PENDING below — NOT yet run by Will).**
@@ -897,26 +952,21 @@ return () => { supabase.removeChannel(channel) }
 
 ## 11. What to Work on Next (Priority Order)
 
-**IMMEDIATE (start of next session): finish the Spend Tracker test, then resume Harness Stage 2.**
-Will ended 2026-07-07 about to test the receipt/tax-package work. Surface the two pending
-migrations FIRST (see below), then walk the test, then continue the harness.
+**IMMEDIATE (start of next session): close out Harness Engineering — the wrap-up step.**
+All 4 harness stages are BUILT + verified green. Only the spec's "After all stages" item is
+left (Will explicitly asked to do it next): update `ARCHITECTURE.md`'s **Deploy & Ops** and
+**Security model** sections to reflect the new harness (verified writes → monitoring/Telemetry
+→ migration ledger/drift → smoke tests), keep `docs/architecture.html` + the Admin Architecture
+tab in sync, then give Will a one-paragraph "what's now covered / what's still thin" summary.
 
-0. **⚠️ PENDING SQL MIGRATIONS (surface immediately).**
-   - `supabase/migrations/20260707_receipts_bucket.sql` — **REQUIRED** for receipt uploads.
-   - `supabase/migrations/20260707_token_usage_grants.sql` — **OPTIONAL** (full read-back on
-     token_usage; Spend Tracker works without it via the fallback).
-   All earlier migrations confirmed run.
-1. **Test the Spend Tracker receipt flow** (after Will runs the receipts migration): Edit an
-   expense → attach a PDF → confirm the 📎 link + the CSV "Receipt File" column + the 📦 Tax
-   Package zip. Also re-upload the receipts that were lost (old uploads never stored). Also fix
-   the mis-dated "Anthropic tokens" expense (April not June) via the new Edit button.
-2. **🔧 Harness Engineering — resume at STAGE 2.** Stage 1 (verified writes) is DONE + deployed.
-   Will has the full 4-stage spec (he pasted it; re-request it). Stage 2 = `harness_events`
-   migration (show SQL first — do NOT auto-apply) + Sentry (needs a Sentry project + DSN in
-   Vercel; build graceful-without-it like COACH_VOICE_CLONING) + a **Telemetry tab** (recent
-   harness_events, severity badges mirroring the Spend Tracker's provider badges). Ground rules:
-   work in stages, STOP for confirmation after each, show every migration SQL before applying.
-3. **📊 Product telemetry** — Will also wants customer click-through tracking in the admin portal
+0. **No pending SQL migrations.** All 33 tracked in the `applied_migrations` ledger (33/33).
+   The drift Migrations panel in `/admin#telemetry` is the live source of truth going forward.
+1. **🏁 Harness wrap-up (do first).** ARCHITECTURE.md Deploy/Ops + Security update + coverage
+   paragraph (see above). Optional follow-ups that came out of the build, if Will wants them:
+   (a) retrofit `withHarness()` across the critical API routes (only the test route uses it now);
+   (b) add `SENTRY_DSN` to Vercel to light up the Sentry half (create a Sentry project first);
+   (c) provision a staging Supabase project — DEFERRED by Will; recommend when genuinely needed.
+2. **📊 Product telemetry** — Will also wants customer click-through tracking in the admin portal
    (a `Product` view alongside `System Health` in the same Telemetry tab; its own `product_events`
    table). Agreed to build AFTER the harness stands up the tab. Separate data model from harness_events.
 4. **🎙 Coach voice cloning — go live + test.** Phase 1 is BUILT. Needs: `ELEVENLABS_API_KEY` in
