@@ -83,18 +83,18 @@ export async function POST(req: Request) {
   } catch (e) { push('token_usage_verified_write', false, (e as Error).message) }
 
   // 6 — Auth-gate regression: unauthenticated calls to protected routes must 401.
-  const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null
-  if (base) {
-    for (const g of ['/api/admin/harness-events', '/api/coach/my-program']) {
-      try {
-        const r = await fetch(base + g)
-        push(`gate:${g}`, r.status === 401, `expected 401, got ${r.status}`)
-      } catch {
-        push(`gate:${g}`, true, 'inconclusive (self-fetch failed)', true)
-      }
+  // Use the CANONICAL public domain — NOT the auto-generated VERCEL_URL, which
+  // sits behind Vercel Deployment Protection and returns its own 200 interstitial
+  // that masks the real route (a false pass/fail). Override via SMOKE_BASE_URL
+  // to point at staging.
+  const base = (process.env.SMOKE_BASE_URL || 'https://atlasprime.app').replace(/\/$/, '')
+  for (const g of ['/api/admin/harness-events', '/api/coach/my-program']) {
+    try {
+      const r = await fetch(base + g)
+      push(`gate:${g}`, r.status === 401 || r.status === 403, `expected 401, got ${r.status}`)
+    } catch {
+      push(`gate:${g}`, true, 'inconclusive (fetch failed)', true)
     }
-  } else {
-    push('auth_gates', true, 'skipped (no VERCEL_URL)', true)
   }
 
   const failed = checks.filter(c => !c.ok && !c.skipped)

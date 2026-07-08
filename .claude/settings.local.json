@@ -189,7 +189,12 @@
       "PowerShell(gh api repos/Willdes1/movement-app/commits/4d94650/status --jq '.state, \\(.statuses[]?.description\\)')",
       "PowerShell(node scripts/migrations-manifest.js)",
       "PowerShell(npm run migration-drift; \"exit code: $LASTEXITCODE\")",
-      "PowerShell(gh api repos/Willdes1/movement-app/commits/2862ff4/status --jq '.state, \\(.statuses[]?.description\\)')"
+      "PowerShell(gh api repos/Willdes1/movement-app/commits/2862ff4/status --jq '.state, \\(.statuses[]?.description\\)')",
+      "PowerShell(gh api repos/Willdes1/movement-app/commits/6161687/status --jq '.state, \\(.statuses[]?.description\\)')",
+      "PowerShell(curl.exe -s -o NUL -w \"%{http_code} \\(final: %{url_effective}\\)`n\" -L https://atlasprime.app/api/admin/harness-events)",
+      "PowerShell(curl.exe -s -o NUL -w \"%{http_code} \\(final: %{url_effective}\\)`n\" -L https://atlasprime.app/api/coach/my-program)",
+      "PowerShell(\"harness-events:\")",
+      "PowerShell(\"my-program:\")"
     ],
     "additionalDirectories": [
       "c:\\Dev\\movement-app\\app\\coach\\programs"

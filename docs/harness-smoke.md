@@ -21,6 +21,12 @@ On completion it writes one `harness_events` row — `smoke_run` (info) on pass 
 `smoke_fail` (error) on failure — so the **last run + timestamp** persists in the
 Telemetry tab.
 
+> **Gate checks hit the canonical domain** (`https://atlasprime.app`), not the
+> auto-generated `VERCEL_URL` — that deployment URL sits behind Vercel Deployment
+> Protection and returns a 200 interstitial that masks the real 401 (a false
+> positive). Set `SMOKE_BASE_URL` in the environment to point the gate checks at
+> staging instead.
+
 ### Intentionally NOT covered against production
 Full `generate-plan` end-to-end is **not** run here — it spends Claude tokens and
 writes real `training_programs` rows. The suite verifies its *dependencies* (DB
