@@ -19,6 +19,7 @@ import CoachAssignmentPrompt from '@/components/CoachAssignmentPrompt'
 import JoinLinkRedeemer from '@/components/JoinLinkRedeemer'
 import AppMain from '@/components/AppMain'
 import ServiceWorkerRegistrar from '@/components/ServiceWorkerRegistrar'
+import ProductTracker from '@/components/ProductTracker'
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -80,6 +81,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <CoachWinBackModal />
               <JoinLinkRedeemer />
               <ServiceWorkerRegistrar />
+              <ProductTracker />
             </PlanGenerationProvider>
           </ThemeProvider>
           </CoachedProvider>

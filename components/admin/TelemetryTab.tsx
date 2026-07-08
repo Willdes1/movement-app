@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import ProductTelemetry from './ProductTelemetry'
 
 const C = {
   bg: '#0d1117', surface: '#161b22', surface2: '#21262d', border: '#30363d',
@@ -69,6 +70,7 @@ export default function TelemetryTab() {
   const [migration, setMigration] = useState<MigrationStatus | null>(null)
   const [smokeRunning, setSmokeRunning] = useState(false)
   const [smoke, setSmoke] = useState<SmokeResult | null>(null)
+  const [view, setView] = useState<'system' | 'product'>('system')
 
   const load = useCallback(async () => {
     setLoading(true); setErr('')
@@ -146,27 +148,47 @@ export default function TelemetryTab() {
 
   return (
     <div style={{ maxWidth: 860 }}>
-      <div style={{ marginBottom: 24, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <div>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: C.text, marginBottom: 4 }}>📡 Telemetry</h2>
-          <p style={{ fontSize: 13, color: C.textDim }}>Harness events — the app&apos;s own safety checks firing. Newest first.</p>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 800, color: C.text, marginBottom: 4 }}>📡 Telemetry</h2>
+            <p style={{ fontSize: 13, color: C.textDim }}>
+              {view === 'system'
+                ? "System — the app's own safety checks firing. Newest first."
+                : 'Product — what customers click through and do in the app.'}
+            </p>
+          </div>
+          {view === 'system' && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                onClick={fireTestError}
+                disabled={firing}
+                title="Fire a deliberate error through the harness wrapper to verify capture"
+                style={{ padding: '7px 13px', borderRadius: 7, border: `1px solid ${C.accentBorder}`, background: C.accentDim, color: C.accent, fontSize: 12, fontWeight: 700, cursor: firing ? 'default' : 'pointer', opacity: firing ? 0.7 : 1 }}
+              >
+                {firing ? 'Firing…' : '🔥 Fire test error'}
+              </button>
+              <button
+                onClick={load}
+                disabled={loading}
+                style={{ padding: '7px 13px', borderRadius: 7, border: `1px solid ${C.border}`, background: 'transparent', color: C.textDim, fontSize: 12, fontWeight: 600, cursor: loading ? 'default' : 'pointer' }}
+              >
+                {loading ? '↻ …' : '↻ Refresh'}
+              </button>
+            </div>
+          )}
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button
-            onClick={fireTestError}
-            disabled={firing}
-            title="Fire a deliberate error through the harness wrapper to verify capture"
-            style={{ padding: '7px 13px', borderRadius: 7, border: `1px solid ${C.accentBorder}`, background: C.accentDim, color: C.accent, fontSize: 12, fontWeight: 700, cursor: firing ? 'default' : 'pointer', opacity: firing ? 0.7 : 1 }}
-          >
-            {firing ? 'Firing…' : '🔥 Fire test error'}
-          </button>
-          <button
-            onClick={load}
-            disabled={loading}
-            style={{ padding: '7px 13px', borderRadius: 7, border: `1px solid ${C.border}`, background: 'transparent', color: C.textDim, fontSize: 12, fontWeight: 600, cursor: loading ? 'default' : 'pointer' }}
-          >
-            {loading ? '↻ …' : '↻ Refresh'}
-          </button>
+        {/* System / Product toggle */}
+        <div style={{ display: 'inline-flex', background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 8, padding: 3, gap: 3 }}>
+          {(['system', 'product'] as const).map(v => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              style={{ padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, background: view === v ? C.accent : 'transparent', color: view === v ? '#fff' : C.textDim }}
+            >
+              {v === 'system' ? '🛡 System' : '📊 Product'}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -176,6 +198,9 @@ export default function TelemetryTab() {
         </div>
       )}
 
+      {view === 'product' && <ProductTelemetry />}
+
+      {view === 'system' && <>
       {/* Status chips */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
         <Chip label={`Sentry: ${sentry ? 'connected' : 'not configured'}`} color={sentry ? C.green : C.textDim} bg={sentry ? C.greenDim : C.surface2} />
@@ -320,6 +345,7 @@ export default function TelemetryTab() {
           </div>
         </div>
       ) : null}
+      </>}
     </div>
   )
 }
