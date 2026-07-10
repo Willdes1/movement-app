@@ -9,6 +9,7 @@ const MENU_ITEMS = [
   { href: '/coach/programs', label: 'Programs', desc: 'Program library & templates',      emoji: '📋' },
   { href: '/coach/builder',  label: 'Builder',  desc: 'AI & manual program builder',      emoji: '🛠️' },
   { href: '/coach/library',  label: 'Library',  desc: 'Your exercises & video clips',     emoji: '🎬' },
+  { href: '/coach/billing',  label: 'Billing',  desc: 'Your plan, usage & upgrades',      emoji: '💳' },
 ]
 
 export default function CoachMobileMenu() {

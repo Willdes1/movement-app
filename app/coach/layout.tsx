@@ -14,6 +14,7 @@ const coachNav = [
   { href: '/coach/library',    label: 'Library',   emoji: '🎬' },
   { href: '/coach/analytics',  label: 'Analytics', emoji: '📈' },
   { href: '/coach/messages',   label: 'Messages',  emoji: '💬' },
+  { href: '/coach/billing',    label: 'Billing',   emoji: '💳' },
 ]
 
 // Mobile bottom tabs — SVG line icons matching the user app's BottomNav style
