@@ -239,6 +239,29 @@ export default function AuthPage() {
         </p>
       </div>
 
+      {/* Athlete vs Coach — let people self-identify at signup (no special link needed) */}
+      {mode === 'signup' && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 22, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, padding: 4 }}>
+          {([
+            { coach: false, label: "I'm an athlete", sub: 'Train with AI plans' },
+            { coach: true,  label: "I'm a coach",   sub: 'Build programs for clients' },
+          ] as const).map(opt => {
+            const active = asCoach === opt.coach
+            return (
+              <button
+                key={opt.label}
+                type="button"
+                onClick={() => { setAsCoach(opt.coach); setError('') }}
+                style={{ flex: 1, padding: '9px 8px', borderRadius: 7, border: 'none', cursor: 'pointer', background: active ? 'var(--accent)' : 'transparent', color: active ? '#fff' : 'var(--text-mid)', transition: 'all 0.15s' }}
+              >
+                <span style={{ display: 'block', fontSize: 13.5, fontWeight: 700 }}>{opt.label}</span>
+                <span style={{ display: 'block', fontSize: 10.5, opacity: 0.85, marginTop: 1 }}>{opt.sub}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {/* OAuth buttons */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
         <button
