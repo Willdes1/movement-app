@@ -180,7 +180,7 @@ export async function POST(request: Request) {
     // Fetch all unprocessed exercises (no video, not already proposed)
     const { data: all } = await supabaseAdmin
       .from('exercise_library')
-      .select('id, name_display, how, name_normalized')
+      .select('id, name_display, how, name_normalized, source_program')
       .is('video_url', null)
       .order('name_display')
 
@@ -198,7 +198,10 @@ export async function POST(request: Request) {
       )
       sorted = available.filter((e: Exercise) => planQueuedIds.has(e.id))
     } else if (lane === 'backlog') {
-      sorted = available.filter((e: Exercise) => !queued.has(e.id))
+      // Partition: the backlog is everything NOT owned by a named lane. Program /
+      // Library-Builder-seeded exercises (source_program set) have their own lanes,
+      // so exclude them here to avoid double-curating the same exercise.
+      sorted = available.filter((e: Exercise) => !queued.has(e.id) && !(e as { source_program?: string | null }).source_program)
     } else {
       sorted = [
         ...available.filter((e: Exercise) => queued.has(e.id)),

@@ -85,6 +85,7 @@ export default function VideoCurationTab() {
 
   // ── Priority queue (from client plan generation) ───────────────────────────
   const [queuedIds, setQueuedIds]         = useState<Set<string>>(new Set())
+  const [programExerciseIds, setProgramExerciseIds] = useState<Set<string>>(new Set())
 
   // ── Program lanes ──────────────────────────────────────────────────────────
   type ProgramLane = { programId: string; name: string; exerciseIds: string[]; pendingCount: number; needsCurationCount: number }
@@ -209,6 +210,9 @@ export default function VideoCurationTab() {
       if (!progMap[laneKey]) progMap[laneKey] = []
       progMap[laneKey].push(ex)
     }
+    // Program-lane exercise IDs — excluded from the Full Library Backlog so the
+    // lanes are a clean partition (no exercise counted in two lanes).
+    setProgramExerciseIds(new Set((programExercises ?? []).map((e: { id: string }) => e.id)))
 
     const { data: cands } = await supabase
       .from('exercise_video_candidates')
@@ -581,7 +585,7 @@ export default function VideoCurationTab() {
                 desc: lane.needsCurationCount > 0
                   ? `${lane.needsCurationCount} need AI curation · ${lane.pendingCount - lane.needsCurationCount} awaiting your review below`
                   : `All ${lane.pendingCount} exercises have proposals — scroll down to review & approve`,
-                count: lane.pendingCount,
+                count: lane.needsCurationCount,
                 curationCount: lane.needsCurationCount,
                 ids: lane.exerciseIds,
                 borderColor: C.accentBorder,
@@ -589,7 +593,7 @@ export default function VideoCurationTab() {
               })),
               // Backlog lane
               (() => {
-                const backlogCount = exercises.filter(e => !e.video_url && !e.candidates.some(c => c.status === 'proposed') && !queuedIds.has(e.id)).length
+                const backlogCount = exercises.filter(e => !e.video_url && !e.candidates.some(c => c.status === 'proposed') && !queuedIds.has(e.id) && !programExerciseIds.has(e.id)).length
                 return {
                   id: 'backlog',
                   label: '⬜ Full Library Backlog',
