@@ -33,3 +33,14 @@ export const BILLING_LIVE = false
 // This is a natural paid coach-tier upsell (see memory project_coach_pricing).
 // ─────────────────────────────────────────────────────────────────────────────
 export const COACH_VOICE_CLONING = true
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MARKETING LANDING PAGE — the public homepage at atlasprime.app ("/").
+//
+// true  → logged-out visitors see the marketing landing page (components/landing).
+// false → INSTANT REVERT: "/" goes straight to the sign-in page like it used to,
+//         no redeploy required beyond flipping this one line.
+//
+// Logged-in users always skip the landing and go to /today regardless.
+// ─────────────────────────────────────────────────────────────────────────────
+export const LANDING_LIVE = true

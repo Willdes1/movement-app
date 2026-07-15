@@ -51,6 +51,7 @@ export default function MobileMenu() {
   }, [open])
 
   if (
+    pathname === '/' ||
     pathname.startsWith('/admin') ||
     pathname.startsWith('/auth') ||
     pathname.startsWith('/coach') ||

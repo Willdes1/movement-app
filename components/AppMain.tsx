@@ -9,6 +9,6 @@ const BARE_ROUTES = ['/coach', '/admin', '/auth', '/legal', '/join']
 
 export default function AppMain({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const bare = BARE_ROUTES.some(p => pathname.startsWith(p))
+  const bare = pathname === '/' || BARE_ROUTES.some(p => pathname.startsWith(p))
   return <main className={bare ? undefined : 'app-main'}>{children}</main>
 }
