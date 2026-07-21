@@ -1,6 +1,6 @@
 # Agent Context — Atlas Prime
 > Full briefing for a new agent to continue this project without any prior conversation history.
-> Last updated: 2026-07-08 | Current branch: master | 386 commits
+> Last updated: 2026-07-15 | Current branch: master | 395 commits
 
 ---
 
@@ -99,7 +99,70 @@
 
 ---
 
-## 4. What Was Built This Session (2026-07-08)
+## 4. What Was Built This Session (2026-07-15)
+
+**Big product + growth night: Product Telemetry, a Video Curation fix, Coach billing
+foundation, self-serve coach signup, and a full public MARKETING LANDING PAGE now live
+at atlasprime.app. All deployed green. Copy rule adopted: NO EM DASHES anywhere in site
+copy or in replies to Will.**
+
+### 🏠 Marketing landing page — LIVE at atlasprime.app (the headline win)
+- `atlasprime.app` (`/`) now shows a real marketing homepage to LOGGED-OUT visitors;
+  logged-in users still go straight to `/today`. Went through 3 rounds: Titan/Heavens
+  (too classical) → merged two-path version → **final "KINETIC"** direction, which Will
+  loved ("super fire", design friends approved). `components/landing/LandingPage.tsx`
+  (namespaced under `.aplp`, injected via dangerouslySetInnerHTML, canvas EKG pulse +
+  pricing toggle + reveal wired in useEffect). Built from the REAL app palette (near-black
+  `#0c0c0f` + orange-red `#FF5C35` + emerald `#2ECC8F`, blue `#4E9FFF` trust cue for the
+  coach side) so site and app feel like one product. Split For Athletes / For Coaches,
+  product mockups, Option-A toggle pricing, SEO hooks (JSON-LD + hidden summary), login →
+  `/auth`. **Grounded in real color research** (subagent, cited): dark+one-accent formula,
+  single-stat hero, high-contrast CTA, no heavy video, black=premium (Wang 2022),
+  blue=trust (Su 2019). Debunked myths ("90% color", "80% recognition", HubSpot red+21%).
+  **Reversible:** `LANDING_LIVE` in `lib/flags.ts` (false = revert to sign-in-first).
+  **Logo swappable:** search `LOGO SWAP` in LandingPage.tsx (nav + footer marks). Mobile
+  hardened to ~320px. `app/page.tsx` + AppMain/Sidebar/MobileMenu/BottomNav hide chrome on `/`.
+
+### 💳 Coach billing — STAGE A (foundation, not yet live)
+- `lib/coach-plans.ts` (Free/Starter $19/Growth $49/Pro $99 — credits + message caps,
+  editable), `lib/coach-usage.ts` + `coach_usage` migration (monthly counters), `/coach/billing`
+  page (plan + live usage meters + tier cards → existing Stripe checkout/portal), nav added.
+  `lib/platform.ts` `isNativeApp()` seam (web=Stripe now, iOS=IAP later). Gated on
+  `BILLING_LIVE` (still false). Model chosen with Will: credits + overages, hard-cap +
+  upgrade prompt (overage auto-billing = Phase 2). **PENDING (Will's to-do):** run
+  `coach_usage` migration, create 3 Stripe products → price IDs in Vercel, then flip
+  BILLING_LIVE + build STAGE B (enforcement gates on generate-program/voice/messaging).
+- **Athlete pricing DRAFTED (Will: "sweet spot, keep it"):** Free (3 AI programs) +
+  Prime $12.99/mo or $89/yr. Idea captured: Founder annual $69 for first 100. Free trials
+  for both apps = brainstorm later with Stripe.
+
+### 📊 Product Telemetry + conversion funnel
+- `product_events` table + `lib/track.ts` + `<ProductTracker>` (auto page_view) + `/api/track`
+  ingest + `/api/admin/product-events`. Telemetry tab gained a **System | Product** toggle
+  (`components/admin/ProductTelemetry.tsx`: KPIs, top pages, conversion events, 7-day bars,
+  recent stream). Wired explicit `trackEvent()` on the funnel: signup/coach_signup,
+  generate_plan_click, plan_generated, coach_ai_program_generated, coach_program_created,
+  coach_client_invited, program_activated, workout_complete. Billing events deferred to Stripe.
+
+### 🎬 Video Curation — lane partition fix
+- Full Library Backlog counted ALL un-proposed exercises incl. Library-Builder-seeded ones →
+  double-counted + a Library Builder run "deducted from backlog". Now backlog EXCLUDES
+  program-lane exercises (client count + server `lane:'backlog'`); program-lane badges show
+  needs-curation-now (drops when you Run). Clean partition, consistent counts.
+
+### 🔑 Self-serve coach signup
+- Added an **"I'm an athlete / I'm a coach" toggle** to the `/auth` signup (flips the existing
+  `asCoach` state → role=coach for email + Google/Apple). No `/coaches` URL needed. Part 2
+  (coach also gets athlete app: Back-to-Training, self-assign, AI generate) already existed.
+
+### 🧾 Also
+- Spend Tracker: AI-ops table now sorts freshest-first + paginated scroll (was sorted by cost).
+- Confirmed Fable 5 NOT free (promo ended ~Jun 22) + costs 2× Opus 4.8 → stay on Opus 4.8.
+- **NEXT for landing: SEO** once copy locked — see `to-do/seo-launch.md`.
+
+---
+
+## Previous Session (2026-07-08)
 
 **Harness Engineering — ALL 4 STAGES COMPLETE + each verified green — plus a Spend
 Tracker sort fix. ~7 commits, all deployed green. Migrations `20260707_harness_events`
@@ -952,23 +1015,29 @@ return () => { supabase.removeChannel(channel) }
 
 ## 11. What to Work on Next (Priority Order)
 
-**IMMEDIATE (start of next session): close out Harness Engineering — the wrap-up step.**
-All 4 harness stages are BUILT + verified green. Only the spec's "After all stages" item is
-left (Will explicitly asked to do it next): update `ARCHITECTURE.md`'s **Deploy & Ops** and
-**Security model** sections to reflect the new harness (verified writes → monitoring/Telemetry
-→ migration ledger/drift → smoke tests), keep `docs/architecture.html` + the Admin Architecture
-tab in sync, then give Will a one-paragraph "what's now covered / what's still thin" summary.
+**IMMEDIATE (start of next session): pick from the open threads below — nothing is forced.**
+The Kinetic marketing landing is LIVE at atlasprime.app. Harness (all 4 stages + wrap-up) DONE.
+Product Telemetry DONE. Coach billing Stage A BUILT (not live). Athlete pricing locked as a draft.
 
-0. **No pending SQL migrations.** All 33 tracked in the `applied_migrations` ledger (33/33).
-   The drift Migrations panel in `/admin#telemetry` is the live source of truth going forward.
-1. **🏁 Harness wrap-up (do first).** ARCHITECTURE.md Deploy/Ops + Security update + coverage
-   paragraph (see above). Optional follow-ups that came out of the build, if Will wants them:
-   (a) retrofit `withHarness()` across the critical API routes (only the test route uses it now);
-   (b) add `SENTRY_DSN` to Vercel to light up the Sentry half (create a Sentry project first);
-   (c) provision a staging Supabase project — DEFERRED by Will; recommend when genuinely needed.
-2. **📊 Product telemetry** — Will also wants customer click-through tracking in the admin portal
-   (a `Product` view alongside `System Health` in the same Telemetry tab; its own `product_events`
-   table). Agreed to build AFTER the harness stands up the tab. Separate data model from harness_events.
+0. **⚠️ Pending SQL migration (coach billing only):** `20260708_coach_usage.sql` — run when Will
+   does the coach-billing Stripe setup (item 2). Not urgent; usage tracking degrades gracefully
+   without it. Everything else is tracked in the `applied_migrations` ledger (drift panel at
+   `/admin#telemetry`). `20260708_product_events.sql` already run (Product view works).
+1. **🔎 SEO for the landing** — copy is effectively locked, so this is READY. See
+   `to-do/seo-launch.md`: per-page title + description via Next metadata, Open Graph + Twitter
+   share card (needs a 1200×630 branded image), sitemap.xml + robots.txt, register Google Search
+   Console + submit sitemap, expand JSON-LD (add FAQ), weave target keywords into copy. Mostly
+   one focused session. Will asked to have this waiting for a fresh session.
+2. **💳 Coach Stripe billing — go live + Stage B (Will's tedious to-do, deferred by choice).**
+   Stage A built. Will's steps: run `coach_usage` migration, create 3 Stripe products
+   (Starter/Growth/Pro) → price IDs in Vercel (`STRIPE_PRO/PLUS/SUPREME_PRICE_ID`), confirm the
+   webhook, then flip `BILLING_LIVE` + build STAGE B (enforcement gates: generate-program
+   credits, voice paid-gating, message caps). Model: credits + overages, hard-cap + upgrade
+   prompt now, auto-overage = Phase 2. Also brainstorm **free trials for both apps** + the
+   Founder athlete deal ($69/yr first 100). Athlete price locked: Free (3 AI) + Prime $12.99/mo, $89/yr.
+3. **🏁 Harness — DONE this session** (verified writes → Telemetry → migration ledger → smoke
+   tests, all 3 architecture surfaces updated). Optional follow-ups if wanted: retrofit
+   `withHarness()` across routes; add `SENTRY_DSN`; provision staging (deferred).
 4. **🎙 Coach voice cloning — go live + test.** Phase 1 is BUILT. Needs: `ELEVENLABS_API_KEY` in
    Vercel (free tier OK for testing; upgrade to $5 Starter before a PAYING customer hears a
    cloned voice) + run `20260623_coach_voice_cloning.sql`. Then test with a coached client.
