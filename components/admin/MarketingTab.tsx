@@ -51,6 +51,7 @@ export default function MarketingTab() {
   const [generating, setGenerating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+  const activeCluster = CONTENT_CLUSTERS.find(c => c.id === cluster) ?? CONTENT_CLUSTERS[0]
 
   const load = useCallback(async () => {
     const res = await authFetch('/api/admin/content')
@@ -62,7 +63,6 @@ export default function MarketingTab() {
   const flash = (kind: 'ok' | 'err', text: string) => { setMsg({ kind, text }); setTimeout(() => setMsg(null), 4000) }
 
   const generate = async () => {
-    if (!topic.trim()) { flash('err', 'Enter a topic first.'); return }
     setGenerating(true); setMsg(null)
     try {
       const res = await authFetch('/api/admin/content/generate', {
@@ -142,19 +142,19 @@ export default function MarketingTab() {
 
       {/* ── GENERATE ────────────────────────────────────────────────────── */}
       <section style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 22, marginBottom: 22 }}>
-        <h2 style={{ fontSize: 16, fontWeight: 750, margin: '0 0 4px' }}>✍️ Generate an article</h2>
+        <h2 style={{ fontSize: 16, fontWeight: 750, margin: '0 0 4px' }}>✨ One-click article</h2>
         <p style={{ color: C.textDim, fontSize: 13, margin: '0 0 16px' }}>
-          Pick a cluster, give a topic, and the engine drafts an expert, human-voiced article. You review and publish. Two a week beats daily filler.
+          Pick a category and hit generate. The engine picks a fresh, unpublished SEO topic and writes an expert, human-voiced draft. You review and publish. Two a week beats daily filler.
         </p>
 
-        <label style={labelSt}>Topic cluster</label>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+        <label style={labelSt}>Category</label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
           {CONTENT_CLUSTERS.map(c => {
             const on = cluster === c.id
             return (
               <button key={c.id} onClick={() => setCluster(c.id)} style={{
                 background: on ? C.accentDim : C.bg, border: `1px solid ${on ? C.accentBorder : C.border}`,
-                color: on ? C.accent : C.textMid, borderRadius: 20, padding: '7px 14px', fontSize: 13,
+                color: on ? C.accent : C.textMid, borderRadius: 20, padding: '8px 15px', fontSize: 13.5,
                 fontWeight: 650, cursor: 'pointer' }}>
                 {c.emoji} {c.label}
               </button>
@@ -162,19 +162,25 @@ export default function MarketingTab() {
           })}
         </div>
 
-        <label style={labelSt}>Topic / working title</label>
-        <input style={{ ...input, marginBottom: 14 }} value={topic} onChange={e => setTopic(e.target.value)}
-          placeholder="e.g. How to keep remote coaching clients accountable" />
-
-        <label style={labelSt}>Angle (optional)</label>
-        <input style={{ ...input, marginBottom: 18 }} value={angle} onChange={e => setAngle(e.target.value)}
-          placeholder="Optional steer, e.g. focus on the first 30 days with a new client" />
-
         <button onClick={generate} disabled={generating} style={{
-          background: C.accent, color: '#0c0c0f', border: 0, borderRadius: 9, padding: '11px 22px',
-          fontSize: 14, fontWeight: 800, cursor: generating ? 'wait' : 'pointer', opacity: generating ? 0.7 : 1 }}>
-          {generating ? 'Writing…' : 'Generate draft'}
+          width: '100%', background: C.accent, color: '#0c0c0f', border: 0, borderRadius: 10, padding: '15px 22px',
+          fontSize: 15.5, fontWeight: 800, cursor: generating ? 'wait' : 'pointer', opacity: generating ? 0.7 : 1 }}>
+          {generating ? 'Writing your article…' : `✨ Generate a ${activeCluster.label} article`}
         </button>
+
+        <details style={{ marginTop: 14 }}>
+          <summary style={{ cursor: 'pointer', color: C.textDim, fontSize: 12.5, fontWeight: 600, userSelect: 'none' }}>
+            Optional: steer the topic yourself
+          </summary>
+          <div style={{ marginTop: 12 }}>
+            <label style={labelSt}>Specific topic (optional)</label>
+            <input style={{ ...input, marginBottom: 12 }} value={topic} onChange={e => setTopic(e.target.value)}
+              placeholder="Leave blank to let the engine choose" />
+            <label style={labelSt}>Angle (optional)</label>
+            <input style={input} value={angle} onChange={e => setAngle(e.target.value)}
+              placeholder="e.g. focus on the first 30 days with a new client" />
+          </div>
+        </details>
       </section>
 
       {/* ── EDITOR ──────────────────────────────────────────────────────── */}

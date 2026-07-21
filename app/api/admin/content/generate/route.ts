@@ -56,22 +56,42 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json().catch(() => ({}))
-    const topic = String(body.topic ?? '').trim()
+    const topic = String(body.topic ?? '').trim()   // optional — blank = engine picks
     const angle = String(body.angle ?? '').trim()
-    if (!topic) return Response.json({ error: 'Topic is required' }, { status: 400 })
 
     const cluster = CONTENT_CLUSTERS.find(c => c.id === body.cluster) ?? CONTENT_CLUSTERS[0]
 
+    // Pull already-published titles in this cluster so the engine never repeats a topic.
+    let existingTitles: string[] = []
+    try {
+      const { data } = await auth.supabase
+        .from('content_posts')
+        .select('title')
+        .eq('category', cluster.id)
+        .order('created_at', { ascending: false })
+        .limit(40)
+      existingTitles = (data ?? []).map((r: { title: string }) => r.title).filter(Boolean)
+    } catch { /* best-effort; not fatal */ }
+
     // Ground the article in the domain knowledge store (best-effort).
-    const knowledge = await retrieveKnowledge(`${topic}. ${cluster.terms}`, 10)
+    const retrievalQuery = topic ? `${topic}. ${cluster.terms}` : `${cluster.label}. ${cluster.terms}`
+    const knowledge = await retrieveKnowledge(retrievalQuery, 10)
     const knowledgeCtx = formatKnowledgeContext(knowledge)
+
+    const topicLine = topic
+      ? `TOPIC: ${topic}`
+      : `TOPIC: You choose it. Pick ONE specific, high-intent article a real person in this audience would search for. Prefer concrete, practical, evergreen angles over broad overviews. Make it genuinely useful.`
+
+    const avoidLine = existingTitles.length
+      ? `\n\nALREADY PUBLISHED (pick a clearly different topic, do not repeat or lightly reword these):\n${existingTitles.map(t => `- ${t}`).join('\n')}`
+      : ''
 
     const userMsg = `Write a blog article.
 
-TOPIC: ${topic}
+${topicLine}
 AUDIENCE: ${cluster.audience}
 TARGET SEARCH TERMS (weave in naturally, no stuffing): ${cluster.terms}
-EDITORIAL ANGLE: ${angle || cluster.angle}
+EDITORIAL ANGLE: ${angle || cluster.angle}${avoidLine}
 
 ${knowledgeCtx ? knowledgeCtx + '\n\n' : ''}Return ONLY the JSON object described in your instructions.`
 
