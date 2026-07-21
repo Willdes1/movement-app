@@ -17,8 +17,11 @@ brand term is owned by the Warframe game; we flank on "AI workout plan",
 "coaching software", etc.). Cadence: ~2 quality articles/week, human-in-the-loop.
 
 ### Phase 1 follow-ups (nice-to-have, not blocking)
-- [ ] Scheduled auto-generation (cron): draft N articles/week into the queue for
-      Will to approve in a batch, instead of clicking each time.
+- [x] Scheduled auto-generation (cron) — SHIPPED 2026-07-21. Daily cron
+      /api/cron/content: auto-drafts to keep a buffer, you approve into a drip
+      queue, approved posts publish on configured days (default Tue+Fri). Settings
+      + drip queue in MarketingTab. SQL: 20260721_content_scheduling. Needs
+      CRON_SECRET in Vercel env.
 - [ ] Programmatic SEO: turn the 750+ exercise library into indexable how-to
       pages (huge indexable surface). Own topic-cluster later.
 - [ ] OG image per article (reuse the code-generated card pattern from the
