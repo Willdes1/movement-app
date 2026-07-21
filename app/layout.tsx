@@ -36,14 +36,46 @@ const spaceMono = Space_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Atlas Prime',
-  description: 'AI-powered performance training for serious athletes',
+  metadataBase: new URL('https://atlasprime.app'),
+  title: {
+    default: 'Atlas Prime | AI Performance Training for Athletes and Coaches',
+    template: '%s | Atlas Prime',
+  },
+  description:
+    'Atlas Prime builds a personalized AI workout plan around your sport, history, and body, and gives coaches a full portal to program for and manage their athletes. Start free.',
+  applicationName: 'Atlas Prime',
+  keywords: [
+    'AI workout plan',
+    'personalized training program',
+    'online coaching platform',
+    'strength program generator',
+    'coach client app',
+    'AI personal trainer',
+    'athlete training app',
+    'sports performance training',
+  ],
+  alternates: { canonical: '/' },
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
     title: 'Atlas Prime',
   },
+  openGraph: {
+    type: 'website',
+    siteName: 'Atlas Prime',
+    url: 'https://atlasprime.app',
+    title: 'Atlas Prime | AI Performance Training for Athletes and Coaches',
+    description:
+      'Your own AI training program, rebuilt around you every week. Train solo, or coach your whole roster from one place.',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Atlas Prime | AI Performance Training',
+    description:
+      'Your own AI training program, rebuilt around you every week. Train solo, or coach your whole roster from one place.',
+  },
+  robots: { index: true, follow: true },
 }
 
 export const viewport: Viewport = {
