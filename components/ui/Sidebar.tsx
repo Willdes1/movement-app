@@ -44,7 +44,7 @@ export default function Sidebar() {
       .then(({ data }) => setProfile(data))
   }, [user])
 
-  if (pathname === '/' || pathname.startsWith('/admin') || pathname.startsWith('/auth') || pathname.startsWith('/coach') || pathname.startsWith('/legal') || pathname.startsWith('/join')) return null
+  if (pathname === '/' || pathname.startsWith('/admin') || pathname.startsWith('/auth') || pathname.startsWith('/coach') || pathname.startsWith('/legal') || pathname.startsWith('/join') || pathname.startsWith('/blog')) return null
 
   const firstName = displayName(profile?.name) || 'Athlete'
   const sport = profile?.sports?.[0] ?? 'Athlete'

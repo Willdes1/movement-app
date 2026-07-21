@@ -1,5 +1,11 @@
 # SEO launch checklist (for the atlasprime.app landing)
 
+> STATUS 2026-07-20 — CORE DONE. Shipped: homepage metadata + OG/Twitter card
+> (code-generated opengraph-image.tsx, confirmed in FB debugger), sitemap.ts,
+> robots.ts, FAQ section + FAQPage schema. Google Search Console auto-verified
+> (domain provider) + sitemap submitted; Bing imported from GSC. Remaining =
+> optional long-tail only: a couple of content/blog pages, /auth + legal descriptions.
+
 Do this once the landing copy is locked (it effectively is). Goal: when someone searches
 "Atlas Prime" (or "AI workout plan", "online coaching software", "AI training programs")
 the site is indexed, ranks, and unfurls into a real share card. Mostly one focused session.

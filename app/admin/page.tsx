@@ -8,6 +8,7 @@ import HealthTab from '@/components/admin/HealthTab'
 import ArchitectureTab from '@/components/admin/ArchitectureTab'
 import TelemetryTab from '@/components/admin/TelemetryTab'
 import ImpersonationActivityTab from '@/components/admin/ImpersonationActivityTab'
+import MarketingTab from '@/components/admin/MarketingTab'
 import RetentionTab from '@/components/admin/RetentionTab'
 import NotesTab from '@/components/admin/NotesTab'
 import BillingTab from '@/components/admin/BillingTab'
@@ -1859,9 +1860,7 @@ export default function AdminPage() {
           {tab === 'retention' && <RetentionTab users={users} />}
           {tab === 'notes' && <NotesTab currentAdminId={user!.id} users={users} />}
           {tab === 'billing' && <BillingTab users={users} />}
-          {tab === 'marketing' && (
-            <PlaceholderTab label="Marketing Control Panel" bullets={['SEO recommendations & LLM visibility', 'Facebook/Meta · LinkedIn · PPC campaign management', 'Reddit content strategy & educational calendar', 'Ad spend ROI tracking & conversion funnels']} />
-          )}
+          {tab === 'marketing' && <MarketingTab />}
           {tab === 'partners' && (
             <PlaceholderTab label="Partner Management" bullets={['Physical therapists, nutritionists, trainers, influencers', 'Track audience size, performance, revenue contribution', 'Revenue-sharing model — partners earn on referrals', 'Partner portal: their own login, analytics, expected pay']} />
           )}

@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 // and header/bottom nav (mobile). Coach portal, admin, auth, legal, and join
 // pages have their own layouts — applying .app-main there double-offsets them
 // (e.g. coach pages got 230px athlete margin + 230px coach margin).
-const BARE_ROUTES = ['/coach', '/admin', '/auth', '/legal', '/join']
+const BARE_ROUTES = ['/coach', '/admin', '/auth', '/legal', '/join', '/blog']
 
 export default function AppMain({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()

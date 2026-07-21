@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-21T02:04:32.924Z",
-  "count": 35,
+  "generatedAt": "2026-07-21T03:26:32.757Z",
+  "count": 36,
   "files": [
     "20260526_pgvector_knowledge.sql",
     "20260527_coach_invites.sql",
@@ -36,6 +36,7 @@
     "20260707_token_usage_grants.sql",
     "20260708_applied_migrations.sql",
     "20260708_coach_usage.sql",
-    "20260708_product_events.sql"
+    "20260708_product_events.sql",
+    "20260720_content_posts.sql"
   ]
 }

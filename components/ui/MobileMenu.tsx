@@ -56,7 +56,8 @@ export default function MobileMenu() {
     pathname.startsWith('/auth') ||
     pathname.startsWith('/coach') ||
     pathname.startsWith('/legal') ||
-    pathname.startsWith('/join')
+    pathname.startsWith('/join') ||
+    pathname.startsWith('/blog')
   ) return null
 
   const firstName = displayName(profile?.name) || 'Athlete'
