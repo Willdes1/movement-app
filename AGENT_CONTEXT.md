@@ -99,7 +99,66 @@
 
 ---
 
-## 4. What Was Built This Session (2026-07-15)
+## 4. What Was Built This Session (2026-07-20 → 07-21)
+
+**SEO launch + a full self-running Content Engine (Phase 1 of the Marketing Hub).
+Everything deployed green. Two migrations RUN by Will (content_posts +
+content_scheduling); CRON_SECRET added to Vercel + redeployed so the auto-pilot cron
+is armed.**
+
+### 🔍 SEO launch — the marketing site is now findable
+- Homepage metadata (keyword-worked title/description/canonical/keywords/OG/Twitter in
+  `app/layout.tsx`, since `/` is a client component). Code-generated 1200x630 branded
+  share card `app/opengraph-image.tsx` (+ `twitter-image.tsx` re-export) — confirmed
+  rendering in the FB debugger. `app/sitemap.ts` + `app/robots.ts`. FAQ section + FAQPage
+  JSON-LD on the landing page. **Google Search Console** auto-verified via the Workspace
+  domain + sitemap submitted; **Bing** imported. Verified with will@atlasprime.app.
+- Reality check with Will: "Atlas Prime" the search term is owned by the Warframe game.
+  We do NOT fight for the brand term; we win non-branded intent (AI workout plan, coaching
+  software) via content. That reframed the whole content strategy.
+
+### ✍️ Content Engine — public blog at /blog (Phase 1 of TODO #6)
+- Admin **Marketing** tab (`components/admin/MarketingTab.tsx`) replaces the old
+  placeholder. **One-click generation:** pick a category (coach-software / recovery-rehab /
+  ai-training / sport-specific), hit generate; the engine picks a fresh, unpublished topic
+  (dupe-guarded), writes an expert, human-voiced, no-em-dash article grounded in the APIE
+  knowledge store, and hands back a draft. Optional topic/angle steering tucked away.
+- Public `/blog` (index) + `/blog/[slug]` with generateMetadata + Article JSON-LD;
+  `components/blog/BlogShell.tsx` (landing palette). Zero-dep markdown renderer
+  (`lib/markdown.ts`). Server reads env-guarded (`lib/content.ts`). App chrome hidden on
+  /blog; posts auto-added to the sitemap. SQL: `20260720_content_posts` (RLS: public reads
+  published only).
+
+### 🚀 Content Auto-pilot — scheduled drip + auto-draft
+- Lifecycle: draft → **ready** (approved, in drip queue) → published. Daily cron
+  `app/api/cron/content` (CRON_SECRET-guarded; in `vercel.json` at `0 9 * * *`): publishes
+  due `scheduled_for` pins, drips the oldest ready post on configured publish days (default
+  **Tue+Fri**), and auto-generates ≤1 draft/run to keep the buffer at `queue_target`.
+  `lib/content-generate.ts` = shared generation (admin route + cron). `content_settings`
+  table + `/api/admin/content/settings`. MarketingTab has Approve-to-queue, a drip-queue
+  view, and an Auto-pilot settings panel (toggle, publish days, buffer size). SQL:
+  `20260721_content_scheduling`. Decisions with Will: drip queue + keep the human approval
+  gate + 2/week (Tue+Fri). Rationale: "no one really reads blogs, this is for SEO" → minimize
+  his effort, one button, approve if he likes it.
+
+### 🧾 Also
+- Added Will's 8-item batch to TODO.md (Added 2026-07-20): admin education KB, massage-gun
+  tab, Claude-as-sales-coach, slide-by-slide onboarding, anytime AI profile optimizer, the
+  Marketing/Lead hub (#6), per-subsection audio controls, wearable integration.
+- `to-do/marketing-hub.md` = phased spec for the rest of #6 (lead investigation, AI outreach,
+  ads). Memory: [[project_content_engine]], [[reference_business_email]] (use
+  will@atlasprime.app for all business accounts).
+
+### ▶️ NEXT for the Content Engine / launch
+- Watch the first auto-pilot cron run (fires ~9am UTC daily); approve the first drafts into
+  the queue. Optional Phase-1 follow-ups in `to-do/marketing-hub.md`: per-article OG images,
+  programmatic SEO from the 750+ exercise library, internal linking.
+- Then either **Coach Billing Stage B** (run coach_usage migration → Stripe products → flip
+  BILLING_LIVE → enforcement gates) or **Marketing Hub Phase 2** (Lead Investigation).
+
+---
+
+## Previous Session (2026-07-15)
 
 **Big product + growth night: Product Telemetry, a Video Curation fix, Coach billing
 foundation, self-serve coach signup, and a full public MARKETING LANDING PAGE now live
