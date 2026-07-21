@@ -3,6 +3,10 @@
     {
       "path": "/api/admin/curate-knowledge",
       "schedule": "0 9 * * 1"
+    },
+    {
+      "path": "/api/cron/content",
+      "schedule": "0 9 * * *"
     }
   ]
 }

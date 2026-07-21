@@ -28,7 +28,8 @@ export async function POST(req: Request) {
 
   const supabase = auth.supabase
   const now = new Date().toISOString()
-  const status = b.status === 'published' ? 'published' : 'draft'
+  const ALLOWED = ['draft', 'ready', 'published']
+  const status = ALLOWED.includes(b.status) ? b.status : 'draft'
   let slug = slugify(b.slug || b.title) || `post-${Date.now()}`
 
   const row: Record<string, unknown> = {
@@ -39,6 +40,7 @@ export async function POST(req: Request) {
     category: b.category ?? null,
     tags: Array.isArray(b.tags) ? b.tags : [],
     cover_emoji: b.cover_emoji ?? null,
+    scheduled_for: b.scheduled_for ?? null,
     status,
     updated_at: now,
   }

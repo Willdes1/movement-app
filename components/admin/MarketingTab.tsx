@@ -42,6 +42,15 @@ function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
 }
 
+type Settings = { auto_generate: boolean; publish_days: number[]; queue_target: number; clusters: string[] }
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+function statusMeta(status: string) {
+  if (status === 'published') return { label: 'published', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' }
+  if (status === 'ready') return { label: 'queued', color: '#3b82f6', bg: 'rgba(59,130,246,0.12)' }
+  return { label: 'draft', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' }
+}
+
 export default function MarketingTab() {
   const [posts, setPosts] = useState<Post[]>([])
   const [draft, setDraft] = useState<Draft | null>(null)
@@ -52,11 +61,19 @@ export default function MarketingTab() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
   const activeCluster = CONTENT_CLUSTERS.find(c => c.id === cluster) ?? CONTENT_CLUSTERS[0]
+  const [settings, setSettings] = useState<Settings | null>(null)
+  const [savingSettings, setSavingSettings] = useState(false)
+  const readyPosts = posts.filter(p => p.status === 'ready')
 
   const load = useCallback(async () => {
-    const res = await authFetch('/api/admin/content')
-    const json = await res.json().catch(() => ({}))
-    if (res.ok) setPosts(json.posts ?? [])
+    const [pRes, sRes] = await Promise.all([
+      authFetch('/api/admin/content'),
+      authFetch('/api/admin/content/settings'),
+    ])
+    const pj = await pRes.json().catch(() => ({}))
+    if (pRes.ok) setPosts(pj.posts ?? [])
+    const sj = await sRes.json().catch(() => ({}))
+    if (sRes.ok) setSettings(sj.settings)
   }, [])
   useEffect(() => { load() }, [load])
 
@@ -81,7 +98,7 @@ export default function MarketingTab() {
     } finally { setGenerating(false) }
   }
 
-  const save = async (status: 'draft' | 'published') => {
+  const save = async (status: 'draft' | 'ready' | 'published') => {
     if (!draft) return
     if (!draft.title.trim()) { flash('err', 'Title is required.'); return }
     setSaving(true)
@@ -97,10 +114,42 @@ export default function MarketingTab() {
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) { flash('err', json.error ?? 'Save failed'); return }
-      flash('ok', status === 'published' ? 'Published live to /blog.' : 'Draft saved.')
+      flash('ok', status === 'published' ? 'Published live to /blog.' : status === 'ready' ? 'Approved into the drip queue.' : 'Draft saved.')
       setDraft({ ...draft, id: json.post.id, slug: json.post.slug, status: json.post.status })
       load()
     } finally { setSaving(false) }
+  }
+
+  // Lightweight status change from the list (approve draft → ready, or back).
+  const setPostStatus = async (p: Post, status: string) => {
+    const res = await authFetch('/api/admin/content', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: p.id, title: p.title, slug: p.slug, meta_description: p.meta_description,
+        excerpt: p.excerpt, body: p.body, category: p.category, tags: p.tags,
+        cover_emoji: p.cover_emoji, status,
+      }),
+    })
+    if (res.ok) { flash('ok', status === 'ready' ? 'Approved into the drip queue.' : status === 'draft' ? 'Moved back to draft.' : 'Updated.'); load() }
+    else flash('err', 'Update failed')
+  }
+
+  const updateSettings = async (patch: Partial<Settings>) => {
+    if (!settings) return
+    const next = { ...settings, ...patch }
+    setSettings(next)
+    setSavingSettings(true)
+    try {
+      const res = await authFetch('/api/admin/content/settings', { method: 'POST', body: JSON.stringify(next) })
+      const json = await res.json().catch(() => ({}))
+      if (res.ok && json.settings) setSettings(json.settings)
+      else flash('err', json.error ?? 'Settings save failed')
+    } finally { setSavingSettings(false) }
+  }
+  const toggleDay = (d: number) => {
+    if (!settings) return
+    const has = settings.publish_days.includes(d)
+    updateSettings({ publish_days: has ? settings.publish_days.filter(x => x !== d) : [...settings.publish_days, d].sort((a, b) => a - b) })
   }
 
   const edit = (p: Post) => {
@@ -189,8 +238,8 @@ export default function MarketingTab() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <h2 style={{ fontSize: 16, fontWeight: 750, margin: 0 }}>
               {draft.id ? '✏️ Edit post' : '📝 Review draft'}{' '}
-              <span style={{ fontSize: 12, color: draft.status === 'published' ? C.green : C.amber, fontWeight: 600 }}>
-                · {draft.status}
+              <span style={{ fontSize: 12, color: statusMeta(draft.status).color, fontWeight: 600 }}>
+                · {statusMeta(draft.status).label}
               </span>
             </h2>
             <button onClick={() => setDraft(null)} style={{ background: 'none', border: 0, color: C.textDim, cursor: 'pointer', fontSize: 13 }}>Close</button>
@@ -243,8 +292,13 @@ export default function MarketingTab() {
             <button onClick={() => save('draft')} disabled={saving} style={{ background: C.surface2, color: C.text, border: `1px solid ${C.border}`, borderRadius: 9, padding: '10px 20px', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
               Save draft
             </button>
+            {draft.status !== 'published' && (
+              <button onClick={() => save('ready')} disabled={saving} style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.35)', borderRadius: 9, padding: '10px 20px', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>
+                Approve to queue
+              </button>
+            )}
             <button onClick={() => save('published')} disabled={saving} style={{ background: C.green, color: '#0c1f14', border: 0, borderRadius: 9, padding: '10px 20px', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>
-              {draft.status === 'published' ? 'Update live post' : 'Publish to /blog'}
+              {draft.status === 'published' ? 'Update live post' : 'Publish now'}
             </button>
             {draft.status === 'published' && draft.slug && (
               <a href={`/blog/${draft.slug}`} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 'auto', alignSelf: 'center', color: C.accent, fontSize: 13, fontWeight: 700 }}>
@@ -254,6 +308,73 @@ export default function MarketingTab() {
           </div>
         </section>
       )}
+
+      {/* ── AUTO-PILOT + DRIP QUEUE ─────────────────────────────────────── */}
+      <section style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 22, marginBottom: 22 }}>
+        <h2 style={{ fontSize: 16, fontWeight: 750, margin: '0 0 4px' }}>🚀 Auto-pilot</h2>
+        <p style={{ color: C.textDim, fontSize: 13, margin: '0 0 16px' }}>
+          The engine keeps your draft buffer stocked. You approve the good ones into the queue. Approved articles publish automatically on your schedule. Nothing goes live without your approval.
+        </p>
+
+        {settings ? (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+              <button onClick={() => updateSettings({ auto_generate: !settings.auto_generate })} style={{
+                width: 46, height: 26, borderRadius: 20, border: 0, cursor: 'pointer', position: 'relative', flexShrink: 0,
+                background: settings.auto_generate ? C.green : C.surface2, transition: '.2s' }}>
+                <span style={{ position: 'absolute', top: 3, left: settings.auto_generate ? 23 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: '.2s' }} />
+              </button>
+              <span style={{ fontSize: 14, fontWeight: 650 }}>Auto-generate drafts {settings.auto_generate ? 'on' : 'off'}</span>
+              {savingSettings && <span style={{ fontSize: 12, color: C.textDim }}>saving…</span>}
+            </div>
+
+            <label style={labelSt}>Publish days</label>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
+              {DAY_LABELS.map((d, i) => {
+                const on = settings.publish_days.includes(i)
+                return (
+                  <button key={i} onClick={() => toggleDay(i)} style={{
+                    background: on ? C.accentDim : C.bg, border: `1px solid ${on ? C.accentBorder : C.border}`,
+                    color: on ? C.accent : C.textMid, borderRadius: 8, padding: '7px 11px', fontSize: 12.5, fontWeight: 650, cursor: 'pointer' }}>
+                    {d}
+                  </button>
+                )
+              })}
+            </div>
+
+            <label style={labelSt}>Draft buffer target</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <input type="number" min={1} max={20} value={settings.queue_target}
+                onChange={e => updateSettings({ queue_target: Math.max(1, Math.min(20, Number(e.target.value) || 1)) })}
+                style={{ ...input, width: 90 }} />
+              <span style={{ fontSize: 12.5, color: C.textDim }}>drafts kept waiting for your review</span>
+            </div>
+          </>
+        ) : <p style={{ color: C.textDim, fontSize: 13 }}>Loading settings…</p>}
+
+        {/* Drip queue */}
+        <div style={{ marginTop: 22, borderTop: `1px solid ${C.border}`, paddingTop: 18 }}>
+          <h3 style={{ fontSize: 13.5, fontWeight: 700, color: C.textMid, margin: '0 0 10px' }}>
+            📬 Drip queue ({readyPosts.length})
+            {settings && <span style={{ color: C.textDim, fontWeight: 500 }}>
+              {' '}· goes out on {settings.publish_days.length ? settings.publish_days.slice().sort((a, b) => a - b).map(d => DAY_LABELS[d]).join(' & ') : 'no day set'}
+            </span>}
+          </h3>
+          {readyPosts.length === 0 ? (
+            <p style={{ color: C.textDim, fontSize: 13 }}>Nothing queued. Approve a draft below to line it up.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {readyPosts.map((p, idx) => (
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5 }}>
+                  <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, color: C.textDim, width: 20 }}>{idx + 1}.</span>
+                  <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.cover_emoji} {p.title}</span>
+                  <button onClick={() => setPostStatus(p, 'draft')} style={{ background: 'none', border: 0, color: C.textDim, cursor: 'pointer', fontSize: 12 }}>unqueue</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* ── POSTS LIST ──────────────────────────────────────────────────── */}
       <section style={{ marginBottom: 30 }}>
@@ -274,10 +395,12 @@ export default function MarketingTab() {
                   </div>
                 </div>
                 <span style={{ fontSize: 10.5, fontWeight: 700, padding: '3px 9px', borderRadius: 20, textTransform: 'uppercase', letterSpacing: '.05em',
-                  background: p.status === 'published' ? C.greenDim : 'rgba(245,158,11,0.12)',
-                  color: p.status === 'published' ? C.green : C.amber }}>
-                  {p.status}
+                  background: statusMeta(p.status).bg, color: statusMeta(p.status).color }}>
+                  {statusMeta(p.status).label}
                 </span>
+                {p.status === 'draft' && (
+                  <button onClick={() => setPostStatus(p, 'ready')} style={{ background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.35)', color: '#3b82f6', borderRadius: 7, padding: '6px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>Approve</button>
+                )}
                 <button onClick={() => edit(p)} style={{ background: 'none', border: `1px solid ${C.border}`, color: C.textMid, borderRadius: 7, padding: '6px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Edit</button>
                 <button onClick={() => del(p.id)} style={{ background: 'none', border: 0, color: C.textDim, cursor: 'pointer', fontSize: 16 }}>✕</button>
               </div>
