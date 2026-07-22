@@ -18,6 +18,8 @@ type Lead = {
   status: string; notes: string | null; search_label: string | null
 }
 
+type Outreach = { email_subject: string; email_body: string; dm_message: string; sms_message: string; call_script: string; tone?: string }
+
 async function authFetch(input: string, init?: RequestInit) {
   const { data: { session } } = await supabase.auth.getSession()
   return fetch(input, { ...init, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token ?? ''}`, ...(init?.headers ?? {}) } })
@@ -47,6 +49,9 @@ export default function LeadInvestigation() {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
   const flash = (kind: 'ok' | 'err', text: string) => { setMsg({ kind, text }); setTimeout(() => setMsg(null), 4500) }
+  const [outreach, setOutreach] = useState<Record<string, Outreach | null>>({})
+  const [genId, setGenId] = useState<string | null>(null)
+  const [tone, setTone] = useState('warm')
 
   const load = useCallback(async () => {
     const p = new URLSearchParams()
@@ -92,6 +97,27 @@ export default function LeadInvestigation() {
     a.href = url; a.download = `atlas-prime-leads-${leads.length}.csv`; a.click()
     URL.revokeObjectURL(url)
   }
+
+  const openLead = async (id: string) => {
+    const willOpen = expanded !== id
+    setExpanded(willOpen ? id : null)
+    if (willOpen && outreach[id] === undefined) {
+      const res = await authFetch(`/api/admin/leads/outreach?leadId=${id}`)
+      const json = await res.json().catch(() => ({}))
+      setOutreach(prev => ({ ...prev, [id]: res.ok ? json.outreach : null }))
+    }
+  }
+  const generateOutreach = async (leadId: string) => {
+    setGenId(leadId)
+    try {
+      const res = await authFetch('/api/admin/leads/outreach', { method: 'POST', body: JSON.stringify({ leadId, tone }) })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) { flash('err', json.error ?? 'Generation failed'); return }
+      setOutreach(prev => ({ ...prev, [leadId]: json.outreach }))
+      flash('ok', 'Outreach kit ready. Copy and send.')
+    } finally { setGenId(null) }
+  }
+  const copy = (text: string) => { navigator.clipboard?.writeText(text); flash('ok', 'Copied to clipboard.') }
 
   const input: React.CSSProperties = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, padding: '9px 11px', fontSize: 13.5, fontFamily: 'inherit', outline: 'none' }
   const labelSt: React.CSSProperties = { fontSize: 11.5, color: C.textDim, fontWeight: 600, marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '.06em' }
@@ -165,6 +191,7 @@ export default function LeadInvestigation() {
           {leads.map(l => {
             const t = typeMeta(l.business_type)
             const open = expanded === l.id
+            const o = outreach[l.id]
             return (
               <div key={l.id} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px' }}>
@@ -185,7 +212,7 @@ export default function LeadInvestigation() {
                   <select value={l.status} onChange={e => setStatus(l, e.target.value)} style={{ ...input, padding: '6px 8px', fontSize: 12 }}>
                     {LEAD_STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                   </select>
-                  <button onClick={() => setExpanded(open ? null : l.id)} style={{ background: 'none', border: `1px solid ${C.border}`, color: C.textMid, borderRadius: 7, padding: '6px 10px', fontSize: 12, cursor: 'pointer' }}>{open ? '▲' : '▼'}</button>
+                  <button onClick={() => openLead(l.id)} style={{ background: 'none', border: `1px solid ${C.border}`, color: C.textMid, borderRadius: 7, padding: '6px 10px', fontSize: 12, cursor: 'pointer' }}>{open ? '▲' : '▼'}</button>
                   <button onClick={() => del(l.id)} style={{ background: 'none', border: 0, color: C.textDim, cursor: 'pointer', fontSize: 15 }}>✕</button>
                 </div>
                 {open && (
@@ -208,6 +235,26 @@ export default function LeadInvestigation() {
                     <textarea defaultValue={l.notes ?? ''} onBlur={e => saveNotes(l.id, e.target.value)} placeholder="Add a note (saves when you click away)…"
                       style={{ ...input, width: '100%', minHeight: 60, resize: 'vertical', fontSize: 13 }} />
                     {!l.email && <p style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>No contact email yet. Owner + email enrichment (Hunter / Apollo) plugs in as a Phase 2b follow-up.</p>}
+
+                    <div style={{ marginTop: 14, borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+                        <div style={{ ...labelSt, margin: 0 }}>✍️ Outreach kit</div>
+                        <select value={tone} onChange={e => setTone(e.target.value)} style={{ ...input, padding: '5px 8px', fontSize: 12 }}>
+                          <option value="warm">Warm</option><option value="direct">Direct</option><option value="problem">Problem-first</option>
+                        </select>
+                        <button onClick={() => generateOutreach(l.id)} disabled={genId === l.id} style={{ background: C.accent, color: '#0c0c0f', border: 0, borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 800, cursor: genId === l.id ? 'wait' : 'pointer', opacity: genId === l.id ? 0.7 : 1 }}>
+                          {genId === l.id ? 'Writing…' : o ? 'Regenerate' : 'Draft outreach'}
+                        </button>
+                      </div>
+                      {o && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                          <OutreachItem label="Email" subject={o.email_subject} body={o.email_body} onCopy={copy} />
+                          <OutreachItem label="Social DM" body={o.dm_message} onCopy={copy} />
+                          <OutreachItem label="SMS" body={o.sms_message} onCopy={copy} />
+                          <OutreachItem label="Cold-call script" body={o.call_script} onCopy={copy} />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -215,6 +262,21 @@ export default function LeadInvestigation() {
           })}
         </div>
       )}
+    </div>
+  )
+}
+
+function OutreachItem({ label, subject, body, onCopy }: { label: string; subject?: string; body: string; onCopy: (t: string) => void }) {
+  if (!body) return null
+  const full = subject ? `Subject: ${subject}\n\n${body}` : body
+  return (
+    <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: C.accent, textTransform: 'uppercase', letterSpacing: '.06em' }}>{label}</span>
+        <button onClick={() => onCopy(full)} style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.textMid, borderRadius: 6, padding: '3px 10px', fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}>Copy</button>
+      </div>
+      {subject && <div style={{ fontSize: 12.5, fontWeight: 650, marginBottom: 4 }}>{subject}</div>}
+      <div style={{ fontSize: 12.5, color: C.textMid, whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{body}</div>
     </div>
   )
 }
