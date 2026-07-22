@@ -47,8 +47,17 @@ Marketing tab now has a Content | Leads switcher. SQL: `20260721_leads`.
 - [ ] **Phase 2b — owner/email enrichment** (Hunter.io or Apollo) as a per-lead
       Enrich button once the source is chosen.
 
-## Phase 3 — AI Outreach
+## Phase 3 — AI Outreach  (3a SHIPPED 2026-07-22)
 Prepare everything so outreach is one click, even if sending is manual.
+- [x] **Per-lead outreach kit** — expand any lead → Draft outreach → Sonnet writes
+      a personalized email (subject+body), social DM, SMS, and cold-call script
+      grounded in the business + Atlas Prime value prop, benefit-led, no em dashes,
+      tone selector (warm/direct/problem-first). Copy buttons, kits persist.
+      `app/api/admin/leads/outreach`, table `lead_outreach`. SQL: `20260722_lead_outreach`.
+- [ ] **Phase 3b — actual sending** (the big/compliance-heavy part, deferred):
+      Mailchimp-style sender, deliverability (SPF/DKIM/DMARC, warmup, throttling),
+      CAN-SPAM/unsubscribe. Needs an email-sending provider. Manual copy-send works now.
+- [ ] Bulk "draft outreach for all qualified leads" action.
 - [ ] AI-generated outreach templates + personalized email generation.
 - [ ] Smarter Mailchimp-style sender that reduces Gmail/Outlook deliverability
       issues (warmup, SPF/DKIM/DMARC guidance, send throttling).
