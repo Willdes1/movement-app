@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { CONTENT_CLUSTERS, clusterLabel } from '@/lib/content-clusters'
+import LeadInvestigation from '@/components/admin/LeadInvestigation'
 
 // ─── Marketing hub. Phase 1 = the Content Engine (public /blog). Lead
 //     Investigation + Ads (TODO #6) are previewed as "coming next". ──────────────
@@ -61,6 +62,7 @@ export default function MarketingTab() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
   const activeCluster = CONTENT_CLUSTERS.find(c => c.id === cluster) ?? CONTENT_CLUSTERS[0]
+  const [view, setView] = useState<'content' | 'leads'>('content')
   const [settings, setSettings] = useState<Settings | null>(null)
   const [savingSettings, setSavingSettings] = useState(false)
   const readyPosts = posts.filter(p => p.status === 'ready')
@@ -177,9 +179,17 @@ export default function MarketingTab() {
   return (
     <div style={{ color: C.text }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, margin: '0 0 4px' }}>Marketing</h1>
-      <p style={{ color: C.textMid, margin: '0 0 24px', fontSize: 14 }}>
-        The growth hub. Live now: the Content Engine that publishes SEO articles to your public blog, grounded in the Atlas Prime knowledge engine.
+      <p style={{ color: C.textMid, margin: '0 0 18px', fontSize: 14 }}>
+        The growth hub. Content publishes SEO articles to your blog; Leads finds and scores businesses to pitch.
       </p>
+
+      <div style={{ display: 'inline-flex', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 4, marginBottom: 22 }}>
+        {([['content', '📝 Content'], ['leads', '🎯 Leads']] as const).map(([v, label]) => (
+          <button key={v} onClick={() => setView(v)} style={{
+            background: view === v ? C.accent : 'transparent', color: view === v ? '#0c0c0f' : C.textMid,
+            border: 0, borderRadius: 7, padding: '8px 18px', fontSize: 13.5, fontWeight: 750, cursor: 'pointer' }}>{label}</button>
+        ))}
+      </div>
 
       {msg && (
         <div style={{ marginBottom: 18, padding: '10px 14px', borderRadius: 8, fontSize: 13.5, fontWeight: 600,
@@ -189,6 +199,9 @@ export default function MarketingTab() {
         </div>
       )}
 
+      {view === 'leads' && <LeadInvestigation />}
+
+      {view === 'content' && (<>
       {/* ── GENERATE ────────────────────────────────────────────────────── */}
       <section style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 22, marginBottom: 22 }}>
         <h2 style={{ fontSize: 16, fontWeight: 750, margin: '0 0 4px' }}>✨ One-click article</h2>
@@ -414,7 +427,6 @@ export default function MarketingTab() {
         <h2 style={{ fontSize: 13, fontWeight: 700, color: C.textDim, textTransform: 'uppercase', letterSpacing: '.08em', margin: '0 0 14px' }}>Coming next in the Marketing Hub</h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 12 }}>
           {[
-            { e: '🎯', t: 'Lead Investigation', d: 'Find PT clinics, studios, and gyms by industry and location. Score and export leads.' },
             { e: '✉️', t: 'AI Outreach', d: 'Personalized emails, DMs, and cold-call scripts. Deliverability-aware sending.' },
             { e: '📣', t: 'Ads Management', d: 'Google, Meta, Instagram, and TikTok campaigns from one console.' },
           ].map(x => (
@@ -426,6 +438,7 @@ export default function MarketingTab() {
           ))}
         </div>
       </section>
+      </>)}
     </div>
   )
 }
