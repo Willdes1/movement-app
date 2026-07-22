@@ -30,16 +30,22 @@ brand term is owned by the Warframe game; we flank on "AI workout plan",
 
 ---
 
-## Phase 2 — Lead Investigation
-Find and score outbound prospects.
-- [ ] Search businesses by industry, local or worldwide: physical therapy
-      clinics, personal training studios, commercial gyms, enterprise chains
-      (24 Hour Fitness, LA Fitness, etc.).
-- [ ] Classify each: Independent / Multi-location / Enterprise. Score the lead.
-- [ ] Find owner / decision-maker, email, phone.
-- [ ] Export lead lists (CSV).
-- Research: which data source/API is compliant and affordable (Google Places,
-  scraping legality, paid B2B data providers). Decide before building.
+## Phase 2 — Lead Investigation  (2a SHIPPED 2026-07-21)
+Find and score outbound prospects. **Built against a pluggable LeadSource
+interface** (`lib/lead-sources.ts`) so the data provider swaps in with no rebuild.
+Marketing tab now has a Content | Leads switcher. SQL: `20260721_leads`.
+- [x] Search businesses by industry + location + scope (sample data provider).
+- [x] Classify Independent / Multi-location / Enterprise + fit score tuned for
+      coach-software buyers (`lib/lead-scoring.ts`).
+- [x] Lead pipeline (new/qualified/contacted/archived), notes, filters.
+- [x] Export lead lists (CSV, client-side).
+- [ ] **DATA SOURCE DECISION still open (Will's call, involves cost/compliance):**
+      Google Places = cheap discovery but ToS is not meant for exportable
+      cold-outreach lists + no owner emails. Apollo.io = compliant B2B prospecting
+      with decision-makers + emails, paid. Registry slots are stubbed in
+      `getLeadSource()` ready to wire.
+- [ ] **Phase 2b — owner/email enrichment** (Hunter.io or Apollo) as a per-lead
+      Enrich button once the source is chosen.
 
 ## Phase 3 — AI Outreach
 Prepare everything so outreach is one click, even if sending is manual.
