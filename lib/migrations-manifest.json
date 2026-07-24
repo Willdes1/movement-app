@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-22T20:07:06.607Z",
-  "count": 39,
+  "generatedAt": "2026-07-24T23:13:39.936Z",
+  "count": 40,
   "files": [
     "20260526_pgvector_knowledge.sql",
     "20260527_coach_invites.sql",
@@ -40,6 +40,7 @@
     "20260720_content_posts.sql",
     "20260721_content_scheduling.sql",
     "20260721_leads.sql",
-    "20260722_lead_outreach.sql"
+    "20260722_lead_outreach.sql",
+    "20260724_ad_campaigns.sql"
   ]
 }
