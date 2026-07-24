@@ -67,11 +67,17 @@ Prepare everything so outreach is one click, even if sending is manual.
 - [ ] Dedicated agents: lead gen, prospect research, email, DM, SMS, cold-call
       script, keyword recs, audience targeting, campaign suggestions.
 
-## Phase 4 — Ads Management
-- [ ] Google Ads, Facebook/Meta, Instagram, TikTok campaign management from one
-      console.
-- [ ] Keyword recommendations, audience targeting, campaign suggestions.
-- [ ] Ad spend ROI tracking + conversion funnels (ties into Product Telemetry).
+## Phase 4 — Ads  (4a SHIPPED 2026-07-24)
+- [x] **AI Ads Studio** — Marketing → Ads. Pick platform (Google Search / Meta /
+      Instagram / TikTok) + product (athlete/coach) + objective + budget → Sonnet
+      builds a launch-ready plan: keywords (search), audience + lookalikes, 2+
+      ad-copy variations respecting each platform's formats/limits, creative hooks,
+      budget + bidding, setup notes. Copy buttons, campaigns persist.
+      `app/api/admin/ads`, `lib/ads-constants.ts`, table `ad_campaigns`. SQL:
+      `20260724_ad_campaigns`.
+- [ ] **Phase 4b (deferred, needs approved ad accounts + real spend):** launch
+      campaigns via each platform API; ad-spend ROI tracking + conversion funnels
+      (tie into Product Telemetry's product_events). Big per-platform API build.
 
 ---
 
