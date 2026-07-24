@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { CONTENT_CLUSTERS, clusterLabel } from '@/lib/content-clusters'
 import LeadInvestigation from '@/components/admin/LeadInvestigation'
 import AdsStudio from '@/components/admin/AdsStudio'
+import MarketingGuide from '@/components/admin/MarketingGuide'
 
 // ─── Marketing hub. Phase 1 = the Content Engine (public /blog). Lead
 //     Investigation + Ads (TODO #6) are previewed as "coming next". ──────────────
@@ -63,7 +64,7 @@ export default function MarketingTab() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
   const activeCluster = CONTENT_CLUSTERS.find(c => c.id === cluster) ?? CONTENT_CLUSTERS[0]
-  const [view, setView] = useState<'content' | 'leads' | 'ads'>('content')
+  const [view, setView] = useState<'content' | 'leads' | 'ads' | 'guide'>('content')
   const [settings, setSettings] = useState<Settings | null>(null)
   const [savingSettings, setSavingSettings] = useState(false)
   const readyPosts = posts.filter(p => p.status === 'ready')
@@ -185,7 +186,7 @@ export default function MarketingTab() {
       </p>
 
       <div style={{ display: 'inline-flex', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 4, marginBottom: 22 }}>
-        {([['content', '📝 Content'], ['leads', '🎯 Leads'], ['ads', '📣 Ads']] as const).map(([v, label]) => (
+        {([['content', '📝 Content'], ['leads', '🎯 Leads'], ['ads', '📣 Ads'], ['guide', 'ℹ️ How to use']] as const).map(([v, label]) => (
           <button key={v} onClick={() => setView(v)} style={{
             background: view === v ? C.accent : 'transparent', color: view === v ? '#0c0c0f' : C.textMid,
             border: 0, borderRadius: 7, padding: '8px 18px', fontSize: 13.5, fontWeight: 750, cursor: 'pointer' }}>{label}</button>
@@ -202,6 +203,7 @@ export default function MarketingTab() {
 
       {view === 'leads' && <LeadInvestigation />}
       {view === 'ads' && <AdsStudio />}
+      {view === 'guide' && <MarketingGuide />}
 
       {view === 'content' && (<>
       {/* ── GENERATE ────────────────────────────────────────────────────── */}
