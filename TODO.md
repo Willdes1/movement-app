@@ -4,16 +4,19 @@
 ---
 
 ## 🔥 Active / Up Next
-- [ ] 🚨 **Marketing Hub is non-functional in production — five tables were never created.** The
-  Telemetry migrations panel confirmed 6 pending migrations on 2026-07-25. Five of them are the
-  tables the Marketing Hub was built against: `20260720_content_posts`,
-  `20260721_content_scheduling`, `20260721_leads`, `20260722_lead_outreach`,
-  `20260724_ad_campaigns`. So Content Engine, Leads, AI Outreach and Ads Studio all ship against
-  tables that do not exist, the public `/blog` has no source, and the daily content cron has been
-  firing against a missing table since 07-21. The sixth, `20260708_coach_usage`, breaks the coach
-  billing usage meters. Fix = run the migrations, then verify each surface end to end and confirm
-  what the cron has actually been doing. **Standalone item. NOT part of the 10-task curation
-  queue, and must not be picked up inside it.**
+- [ ] 🚨 **Marketing Hub: tables now exist, but nothing has been verified end to end.** All 6
+  missing migrations were run on 2026-07-25 (ledger 42/42), so Content Engine, Leads, AI Outreach,
+  Ads Studio and coach usage meters are unblocked. But every one of those surfaces shipped against
+  tables that did not exist for days, and none has been exercised since. Remaining work: click
+  through each surface, confirm the public `/blog` renders, and check what the daily content cron
+  actually did while `content_posts` was missing from 07-21 to 07-25 (it may start generating and
+  publishing on its next run now that the table is there). **Standalone item. NOT part of the
+  10-task curation queue, and must not be picked up inside it.**
+- [ ] **6 of 9 approved YouTube channels have unresolvable channel IDs.** Found 2026-07-25 via the
+  index estimator: Squat University, Bob & Brad, E3 Rehab, Prehab Guys, Knees Over Toes Guy and
+  Calisthenicmovement all return nothing from `channels.list`, and one stored id is 23 chars when
+  YouTube ids are always 24. Suspect `discover-channels` is storing mangled ids. Every rehab and
+  mobility channel is in the broken set, which Task 4 will need. Part of the curation queue work.
 - [x] **Hyperextended elbow recovery plan** — 6-phase: RICE → Passive ROM → Active ROM → Isometric Loading → Progressive Resistance → Sport-Specific Return. Live at /recovery/elbow.
 - [x] **Shoulder Impingement playbook** — 4-phase: Pain Relief & Posture → Mobility → Rotator Cuff Activation → Return to Function. Live at /recovery/shoulder.
 - [x] **Knee Rehab playbook** — 4-phase: Protect → Stability → Strength → Return to Sport (includes hop test clearance). Live at /recovery/knee.

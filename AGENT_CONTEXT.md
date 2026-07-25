@@ -130,23 +130,18 @@ phase shipped). All deployed green. Many migrations RUN by Will.**
   SQL to file, tight diffs, no em dashes, smoke test each). Full queue in
   [[project_youtube_curation_work_queue]]. Run ONE at a time, pause for confirmation.
 
-### ⚠️ PENDING SQL MIGRATIONS — 6, confirmed from the Telemetry panel 2026-07-25
-41 files on disk, 35 applied. Of the 8 added since the ledger last read 33/33 on 07-08, only
-`20260708_product_events` and `20260724_youtube_api_usage` actually ran. These 6 have NOT:
+### ✅ SQL MIGRATIONS — ALL APPLIED as of 2026-07-25 (ledger reads 42/42)
+The Telemetry panel had reported 6 pending. Will ran all 6 plus the new Task 1 migration, and the
+ledger now reads 42. Verified table-by-table, not inferred.
 
-1. `20260708_coach_usage.sql`
-2. `20260720_content_posts.sql`
-3. `20260721_content_scheduling.sql`
-4. `20260721_leads.sql`
-5. `20260722_lead_outreach.sql`
-6. `20260724_ad_campaigns.sql`
+For the record, the 6 that had been silently missing: `20260708_coach_usage`,
+`20260720_content_posts`, `20260721_content_scheduling`, `20260721_leads`,
+`20260722_lead_outreach`, `20260724_ad_campaigns`. Plus `20260725_youtube_uploads_index` (Task 1).
 
-**Consequence: the entire Marketing Hub was shipped against five tables that do not exist, so
-Content Engine, Leads, Outreach and Ads Studio are all non-functional in production.** Logged as
-a standalone item in TODO.md. It is NOT part of the 10-task curation queue and must not be
-worked on inside it.
-
-Not yet reviewed by Will, awaiting his run: `20260725_youtube_uploads_index.sql` (Task 1).
+**The Marketing Hub had been shipped against five tables that did not exist.** The tables now
+exist, so it is unblocked, but **no surface has been verified end to end yet** and the daily
+content cron was firing against a missing table from 07-21 to 07-25. Tracked as a standalone
+TODO.md item. NOT part of the 10-task curation queue.
 
 ### ▶️ NEXT
 - **Resume Task 1 refactor** (local matching + cached uploads index + capped gated fallback +
