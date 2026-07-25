@@ -14,6 +14,24 @@ const C = {
   text: '#e6edf3', textMid: '#b1bac4', textDim: '#6e7681',
 }
 
+// PostgREST caps an unbounded select at 1,000 rows. exercise_library is past
+// 2,000, so a plain .select() silently returned a slice: this tab reported
+// exactly 1000 total exercises and could not see the rest of the library at all.
+const PAGE_ROWS = 1000
+async function fetchAllRows<T>(
+  build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
+): Promise<{ data: T[]; error: unknown }> {
+  const out: T[] = []
+  for (let from = 0; ; from += PAGE_ROWS) {
+    const { data, error } = await build(from, from + PAGE_ROWS - 1)
+    if (error) return { data: out, error }
+    const rows = data ?? []
+    out.push(...rows)
+    if (rows.length < PAGE_ROWS) break
+  }
+  return { data: out, error: null }
+}
+
 type Channel = {
   channel_id: string; channel_name: string; audience_focus: string; priority: number
 }
@@ -180,15 +198,17 @@ export default function VideoCurationTab() {
     // Loop columns (loop_start_sec/loop_end_sec) may not exist yet if the migration
     // hasn't been run — fall back to a select without them so the tab still loads.
     let exList: Omit<Exercise, 'candidates'>[] | null = null
-    const withLoop = await supabase
+    const withLoop = await fetchAllRows((f, t) => supabase
       .from('exercise_library')
       .select('id, name_display, name_normalized, video_url, video_source, loop_start_sec, loop_end_sec')
       .order('name_display')
+      .range(f, t))
     if (withLoop.error) {
-      const fallback = await supabase
+      const fallback = await fetchAllRows((f, t) => supabase
         .from('exercise_library')
         .select('id, name_display, name_normalized, video_url, video_source')
         .order('name_display')
+        .range(f, t))
       exList = (fallback.data ?? []) as unknown as Omit<Exercise, 'candidates'>[]
     } else {
       exList = (withLoop.data ?? []) as unknown as Omit<Exercise, 'candidates'>[]
@@ -198,18 +218,22 @@ export default function VideoCurationTab() {
     // Try selecting source_label; if the column doesn't exist yet (migration not run),
     // fall back to a query without it so lanes still render with 0 program entries.
     let queuedRows: { exercise_id: string; source_label: string | null }[] | null = null
-    const { data: qr, error: qrErr } = await supabase
+    const { data: qr, error: qrErr } = await fetchAllRows((f, t) => supabase
       .from('exercise_video_candidates')
       .select('exercise_id, source_label')
       .eq('status', 'queued')
+      .order('exercise_id')
+      .range(f, t))
     if (!qrErr) {
       queuedRows = qr as { exercise_id: string; source_label: string | null }[]
     } else {
       // Column likely doesn't exist yet — fall back without source_label
-      const { data: qrFallback } = await supabase
+      const { data: qrFallback } = await fetchAllRows<{ exercise_id: string }>((f, t) => supabase
         .from('exercise_video_candidates')
         .select('exercise_id')
         .eq('status', 'queued')
+        .order('exercise_id')
+        .range(f, t))
       queuedRows = (qrFallback ?? []).map(r => ({ exercise_id: r.exercise_id, source_label: null }))
     }
 
@@ -224,11 +248,12 @@ export default function VideoCurationTab() {
 
     // Program lanes: read directly from exercise_library.source_program
     // This is stable regardless of pipeline stage (queued → proposed → approved)
-    const { data: programExercises } = await supabase
+    const { data: programExercises } = await fetchAllRows((f, t) => supabase
       .from('exercise_library')
       .select('id, name_display, source_program, video_url')
       .not('source_program', 'is', null)
       .order('name_display')
+      .range(f, t))
 
     // Group by program name
     const progMap: Record<string, { id: string; name_display: string; video_url: string | null }[]> = {}
@@ -244,11 +269,13 @@ export default function VideoCurationTab() {
     // lanes are a clean partition (no exercise counted in two lanes).
     setProgramExerciseIds(new Set((programExercises ?? []).map((e: { id: string }) => e.id)))
 
-    const { data: cands } = await supabase
+    const { data: cands } = await fetchAllRows<Candidate>((f, t) => supabase
       .from('exercise_video_candidates')
       .select('*')
       .in('status', ['proposed', 'approved'])
       .order('ai_relevance_score', { ascending: false })
+      .order('id')
+      .range(f, t))
 
     const candMap: Record<string, Candidate[]> = {}
     for (const c of (cands ?? [])) {
