@@ -99,7 +99,45 @@
 
 ---
 
-## 4. What Was Built This Session (2026-07-20 → 07-21)
+## 4. What Was Built This Session (2026-07-22 → 07-25)
+
+**Finished the Marketing Hub (TODO #6) end to end, added an in-app guide, then
+started a 10-task work queue beginning with the YouTube quota rework (instrumentation
+phase shipped). All deployed green. Many migrations RUN by Will.**
+
+### 🎯 Marketing Hub complete (Phases 2 → 4) — admin Marketing is now Content | Leads | Ads | How to use
+- **Lead Investigation (Phase 2a):** search/classify/score/export businesses. Built on a
+  pluggable `LeadSource` interface (`lib/lead-sources.ts`) with realistic SAMPLE data now;
+  Google Places vs Apollo data-source decision still OPEN (Will's call, cost/compliance).
+  `lib/lead-scoring.ts`, `lib/lead-constants.ts`, `components/admin/LeadInvestigation.tsx`,
+  `app/api/admin/leads/*`. SQL `20260721_leads`.
+- **AI Outreach (Phase 3a):** expand a lead -> tone -> Draft outreach -> Sonnet writes
+  email/DM/SMS/cold-call kit, copy buttons, persists. SQL `20260722_lead_outreach`.
+  Phase 3b (automated Mailchimp-style sending) deferred.
+- **AI Ads Studio (Phase 4a):** platform/product/objective/budget -> Sonnet builds a
+  launch-ready plan (keywords, audience, ad copy, creative, budget). `components/admin/AdsStudio.tsx`,
+  `app/api/admin/ads/*`, `lib/ads-constants.ts`. SQL `20260724_ad_campaigns`. Phase 4b
+  (live platform API launching + ROI) deferred.
+- **"How to use" guide tab** (`components/admin/MarketingGuide.tsx`) = in-app playbook. Also a
+  standalone Artifact version. See [[project_marketing_hub]].
+
+### 📺 YouTube quota rework — Task 1, phase 1 (instrumentation) SHIPPED
+- `lib/youtube.ts` single wrapper (logging, 429 backoff, 403 breaker, ETag, `getVideosBatched`
+  reused by Task 2), routed the two existing YT routes through it, no behavior change. Migration
+  `20260724_youtube_api_usage` RUN. **Measured: ~200 units/video (2x search.list); ETag 304s DO
+  cost quota (verified).** NEXT = the refactor. Full state in [[project_youtube_quota_task1]].
+- **A 10-task work queue is now active** with standing process rules (read-first, plan+pause,
+  SQL to file, tight diffs, no em dashes, smoke test each). Full queue in
+  [[project_youtube_curation_work_queue]]. Run ONE at a time, pause for confirmation.
+
+### ▶️ NEXT
+- **Resume Task 1 refactor** (local matching + cached uploads index + capped gated fallback +
+  quota meter + extension doc). Then Tasks 2 to 10 in order. Do NOT start a task without
+  showing plan + file list and pausing.
+
+---
+
+## Previous Session (2026-07-20 → 07-21)
 
 **SEO launch + a full self-running Content Engine (Phase 1 of the Marketing Hub).
 Everything deployed green. Two migrations RUN by Will (content_posts +
