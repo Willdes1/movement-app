@@ -57,6 +57,14 @@ to 30 entries covering the common cases (1 DB, DB, BB, KB, SA, alt, and similar)
 absorbs that map as its seed, and the inline version is deleted at that point. Task 6 is not
 pulled forward.
 
+**Curation is deployed-only, and stays that way.** `.env.local` carries no `YOUTUBE_API_KEY` and
+no `SUPABASE_SERVICE_ROLE_KEY`, so YouTube calls fail locally and every admin Supabase client
+silently falls back to the anon key. Curation has therefore only ever run on Vercel. Decision
+2026-07-25: **do not add a YouTube key locally.** Dev runs would consume the same production
+quota this task exists to measure and protect. Anything that spends quota, including the index
+estimator and the index build, runs deployed and is triggered from the admin portal. Recorded so
+neither side relitigates it.
+
 **Confidence threshold is not to be guessed.** On the first index build, matching runs in dry-run
 mode with the fallback disabled, logs the score distribution, and presents a histogram. The
 threshold is chosen from that real data, and stays configurable either way.

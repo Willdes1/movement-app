@@ -130,19 +130,43 @@ phase shipped). All deployed green. Many migrations RUN by Will.**
   SQL to file, tight diffs, no em dashes, smoke test each). Full queue in
   [[project_youtube_curation_work_queue]]. Run ONE at a time, pause for confirmation.
 
+### ⚠️ PENDING SQL MIGRATIONS — 6, confirmed from the Telemetry panel 2026-07-25
+41 files on disk, 35 applied. Of the 8 added since the ledger last read 33/33 on 07-08, only
+`20260708_product_events` and `20260724_youtube_api_usage` actually ran. These 6 have NOT:
+
+1. `20260708_coach_usage.sql`
+2. `20260720_content_posts.sql`
+3. `20260721_content_scheduling.sql`
+4. `20260721_leads.sql`
+5. `20260722_lead_outreach.sql`
+6. `20260724_ad_campaigns.sql`
+
+**Consequence: the entire Marketing Hub was shipped against five tables that do not exist, so
+Content Engine, Leads, Outreach and Ads Studio are all non-functional in production.** Logged as
+a standalone item in TODO.md. It is NOT part of the 10-task curation queue and must not be
+worked on inside it.
+
+Not yet reviewed by Will, awaiting his run: `20260725_youtube_uploads_index.sql` (Task 1).
+
 ### ▶️ NEXT
 - **Resume Task 1 refactor** (local matching + cached uploads index + capped gated fallback +
   quota meter + extension doc). Then Tasks 2 to 10 in order. Do NOT start a task without
   showing plan + file list and pausing.
+- **Source of truth for the queue is `to-do/youtube-curation-queue.md`**, not memory. It carries
+  dated corrections (the ETag assumption is false; the Task 1 to Task 6 dependency was invented).
 
 ---
 
 ## Previous Session (2026-07-20 → 07-21)
 
 **SEO launch + a full self-running Content Engine (Phase 1 of the Marketing Hub).
-Everything deployed green. Two migrations RUN by Will (content_posts +
-content_scheduling); CRON_SECRET added to Vercel + redeployed so the auto-pilot cron
+Everything deployed green. CRON_SECRET added to Vercel + redeployed so the auto-pilot cron
 is armed.**
+
+> ⚠️ CORRECTION (2026-07-25): this session's notes originally claimed `content_posts` and
+> `content_scheduling` were RUN. **They were not.** The Telemetry migrations panel reports
+> 6 pending, and both are on that list. See the pending-migrations block in section 4.
+> Treat every "RUN by Will" claim in this file as unverified unless the panel confirms it.
 
 ### 🔍 SEO launch — the marketing site is now findable
 - Homepage metadata (keyword-worked title/description/canonical/keywords/OG/Twitter in
