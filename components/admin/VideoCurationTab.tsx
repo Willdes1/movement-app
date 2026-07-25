@@ -83,6 +83,18 @@ export default function VideoCurationTab() {
   const [discovering, setDiscovering]     = useState(false)
   const [discoverLog, setDiscoverLog]     = useState<string[]>([])
 
+  // ── Uploads-index build estimate (Task 1, read-only, costs 1 unit per 50 channels)
+  type IndexEstimate = {
+    channels_active: number; channels_resolved: number; unresolved: string[]
+    total_videos: number; one_time_build_units: number
+    daily_refresh_units_estimate: number; units_spent_on_this_estimate: number
+    percent_of_daily_quota: number
+    per_channel: { channel_name: string; video_count: number; build_units: number; resolved: boolean }[]
+    error?: string
+  }
+  const [estimating, setEstimating]       = useState(false)
+  const [estimate, setEstimate]           = useState<IndexEstimate | null>(null)
+
   // ── Priority queue (from client plan generation) ───────────────────────────
   const [queuedIds, setQueuedIds]         = useState<Set<string>>(new Set())
   const [programExerciseIds, setProgramExerciseIds] = useState<Set<string>>(new Set())
@@ -142,6 +154,24 @@ export default function VideoCurationTab() {
       setDiscoverLog([`Error: ${err instanceof Error ? err.message : 'Discovery failed'}`])
     }
     setDiscovering(false)
+  }
+
+  // Read-only. Costs 1 quota unit per 50 approved channels and writes nothing.
+  async function estimateIndexBuild() {
+    setEstimating(true)
+    setEstimate(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/admin/youtube-index-estimate', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token ?? ''}` },
+      })
+      const data = await res.json()
+      setEstimate(data)
+    } catch (err) {
+      setEstimate({ error: err instanceof Error ? err.message : 'Estimate failed' } as IndexEstimate)
+    }
+    setEstimating(false)
   }
 
   // ── Exercise helpers ───────────────────────────────────────────────────────
@@ -522,6 +552,79 @@ export default function VideoCurationTab() {
           </div>
         )}
       </div>
+
+      {/* ── Uploads index build estimate (Task 1) ───────────────────────────── */}
+      {hasChannels && (
+        <div style={{ padding: '16px 18px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <p style={{ fontSize: 11, fontWeight: 700, color: C.purple, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 3 }}>
+                Uploads index build cost
+              </p>
+              <p style={{ fontSize: 12, color: C.textDim }}>
+                Read-only check. Costs 1 quota unit per 50 channels and writes nothing.
+              </p>
+            </div>
+            <button
+              onClick={estimateIndexBuild}
+              disabled={estimating}
+              style={{
+                padding: '8px 18px', borderRadius: 8, border: `1px solid ${C.border}`,
+                cursor: estimating ? 'not-allowed' : 'pointer',
+                background: estimating ? C.surface2 : 'transparent',
+                color: estimating ? C.textDim : C.textMid,
+                fontSize: 13, fontWeight: 700, fontFamily: 'inherit', whiteSpace: 'nowrap',
+              }}>
+              {estimating ? '⏳ Checking…' : '📐 Estimate index build'}
+            </button>
+          </div>
+
+          {estimate && (
+            <div style={{ marginTop: 12, padding: '10px 12px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 7 }}>
+              {estimate.error ? (
+                <p style={{ fontSize: 12, color: C.red, fontFamily: 'monospace' }}>Error: {estimate.error}</p>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18, marginBottom: 10 }}>
+                    <div>
+                      <p style={{ fontSize: 20, fontWeight: 800, color: C.purple }}>{estimate.one_time_build_units?.toLocaleString()}</p>
+                      <p style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.06em' }}>one-time units</p>
+                    </div>
+                    <div>
+                      <p style={{ fontSize: 20, fontWeight: 800, color: C.text }}>{estimate.percent_of_daily_quota}%</p>
+                      <p style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.06em' }}>of one day</p>
+                    </div>
+                    <div>
+                      <p style={{ fontSize: 20, fontWeight: 800, color: C.text }}>{estimate.total_videos?.toLocaleString()}</p>
+                      <p style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.06em' }}>videos cached</p>
+                    </div>
+                    <div>
+                      <p style={{ fontSize: 20, fontWeight: 800, color: C.green }}>~{estimate.daily_refresh_units_estimate}</p>
+                      <p style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.06em' }}>units/day refresh</p>
+                    </div>
+                    <div>
+                      <p style={{ fontSize: 20, fontWeight: 800, color: C.textMid }}>{estimate.units_spent_on_this_estimate}</p>
+                      <p style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.06em' }}>units this check</p>
+                    </div>
+                  </div>
+                  {estimate.unresolved?.length > 0 && (
+                    <p style={{ fontSize: 11, color: C.amber, marginBottom: 6 }}>
+                      ⚠ {estimate.unresolved.length} channel id(s) did not resolve on YouTube: {estimate.unresolved.join(', ')}
+                    </p>
+                  )}
+                  <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+                    {(estimate.per_channel ?? []).map((c, i) => (
+                      <p key={i} style={{ fontSize: 11, color: c.resolved ? C.textMid : C.red, fontFamily: 'monospace', lineHeight: 1.7 }}>
+                        {c.build_units.toString().padStart(4)} units · {c.video_count.toLocaleString()} videos · {c.channel_name}
+                      </p>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Stats strip ────────────────────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 20 }}>
