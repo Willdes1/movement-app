@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
+import { ytFetch, beginYtBatch } from '@/lib/youtube'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -10,8 +11,6 @@ const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
-
-const YT_KEY = process.env.YOUTUBE_API_KEY!
 
 const DISCOVERY_QUERIES = [
   'certified personal trainer exercise tutorial form',
@@ -35,22 +34,17 @@ type ChannelDetail = {
   videoCount: number
 }
 
-async function searchChannels(query: string): Promise<string[]> {
-  const url = `https://www.googleapis.com/youtube/v3/search?part=id&type=channel&q=${encodeURIComponent(query)}&maxResults=8&key=${YT_KEY}`
-  const res = await fetch(url)
-  const data = await res.json()
-  return (data.items ?? [])
+async function searchChannels(query: string, batchId: string): Promise<string[]> {
+  const { data } = await ytFetch('search', { part: 'id', type: 'channel', q: query, maxResults: 8 }, { batchId })
+  return (data?.items ?? [])
     .map((i: { id: { channelId: string } }) => i.id.channelId)
     .filter(Boolean)
 }
 
-async function getChannelDetails(channelIds: string[]): Promise<ChannelDetail[]> {
+async function getChannelDetails(channelIds: string[], batchId: string): Promise<ChannelDetail[]> {
   if (!channelIds.length) return []
-  const ids = channelIds.join(',')
-  const url = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${ids}&key=${YT_KEY}`
-  const res = await fetch(url)
-  const data = await res.json()
-  return (data.items ?? [])
+  const { data } = await ytFetch('channels', { part: 'snippet,statistics', id: channelIds.join(',') }, { batchId })
+  return (data?.items ?? [])
     .map((c: YTChannelRaw) => ({
       channelId: c.id,
       channelName: c.snippet?.title ?? '',
@@ -105,10 +99,12 @@ Score 0.0–1.0. Include only channels with score >= 0.65. Rank by quality and c
 
 export async function POST() {
   try {
+    const batchId = beginYtBatch()
+
     // Run all search queries and collect unique channel IDs
     const seen = new Set<string>()
     for (const query of DISCOVERY_QUERIES) {
-      const ids = await searchChannels(query)
+      const ids = await searchChannels(query, batchId)
       ids.forEach(id => seen.add(id))
     }
 
@@ -118,7 +114,7 @@ export async function POST() {
 
     // Fetch details for all discovered channels in one batch
     const allIds = [...seen]
-    const details = await getChannelDetails(allIds)
+    const details = await getChannelDetails(allIds, batchId)
 
     if (details.length === 0) {
       return Response.json({ error: 'No channels met minimum subscriber threshold (100K)' }, { status: 400 })

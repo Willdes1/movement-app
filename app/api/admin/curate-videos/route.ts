@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
+import { ytFetch, getVideosBatched, beginYtBatch } from '@/lib/youtube'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -11,43 +12,33 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-const YT_KEY = process.env.YOUTUBE_API_KEY!
-
-// ─── YouTube helpers ──────────────────────────────────────────────────────────
-async function searchChannel(channelId: string, query: string): Promise<{ ids: string[]; error?: string }> {
+// ─── YouTube helpers (all calls routed through lib/youtube.ts for logging) ─────
+async function searchChannel(channelId: string, query: string, batchId: string): Promise<{ ids: string[]; error?: string }> {
   // No videoEmbeddable filter here — getVideoDetails already gates on embeddability.
-  // Including it at search time silently drops valid candidates.
-  const url = `https://www.googleapis.com/youtube/v3/search?part=id&channelId=${channelId}&q=${encodeURIComponent(query)}&type=video&maxResults=3&key=${YT_KEY}`
-  const res = await fetch(url)
-  const data = await res.json()
-  if (data.error) {
-    const reason = data.error.errors?.[0]?.reason ?? data.error.message ?? 'unknown'
-    return { ids: [], error: `YT API error (${data.error.code}): ${reason}` }
+  const { data, error } = await ytFetch('search', { part: 'id', channelId, q: query, type: 'video', maxResults: 3 }, { batchId })
+  if (data?.error || error) {
+    const reason = data?.error?.errors?.[0]?.reason ?? data?.error?.message ?? error ?? 'unknown'
+    return { ids: [], error: `YT API error (${data?.error?.code ?? ''}): ${reason}` }
   }
-  const ids = (data.items ?? []).map((i: { id: { videoId: string } }) => i.id.videoId).filter(Boolean)
+  const ids = (data?.items ?? []).map((i: { id: { videoId: string } }) => i.id.videoId).filter(Boolean)
   return { ids }
 }
 
-async function searchGeneral(query: string): Promise<{ ids: string[]; error?: string }> {
-  const url = `https://www.googleapis.com/youtube/v3/search?part=id&q=${encodeURIComponent(query + ' exercise tutorial')}&type=video&maxResults=5&key=${YT_KEY}`
-  const res = await fetch(url)
-  const data = await res.json()
-  if (data.error) {
-    const reason = data.error.errors?.[0]?.reason ?? data.error.message ?? 'unknown'
-    return { ids: [], error: `YT API error (${data.error.code}): ${reason}` }
+async function searchGeneral(query: string, batchId: string): Promise<{ ids: string[]; error?: string }> {
+  const { data, error } = await ytFetch('search', { part: 'id', q: query + ' exercise tutorial', type: 'video', maxResults: 5 }, { batchId })
+  if (data?.error || error) {
+    const reason = data?.error?.errors?.[0]?.reason ?? data?.error?.message ?? error ?? 'unknown'
+    return { ids: [], error: `YT API error (${data?.error?.code ?? ''}): ${reason}` }
   }
-  const ids = (data.items ?? []).map((i: { id: { videoId: string } }) => i.id.videoId).filter(Boolean)
+  const ids = (data?.items ?? []).map((i: { id: { videoId: string } }) => i.id.videoId).filter(Boolean)
   return { ids }
 }
 
-async function getVideoDetails(videoIds: string[]): Promise<VideoDetail[]> {
+async function getVideoDetails(videoIds: string[], batchId: string): Promise<VideoDetail[]> {
   if (videoIds.length === 0) return []
-  const ids = videoIds.join(',')
-  const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics,status&id=${ids}&key=${YT_KEY}`
-  const res = await fetch(url)
-  const data = await res.json()
-  return (data.items ?? [])
-    .filter((v: { status: { embeddable: boolean } }) => v.status?.embeddable)
+  const items = await getVideosBatched(videoIds, ['snippet', 'contentDetails', 'statistics', 'status'], { batchId })
+  return items
+    .filter((v: { status?: { embeddable?: boolean } }) => v.status?.embeddable)
     .map((v: YTVideo) => ({
       videoId: v.id,
       url: `https://www.youtube.com/watch?v=${v.id}`,
@@ -124,6 +115,7 @@ Return ONLY valid JSON array, no markdown:
 export async function POST(request: Request) {
   try {
     const { exerciseId, exerciseIds, batchSize = 10, regenerate = false, lane = 'all' } = await request.json().catch(() => ({}))
+    const batchId = beginYtBatch()
 
     // Load approved channels
     const { data: channels } = await supabaseAdmin
@@ -140,7 +132,7 @@ export async function POST(request: Request) {
         .from('exercise_library')
         .select('id, name_display, how, name_normalized')
         .eq('id', exerciseId)
-      const results = await processExercises(exercises ?? [], channels, regenerate)
+      const results = await processExercises(exercises ?? [], channels, regenerate, batchId)
       return Response.json({ processed: results.length, results })
     }
 
@@ -160,7 +152,7 @@ export async function POST(request: Request) {
         .is('video_url', null)
 
       const filtered = (targeted ?? []).filter((e: Exercise) => !alreadyProposed.has(e.id)).slice(0, batchSize)
-      const results = await processExercises(filtered, channels, regenerate)
+      const results = await processExercises(filtered, channels, regenerate, batchId)
       return Response.json({ processed: results.length, results })
     }
 
@@ -210,7 +202,7 @@ export async function POST(request: Request) {
     }
 
     const batch = sorted.slice(0, batchSize)
-    const results = await processExercises(batch, channels, regenerate)
+    const results = await processExercises(batch, channels, regenerate, batchId)
     return Response.json({ processed: results.length, results })
 
   } catch (err) {
@@ -257,7 +249,7 @@ function buildAlternativeQueries(name: string): string[] {
   return [...new Set(queries)].filter(q => q.length >= 5)
 }
 
-async function processOne(ex: Exercise, channels: Channel[], regenerate: boolean) {
+async function processOne(ex: Exercise, channels: Channel[], regenerate: boolean, batchId: string) {
     try {
       const apiErrors: string[] = []
       const allVideoIds: string[] = []
@@ -269,7 +261,7 @@ async function processOne(ex: Exercise, channels: Channel[], regenerate: boolean
 
         for (const q of queries) {
           for (const ch of channelPool) {
-            const { ids, error } = await searchChannel(ch.channel_id, q)
+            const { ids, error } = await searchChannel(ch.channel_id, q, batchId)
             if (error) apiErrors.push(error)
             allVideoIds.push(...ids)
           }
@@ -279,7 +271,7 @@ async function processOne(ex: Exercise, channels: Channel[], regenerate: boolean
         // Broader fallback: try each query variant against general YouTube
         if (allVideoIds.length < 3) {
           for (const q of queries) {
-            const { ids, error } = await searchGeneral(q)
+            const { ids, error } = await searchGeneral(q, batchId)
             if (error) apiErrors.push(error)
             allVideoIds.push(...ids)
             if (allVideoIds.length >= 8) break
@@ -290,21 +282,21 @@ async function processOne(ex: Exercise, channels: Channel[], regenerate: boolean
         const searchQuery = buildSearchQuery(ex.name_display)
 
         for (const ch of channels.slice(0, 2)) {
-          const { ids, error } = await searchChannel(ch.channel_id, searchQuery)
+          const { ids, error } = await searchChannel(ch.channel_id, searchQuery, batchId)
           if (error) apiErrors.push(error)
           allVideoIds.push(...ids)
           if (allVideoIds.length >= 6) break
         }
 
         if (allVideoIds.length === 0) {
-          const { ids: fallbackIds, error } = await searchGeneral(searchQuery)
+          const { ids: fallbackIds, error } = await searchGeneral(searchQuery, batchId)
           if (error) apiErrors.push(error)
           allVideoIds.push(...fallbackIds)
         }
       }
 
       const unique = [...new Set(allVideoIds)]
-      const details = await getVideoDetails(unique.slice(0, 12))
+      const details = await getVideoDetails(unique.slice(0, 12), batchId)
 
       if (details.length === 0) {
         const errSuffix = apiErrors.length ? ` [${apiErrors[0]}]` : ''
@@ -348,12 +340,12 @@ async function processOne(ex: Exercise, channels: Channel[], regenerate: boolean
 }
 
 // Process exercises 4 at a time in parallel to stay within function timeout
-async function processExercises(exercises: Exercise[], channels: Channel[], regenerate = false) {
+async function processExercises(exercises: Exercise[], channels: Channel[], regenerate = false, batchId = '') {
   const results = []
   const CONCURRENCY = 4
   for (let i = 0; i < exercises.length; i += CONCURRENCY) {
     const chunk = exercises.slice(i, i + CONCURRENCY)
-    const chunkResults = await Promise.all(chunk.map(ex => processOne(ex, channels, regenerate)))
+    const chunkResults = await Promise.all(chunk.map(ex => processOne(ex, channels, regenerate, batchId)))
     results.push(...chunkResults)
   }
   return results
