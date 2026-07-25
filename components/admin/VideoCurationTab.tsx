@@ -112,6 +112,8 @@ export default function VideoCurationTab() {
   }
   const [estimating, setEstimating]       = useState(false)
   const [estimate, setEstimate]           = useState<IndexEstimate | null>(null)
+  const [indexing, setIndexing]           = useState(false)
+  const [indexLog, setIndexLog]           = useState<string[]>([])
 
   // ── Priority queue (from client plan generation) ───────────────────────────
   const [queuedIds, setQueuedIds]         = useState<Set<string>>(new Set())
@@ -190,6 +192,56 @@ export default function VideoCurationTab() {
       setEstimate({ error: err instanceof Error ? err.message : 'Estimate failed' } as IndexEstimate)
     }
     setEstimating(false)
+  }
+
+  // Fills or refreshes the cached uploads index. The route is time-budgeted and
+  // hands back a resume point, so this loops until it reports done.
+  type IndexRunResult = {
+    done?: boolean; quota_exhausted?: boolean
+    units_spent?: number; videos_upserted?: number; pruned?: number
+    cached_total?: number | null; errors?: string[]
+    resume?: { channelId: string; pageToken: string } | null
+    error?: string
+  }
+  async function runIndex(mode: 'build' | 'refresh') {
+    setIndexing(true)
+    setIndexLog([mode === 'build' ? 'Building uploads index…' : 'Refreshing uploads index…'])
+    let resumeChannelId: string | null = null
+    let resumePageToken: string | null = null
+    let units = 0, videos = 0, pruned = 0
+
+    // Safety cap: a full build of ~6,300 videos is ~127 pages, and each round
+    // fits many pages, so this can never be the binding limit in practice.
+    for (let round = 0; round < 60; round++) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const res: Response = await fetch('/api/admin/youtube-index', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session?.access_token ?? ''}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode, resumeChannelId, resumePageToken }),
+        })
+        const d: IndexRunResult = await res.json()
+        if (d.error) { setIndexLog(p => [...p, `Error: ${d.error}`]); break }
+
+        units  += d.units_spent ?? 0
+        videos += d.videos_upserted ?? 0
+        pruned += d.pruned ?? 0
+        setIndexLog(p => [...p, `  round ${round + 1}: +${d.videos_upserted} videos · ${d.units_spent} units · ${d.cached_total ?? '?'} cached total`])
+        for (const e of (d.errors ?? [])) setIndexLog(p => [...p, `  ⚠ ${e}`])
+
+        if (d.quota_exhausted) { setIndexLog(p => [...p, '⛔ Daily quota exhausted. Resume after the midnight PT reset.']); break }
+        if (d.done) {
+          setIndexLog(p => [...p, `✓ Done — ${videos} videos cached · ${units} units spent${pruned ? ` · ${pruned} pruned` : ''}`])
+          break
+        }
+        resumeChannelId = d.resume?.channelId ?? null
+        resumePageToken = d.resume?.pageToken || null
+      } catch (err) {
+        setIndexLog(p => [...p, `Error: ${err instanceof Error ? err.message : 'index run failed'}`])
+        break
+      }
+    }
+    setIndexing(false)
   }
 
   // ── Exercise helpers ───────────────────────────────────────────────────────
@@ -592,19 +644,52 @@ export default function VideoCurationTab() {
                 Read-only check. Costs 1 quota unit per 50 channels and writes nothing.
               </p>
             </div>
-            <button
-              onClick={estimateIndexBuild}
-              disabled={estimating}
-              style={{
-                padding: '8px 18px', borderRadius: 8, border: `1px solid ${C.border}`,
-                cursor: estimating ? 'not-allowed' : 'pointer',
-                background: estimating ? C.surface2 : 'transparent',
-                color: estimating ? C.textDim : C.textMid,
-                fontSize: 13, fontWeight: 700, fontFamily: 'inherit', whiteSpace: 'nowrap',
-              }}>
-              {estimating ? '⏳ Checking…' : '📐 Estimate index build'}
-            </button>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                onClick={estimateIndexBuild}
+                disabled={estimating || indexing}
+                style={{
+                  padding: '8px 18px', borderRadius: 8, border: `1px solid ${C.border}`,
+                  cursor: (estimating || indexing) ? 'not-allowed' : 'pointer',
+                  background: estimating ? C.surface2 : 'transparent',
+                  color: estimating ? C.textDim : C.textMid,
+                  fontSize: 13, fontWeight: 700, fontFamily: 'inherit', whiteSpace: 'nowrap',
+                }}>
+                {estimating ? '⏳ Checking…' : '📐 Estimate index build'}
+              </button>
+              <button
+                onClick={() => runIndex('refresh')}
+                disabled={estimating || indexing}
+                style={{
+                  padding: '8px 18px', borderRadius: 8, border: `1px solid ${C.border}`,
+                  cursor: (estimating || indexing) ? 'not-allowed' : 'pointer',
+                  background: 'transparent', color: C.textMid,
+                  fontSize: 13, fontWeight: 700, fontFamily: 'inherit', whiteSpace: 'nowrap',
+                }}>
+                ↻ Refresh index
+              </button>
+              <button
+                onClick={() => runIndex('build')}
+                disabled={estimating || indexing}
+                style={{
+                  padding: '8px 18px', borderRadius: 8, border: 'none',
+                  cursor: (estimating || indexing) ? 'not-allowed' : 'pointer',
+                  background: indexing ? C.surface2 : C.purple,
+                  color: indexing ? C.textDim : '#000',
+                  fontSize: 13, fontWeight: 700, fontFamily: 'inherit', whiteSpace: 'nowrap',
+                }}>
+                {indexing ? '⏳ Indexing…' : '⚡ Build index'}
+              </button>
+            </div>
           </div>
+
+          {indexLog.length > 0 && (
+            <div style={{ marginTop: 12, padding: '10px 12px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 7, maxHeight: 220, overflowY: 'auto' }}>
+              {indexLog.map((l, i) => (
+                <p key={i} style={{ fontSize: 11, color: i === 0 ? C.purple : C.textMid, fontFamily: 'monospace', lineHeight: 1.7 }}>{l}</p>
+              ))}
+            </div>
+          )}
 
           {estimate && (
             <div style={{ marginTop: 12, padding: '10px 12px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 7 }}>
