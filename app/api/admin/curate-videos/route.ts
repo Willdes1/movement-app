@@ -264,6 +264,11 @@ async function processOne(ex: Exercise, channels: Channel[], regenerate: boolean
             const { ids, error } = await searchChannel(ch.channel_id, q, batchId)
             if (error) apiErrors.push(error)
             allVideoIds.push(...ids)
+            // The stop condition has to be checked HERE, inside the channel loop.
+            // It used to sit only on the outer query loop, so the first query swept
+            // every active channel before anything could stop it: ~15 search.list
+            // calls = ~1,500 quota units for a single regenerate.
+            if (allVideoIds.length >= 9) break
           }
           if (allVideoIds.length >= 9) break
         }
