@@ -38,6 +38,29 @@ What to build:
 
 Target outcome: a documented per-video unit cost low enough to curate several hundred videos in a single day inside the default quota.
 
+### Corrections to this task (added 2026-07-25, after testing)
+
+**Item 3, ETag caching.** The claim above that ETag support stops unchanged videos from burning
+units is **wrong**, and this was tested, not assumed. Firing 100 conditional requests that all
+returned 304 moved the Google Cloud Console "Queries per day" counter from 26 to 127. A 304 costs
+the same quota as a 200 on this API. Conditional requests therefore save nothing here. The savings
+have to come from the **local cache** of channel uploads, which removes the call entirely, rather
+than from making the call cheaper. ETag plumbing stays in `lib/youtube.ts` because it saves
+bandwidth and parsing, but it must not be counted as a quota optimisation anywhere, including in
+the Task 1 item 6 extension form.
+
+**No dependency on Task 6.** An earlier agent summary of this queue claimed Task 1's title
+matching depended on the Task 6 abbreviation mapping table. This spec never said that. Task 6's
+mapping is referenced by Task 9 item 5 only. The dependency was invented during summarisation and
+is void. Decision: **Task 1 ships its own minimal inline abbreviation map in `lib/`**, roughly 20
+to 30 entries covering the common cases (1 DB, DB, BB, KB, SA, alt, and similar). Task 6 later
+absorbs that map as its seed, and the inline version is deleted at that point. Task 6 is not
+pulled forward.
+
+**Confidence threshold is not to be guessed.** On the first index build, matching runs in dry-run
+mode with the fallback disabled, logs the score distribution, and presents a histogram. The
+threshold is chosen from that real data, and stays configurable either way.
+
 ---
 
 ## Task 2: Dead video detection
@@ -106,6 +129,11 @@ What to build:
 1. **Audit.** List every location in the codebase where the movement library is rendered, admin and athlete, and show me the differences in fields, sorting, and display. Then consolidate onto one shared component and one query pattern.
 2. **Naming convention.** Establish a single naming standard and document it. Abbreviated names become full descriptive names. Examples: "1 DB Chest Fly" becomes "Single-Arm Dumbbell Chest Fly", "1 DB Back Row" becomes "Single-Arm Dumbbell Row". Keep the original name in a `legacy_name` column so nothing breaks and I can trace changes.
 3. **Rename migration.** Generate the full mapping table of old name to new name as a reviewable file. I will approve it before anything is applied. Do not apply it automatically.
+> Note added 2026-07-25: Task 1 does **not** depend on this task's mapping table. Task 1 ships a
+> small inline abbreviation map of its own so it is not blocked. When this task builds the real
+> mapping, it seeds from that inline map and then deletes it. See the corrections block under
+> Task 1.
+
 4. **Unilateral video recleanup.** Many approved videos demonstrate both arms or both legs when the exercise is unilateral. I approved these by mistake and it is a large cleanup. Build a report that flags every exercise whose name indicates single-arm, single-leg, alternating, or offset, and queue those videos for recuration with their approval reset to pending. Give me a count first so I know the size of the job before anything is reset.
 
 ---
