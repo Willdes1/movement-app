@@ -88,11 +88,31 @@ const NEGATIVE_TITLE_PATTERNS: [RegExp, string][] = [
  */
 const COMMON_MOVEMENT_WORDS = new Set([
   'push', 'pull', 'press', 'squat', 'curl', 'row', 'raise', 'fly', 'flye',
-  'extension', 'flexion', 'lunge', 'deadlift', 'up', 'down', 'front', 'back',
-  'side', 'lateral', 'seated', 'standing', 'lying', 'incline', 'decline',
+  'extension', 'flexion', 'lunge', 'deadlift', 'up', 'down',
+  'seated', 'standing', 'lying', 'incline', 'decline',
   'bar', 'machine', 'cable', 'band', 'hold', 'stretch', 'twist', 'crunch',
-  'left', 'right', 'leg', 'arm', 'shoulder', 'chest', 'glute', 'hip', 'knee',
+  'leg', 'arm', 'shoulder', 'chest', 'glute', 'hip', 'knee',
 ])
+
+/**
+ * The action itself. These ARE common words, so the distinctive-term gate
+ * ignores them, but they are the most discriminating part of a movement name:
+ * "Sled Pull" and "Sled Push" share every distinctive term and are opposite
+ * exercises. That match scored 0.63 until this gate existed. Same story for
+ * Single-Arm Row matched to a Single Leg RDL.
+ */
+const MOVEMENT_VERBS = new Set([
+  'push', 'pull', 'press', 'squat', 'curl', 'row', 'raise', 'fly',
+  'extension', 'flexion', 'lunge', 'deadlift', 'hold', 'stretch', 'twist',
+  'crunch', 'thrust', 'plank', 'walkout', 'carry', 'swing', 'jump', 'step',
+  'bridge', 'dip', 'pullup', 'pushup', 'shrug', 'kickback', 'rotation',
+])
+
+/** Loose equality so plurals and spelling variants do not cause false misses. */
+function verbForm(token: string): string {
+  const t = token === 'flye' ? 'fly' : token
+  return t.endsWith('s') && t.length > 3 ? t.slice(0, -1) : t
+}
 
 function contentTokens(text: string): string[] {
   return expandAndNormalize(text)
@@ -177,7 +197,17 @@ export function scoreCandidate(exerciseName: string, video: CachedVideo): MatchS
     reasons.push(`title is missing the distinctive term(s): ${missingKeyTerms.join(', ')}`)
   }
 
-  // Gate 2: commentary is not demonstration.
+  // Gate 2: the action has to match. Every movement verb in the exercise name
+  // must appear in the title, or it is a different exercise.
+  const exVerbs = [...new Set(exTokens.map(verbForm).filter(t => MOVEMENT_VERBS.has(t)))]
+  const titleVerbs = new Set([...titleTokens].map(verbForm))
+  const missingVerbs = exVerbs.filter(v => !titleVerbs.has(v))
+  if (exVerbs.length > 0 && missingVerbs.length > 0) {
+    score = Math.min(score, 0.25)
+    reasons.push(`different movement: title has no ${missingVerbs.join(', ')}`)
+  }
+
+  // Gate 3: commentary is not demonstration.
   for (const [pattern, label] of NEGATIVE_TITLE_PATTERNS) {
     if (pattern.test(video.title)) {
       score *= 0.3

@@ -114,6 +114,7 @@ export default function VideoCurationTab() {
   const [estimate, setEstimate]           = useState<IndexEstimate | null>(null)
   const [indexing, setIndexing]           = useState(false)
   const [indexLog, setIndexLog]           = useState<string[]>([])
+  const [handleInput, setHandleInput]     = useState('')
 
   // ── Matching dry run (zero YouTube quota; picks the confidence threshold)
   type DryRun = {
@@ -286,6 +287,39 @@ export default function VideoCurationTab() {
       await loadChannels()
     } catch (err) {
       setIndexLog(p => [...p, `Error: ${err instanceof Error ? err.message : 'repair failed'}`])
+    }
+    setIndexing(false)
+  }
+
+  // 1 unit per handle. The cheap way to widen coverage: index more of YouTube
+  // rather than searching it.
+  async function addChannels() {
+    if (!handleInput.trim()) return
+    setIndexing(true)
+    setIndexLog(['Resolving handles…'])
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res: Response = await fetch('/api/admin/youtube-add-channels', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token ?? ''}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ handles: handleInput }),
+      })
+      const d = await res.json()
+      if (d.error) { setIndexLog(p => [...p, `Error: ${d.error}`]); setIndexing(false); return }
+      setIndexLog(p => [...p, `${d.added?.length ?? 0} added · ${d.units_spent} units spent`])
+      for (const a of (d.added ?? [])) {
+        setIndexLog(p => [...p, `  ✓ ${a.name} — ${a.videos.toLocaleString()} videos · ${a.index_units} units to index`])
+      }
+      for (const s of (d.skipped ?? [])) {
+        setIndexLog(p => [...p, `  ✗ @${s.handle}: ${s.reason}`])
+      }
+      if (d.estimated_index_units) {
+        setIndexLog(p => [...p, `→ ${d.new_videos_available?.toLocaleString()} new videos for ~${d.estimated_index_units} units (${d.estimated_index_pct_of_day}% of a day). Run Build index.`])
+      }
+      setHandleInput('')
+      await loadChannels()
+    } catch (err) {
+      setIndexLog(p => [...p, `Error: ${err instanceof Error ? err.message : 'add failed'}`])
     }
     setIndexing(false)
   }
@@ -753,6 +787,35 @@ export default function VideoCurationTab() {
                   fontSize: 13, fontWeight: 700, fontFamily: 'inherit', whiteSpace: 'nowrap',
                 }}>
                 {indexing ? '⏳ Indexing…' : '⚡ Build index'}
+              </button>
+            </div>
+          </div>
+
+          {/* Add channels by handle — 1 unit each, the cheap coverage lever */}
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+            <p style={{ fontSize: 11, color: C.textDim, marginBottom: 6 }}>
+              Add channels by handle, 1 unit each. Paste @handles or channel URLs, separated by spaces or new lines.
+            </p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <input
+                value={handleInput}
+                onChange={e => setHandleInput(e.target.value)}
+                placeholder="@SquatUniversity @E3Rehab @TomMerrick"
+                style={{
+                  flex: 1, minWidth: 240, padding: '8px 12px', borderRadius: 8,
+                  border: `1px solid ${C.border}`, background: C.bg, color: C.text,
+                  fontSize: 13, fontFamily: 'inherit',
+                }} />
+              <button
+                onClick={addChannels}
+                disabled={indexing || !handleInput.trim()}
+                style={{
+                  padding: '8px 18px', borderRadius: 8, border: `1px solid ${C.border}`,
+                  cursor: (indexing || !handleInput.trim()) ? 'not-allowed' : 'pointer',
+                  background: 'transparent', color: C.textMid,
+                  fontSize: 13, fontWeight: 700, fontFamily: 'inherit', whiteSpace: 'nowrap',
+                }}>
+                + Add channels
               </button>
             </div>
           </div>

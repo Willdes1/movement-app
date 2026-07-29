@@ -118,7 +118,18 @@ export async function POST(req: Request) {
       unitsSpent += 1
       pagesFetched += 1
 
-      if (error) { errors.push(`${ch.channel_name}: ${error}`); break }
+      if (error) {
+        errors.push(`${ch.channel_name}: ${error}`)
+        // A stored uploads playlist that no longer exists (a repaired channel
+        // id can land here) would fail forever. Clear it so the next run
+        // re-resolves it from channels.list instead of retrying a dead id.
+        if (error.includes('playlistNotFound')) {
+          await supabase.from('approved_yt_channels')
+            .update({ uploads_playlist_id: null }).eq('channel_id', ch.channel_id)
+          errors.push(`${ch.channel_name}: cleared bad uploads playlist, will re-resolve next run`)
+        }
+        break
+      }
 
       const items = (data?.items ?? []) as PlaylistItem[]
       if (!items.length) break
