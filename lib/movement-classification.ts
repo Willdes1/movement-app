@@ -86,9 +86,14 @@ export function classifyMovement(
   let track: Track = 'fitness'
   let confidence = 0
 
+  // A sport tag ALONE is never enough. Library Builder seeds legitimate gym
+  // work under sport categories: "Anti-Rotation Press" under Skiing, "Arched
+  // Back Body Tension Hold" under Surfing. The first pass wrongly pulled those
+  // out of curation. A false positive silently removes a real exercise from
+  // curation forever; a false negative just wastes one free local match. The
+  // asymmetry says: require trick vocabulary, not just a sport tag.
   if (strongHit) { track = 'trick'; confidence = 0.95 }
   else if (sportHit && (rotation || weakHits.length >= 1)) { track = 'trick'; confidence = 0.9 }
-  else if (sportHit) { track = 'trick'; confidence = 0.75 }
   else if (rotation && weakHits.length >= 1) { track = 'trick'; confidence = 0.8 }
   else if (weakHits.length >= 2) { track = 'trick'; confidence = 0.6 }
   else if (rotation) { track = 'trick'; confidence = 0.55 }

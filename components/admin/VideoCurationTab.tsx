@@ -262,6 +262,34 @@ export default function VideoCurationTab() {
     setIndexing(false)
   }
 
+  // Cheap first: handle lookups at 1 unit each. No search.list unless asked.
+  async function repairChannels() {
+    setIndexing(true)
+    setIndexLog(['Checking which channel ids still resolve…'])
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res: Response = await fetch('/api/admin/youtube-repair-channels', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token ?? ''}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ allowSearch: false }),
+      })
+      const d = await res.json()
+      if (d.error) { setIndexLog(p => [...p, `Error: ${d.error}`]); setIndexing(false); return }
+      setIndexLog(p => [...p, `${d.broken} broken · ${d.units_spent} units spent`])
+      for (const r of (d.repaired ?? [])) {
+        setIndexLog(p => [...p, `  ✓ ${r.name}: ${r.old_id} → ${r.new_id} (${r.via})`])
+      }
+      for (const s of (d.still_broken ?? [])) {
+        setIndexLog(p => [...p, `  ✗ ${s.name}: tried ${s.tried.join(', ')}`])
+      }
+      if (d.next_step) setIndexLog(p => [...p, `→ ${d.next_step}`])
+      await loadChannels()
+    } catch (err) {
+      setIndexLog(p => [...p, `Error: ${err instanceof Error ? err.message : 'repair failed'}`])
+    }
+    setIndexing(false)
+  }
+
   async function runDryRun() {
     setDryRunning(true)
     setDryRun(null)
@@ -702,6 +730,17 @@ export default function VideoCurationTab() {
                   fontSize: 13, fontWeight: 700, fontFamily: 'inherit', whiteSpace: 'nowrap',
                 }}>
                 ↻ Refresh index
+              </button>
+              <button
+                onClick={repairChannels}
+                disabled={estimating || indexing}
+                style={{
+                  padding: '8px 18px', borderRadius: 8, border: `1px solid ${C.amberBorder}`,
+                  cursor: (estimating || indexing) ? 'not-allowed' : 'pointer',
+                  background: 'transparent', color: C.amber,
+                  fontSize: 13, fontWeight: 700, fontFamily: 'inherit', whiteSpace: 'nowrap',
+                }}>
+                🔧 Repair channel IDs
               </button>
               <button
                 onClick={() => runIndex('build')}

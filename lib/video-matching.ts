@@ -68,6 +68,16 @@ const NEGATIVE_TITLE_PATTERNS: [RegExp, string][] = [
   [/\bi tried\b/i,              'vlog'],
   [/\bpodcast\b/i,              'podcast'],
   [/\bfix(ing)? your\b/i,       'corrective commentary'],
+  // Round 2, from real dry-run output. These slipped through and scored 0.59
+  // to 0.63: "KettleBell Deadlifts are POINTLESS", "Are Behind The Neck
+  // Presses SAFE??", "Skip This Bodyweight Exercise".
+  [/\bpointless\b/i,            'opinion piece'],
+  [/\buseless\b/i,              'opinion piece'],
+  [/\bskip this\b/i,            'opinion piece'],
+  [/\bwon'?t\b/i,               'opinion piece'],
+  [/\boverrated\b/i,            'opinion piece'],
+  [/\bdangerous\b/i,            'opinion piece'],
+  [/\?/,                        'question-style title, usually commentary'],
 ]
 
 /**
@@ -158,8 +168,12 @@ export function scoreCandidate(exerciseName: string, video: CachedVideo): MatchS
   // match. This is what stops "Best Push Up Ever" landing on Archer Push-Up.
   const keyTerms = exTokens.filter(t => !COMMON_MOVEMENT_WORDS.has(t))
   const missingKeyTerms = keyTerms.filter(t => !titleTokens.has(t))
+  // Capped to 0.25, not 0.35. At 0.35 the capped items piled into the 0.3-0.4
+  // histogram bucket, which made a 0.30 threshold look like it matched 32% when
+  // it was really just letting every rejected match back in. The cap has to sit
+  // below any threshold anyone would sensibly choose.
   if (keyTerms.length > 0 && missingKeyTerms.length > 0) {
-    score = Math.min(score, 0.35)
+    score = Math.min(score, 0.25)
     reasons.push(`title is missing the distinctive term(s): ${missingKeyTerms.join(', ')}`)
   }
 
