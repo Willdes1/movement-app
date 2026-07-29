@@ -118,9 +118,15 @@ export default function VideoCurationTab() {
   // ── Matching dry run (zero YouTube quota; picks the confidence threshold)
   type DryRun = {
     sampled: number; zero_candidates: number; timed_out?: boolean
+    backlog?: {
+      total_uncurated: number; fitness: number; trick: number; trick_pct: number
+      trick_by_source: [string, number][]
+      trick_examples: { name: string; why: string[]; confidence: number }[]
+      fitness_examples: string[]
+    }
     percentiles: { p10: number; p25: number; p50: number; p75: number; p90: number }
     histogram: { bucket: string; count: number }[]
-    tradeoff: { threshold: number; matched_locally: number; needs_fallback: number; local_rate_pct: number }[]
+    tradeoff: { threshold: number; matched_locally: number; needs_fallback: number; local_rate_pct: number; projected_fallback_backlog: number }[]
     examples: Record<string, { exercise: string; score: number; matched: string | null; why: string[] }[]>
     error?: string
   }
@@ -799,8 +805,48 @@ export default function VideoCurationTab() {
                 <p style={{ fontSize: 12, color: C.red, fontFamily: 'monospace' }}>Error: {dryRun.error}</p>
               ) : (
                 <>
+                  {/* Backlog split — counts only, nothing written */}
+                  {dryRun.backlog && (
+                    <div style={{ marginBottom: 12, paddingBottom: 12, borderBottom: `1px solid ${C.border}` }}>
+                      <p style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+                        Backlog split (counts only, nothing written)
+                      </p>
+                      <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginBottom: 8 }}>
+                        <div>
+                          <p style={{ fontSize: 20, fontWeight: 800, color: C.text }}>{dryRun.backlog.total_uncurated.toLocaleString()}</p>
+                          <p style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase' }}>uncurated</p>
+                        </div>
+                        <div>
+                          <p style={{ fontSize: 20, fontWeight: 800, color: C.green }}>{dryRun.backlog.fitness.toLocaleString()}</p>
+                          <p style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase' }}>fitness (curate)</p>
+                        </div>
+                        <div>
+                          <p style={{ fontSize: 20, fontWeight: 800, color: C.purple }}>{dryRun.backlog.trick.toLocaleString()}</p>
+                          <p style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase' }}>trick ({dryRun.backlog.trick_pct}%)</p>
+                        </div>
+                      </div>
+                      {dryRun.backlog.trick_by_source?.length > 0 && (
+                        <div style={{ fontFamily: 'monospace', fontSize: 11, color: C.textMid, marginBottom: 6 }}>
+                          {dryRun.backlog.trick_by_source.map(([src, n]) => (
+                            <p key={src} style={{ lineHeight: 1.7 }}>{String(n).padStart(4)} · {src}</p>
+                          ))}
+                        </div>
+                      )}
+                      {dryRun.backlog.trick_examples?.length > 0 && (
+                        <div>
+                          <p style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase', marginBottom: 3 }}>classified as trick</p>
+                          {dryRun.backlog.trick_examples.map((t, i) => (
+                            <p key={i} style={{ fontSize: 11, color: C.textMid, fontFamily: 'monospace', lineHeight: 1.7 }}>
+                              {t.name} <span style={{ color: C.textDim }}>({t.why.join(', ')})</span>
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <p style={{ fontSize: 12, color: C.textMid, marginBottom: 10 }}>
-                    {dryRun.sampled} exercises scored · {dryRun.zero_candidates} found nothing in the cache
+                    {dryRun.sampled} fitness exercises scored · {dryRun.zero_candidates} found nothing in the cache
                     {dryRun.timed_out ? ' · stopped early on the time budget' : ''}
                     {' · median '}<strong style={{ color: C.text }}>{dryRun.percentiles?.p50?.toFixed(2)}</strong>
                   </p>
@@ -825,10 +871,10 @@ export default function VideoCurationTab() {
                     What each threshold would cost
                   </p>
                   <div style={{ fontFamily: 'monospace', fontSize: 11 }}>
-                    <p style={{ color: C.textDim, lineHeight: 1.8 }}>threshold · matched locally · needs paid fallback</p>
+                    <p style={{ color: C.textDim, lineHeight: 1.8 }}>threshold · matched locally · fallback across whole fitness backlog</p>
                     {(dryRun.tradeoff ?? []).map(t => (
                       <p key={t.threshold} style={{ color: C.textMid, lineHeight: 1.8 }}>
-                        {t.threshold.toFixed(2)} · {String(t.matched_locally).padStart(4)} ({t.local_rate_pct}%) · {t.needs_fallback}
+                        {t.threshold.toFixed(2)} · {String(t.matched_locally).padStart(4)} ({t.local_rate_pct}%) · {t.projected_fallback_backlog?.toLocaleString()} exercises ≈ {Math.ceil((t.projected_fallback_backlog ?? 0) / 20)} days at 20/day
                       </p>
                     ))}
                   </div>

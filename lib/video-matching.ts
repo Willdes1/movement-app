@@ -47,6 +47,43 @@ const STOPWORDS = new Set([
   'proper', 'do', 'this', 'of', 'in', 'on', 'is', 'it', 'guide', 'tips',
 ])
 
+/**
+ * Titles that are commentary, not demonstration. A "mistakes" video or a
+ * "waste of time" rant contains all the right words and is exactly the wrong
+ * video: one of these was scoring 0.36 against Antagonist Shoulder External
+ * Rotation while arguing the exercise is pointless.
+ */
+const NEGATIVE_TITLE_PATTERNS: [RegExp, string][] = [
+  [/\bmistakes?\b/i,            'mistakes video'],
+  [/\bwaste of time\b/i,        'opinion piece'],
+  [/\bstop doing\b/i,           'opinion piece'],
+  [/\bdon'?t\s+(do|make)\b/i,   'opinion piece'],
+  [/\bworst\b/i,                'opinion piece'],
+  [/\bmyths?\b/i,               'myth-busting video'],
+  [/\breaction\b/i,             'reaction video'],
+  [/\btop\s*\d+\b/i,            'listicle'],
+  [/\b\d+\s+(best|worst)\b/i,   'listicle'],
+  [/\bvs\.?\b|\bversus\b/i,     'comparison video'],
+  [/\btier list\b/i,            'tier list'],
+  [/\bi tried\b/i,              'vlog'],
+  [/\bpodcast\b/i,              'podcast'],
+  [/\bfix(ing)? your\b/i,       'corrective commentary'],
+]
+
+/**
+ * Words so common in movement names that their presence proves nothing. What
+ * identifies an exercise is the REST: "archer", "axle", "antagonist". If those
+ * are missing from a title, the match is wrong no matter how much else lines
+ * up, which is how "Best Push Up Ever" scored 0.60 against Archer Push-Up.
+ */
+const COMMON_MOVEMENT_WORDS = new Set([
+  'push', 'pull', 'press', 'squat', 'curl', 'row', 'raise', 'fly', 'flye',
+  'extension', 'flexion', 'lunge', 'deadlift', 'up', 'down', 'front', 'back',
+  'side', 'lateral', 'seated', 'standing', 'lying', 'incline', 'decline',
+  'bar', 'machine', 'cable', 'band', 'hold', 'stretch', 'twist', 'crunch',
+  'left', 'right', 'leg', 'arm', 'shoulder', 'chest', 'glute', 'hip', 'knee',
+])
+
 function contentTokens(text: string): string[] {
   return expandAndNormalize(text)
     .split(' ')
@@ -110,14 +147,32 @@ export function scoreCandidate(exerciseName: string, video: CachedVideo): MatchS
   const inDesc = exTokens.filter(t => descTokens.has(t))
   const descSupport = inDesc.length / exTokens.length
 
-  const score =
+  let score =
     WEIGHTS.titleTokenOverlap  * titleOverlap +
     WEIGHTS.trigramSimilarity  * trigram +
     WEIGHTS.equipmentMatch     * equipmentScore +
     WEIGHTS.unilateralMatch    * unilateralScore +
     WEIGHTS.descriptionSupport * descSupport
 
-  return { video, score: Number(score.toFixed(4)), reasons }
+  // Gate 1: the distinctive terms have to be there. Generic overlap is not a
+  // match. This is what stops "Best Push Up Ever" landing on Archer Push-Up.
+  const keyTerms = exTokens.filter(t => !COMMON_MOVEMENT_WORDS.has(t))
+  const missingKeyTerms = keyTerms.filter(t => !titleTokens.has(t))
+  if (keyTerms.length > 0 && missingKeyTerms.length > 0) {
+    score = Math.min(score, 0.35)
+    reasons.push(`title is missing the distinctive term(s): ${missingKeyTerms.join(', ')}`)
+  }
+
+  // Gate 2: commentary is not demonstration.
+  for (const [pattern, label] of NEGATIVE_TITLE_PATTERNS) {
+    if (pattern.test(video.title)) {
+      score *= 0.3
+      reasons.push(`penalised: ${label}`)
+      break
+    }
+  }
+
+  return { video, score: Number(Math.max(0, score).toFixed(4)), reasons }
 }
 
 /** Score every candidate and return them best first. */
