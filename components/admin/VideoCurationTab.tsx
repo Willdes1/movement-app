@@ -115,6 +115,18 @@ export default function VideoCurationTab() {
   const [indexing, setIndexing]           = useState(false)
   const [indexLog, setIndexLog]           = useState<string[]>([])
 
+  // ── Matching dry run (zero YouTube quota; picks the confidence threshold)
+  type DryRun = {
+    sampled: number; zero_candidates: number; timed_out?: boolean
+    percentiles: { p10: number; p25: number; p50: number; p75: number; p90: number }
+    histogram: { bucket: string; count: number }[]
+    tradeoff: { threshold: number; matched_locally: number; needs_fallback: number; local_rate_pct: number }[]
+    examples: Record<string, { exercise: string; score: number; matched: string | null; why: string[] }[]>
+    error?: string
+  }
+  const [dryRunning, setDryRunning]       = useState(false)
+  const [dryRun, setDryRun]               = useState<DryRun | null>(null)
+
   // ── Priority queue (from client plan generation) ───────────────────────────
   const [queuedIds, setQueuedIds]         = useState<Set<string>>(new Set())
   const [programExerciseIds, setProgramExerciseIds] = useState<Set<string>>(new Set())
@@ -242,6 +254,23 @@ export default function VideoCurationTab() {
       }
     }
     setIndexing(false)
+  }
+
+  async function runDryRun() {
+    setDryRunning(true)
+    setDryRun(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res: Response = await fetch('/api/admin/youtube-match-dryrun', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token ?? ''}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sampleSize: 300 }),
+      })
+      setDryRun(await res.json() as DryRun)
+    } catch (err) {
+      setDryRun({ error: err instanceof Error ? err.message : 'Dry run failed' } as DryRun)
+    }
+    setDryRunning(false)
   }
 
   // ── Exercise helpers ───────────────────────────────────────────────────────
@@ -731,6 +760,96 @@ export default function VideoCurationTab() {
                       </p>
                     ))}
                   </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Matching dry run (zero quota) ──────────────────────────────────── */}
+      {hasChannels && (
+        <div style={{ padding: '16px 18px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <p style={{ fontSize: 11, fontWeight: 700, color: C.accent, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 3 }}>
+                Matching dry run
+              </p>
+              <p style={{ fontSize: 12, color: C.textDim }}>
+                Matches 300 uncurated exercises against the cache. No fallback fires, nothing is written, zero YouTube quota.
+              </p>
+            </div>
+            <button
+              onClick={runDryRun}
+              disabled={dryRunning}
+              style={{
+                padding: '8px 18px', borderRadius: 8, border: 'none',
+                cursor: dryRunning ? 'not-allowed' : 'pointer',
+                background: dryRunning ? C.surface2 : C.accent,
+                color: dryRunning ? C.textDim : '#fff',
+                fontSize: 13, fontWeight: 700, fontFamily: 'inherit', whiteSpace: 'nowrap',
+              }}>
+              {dryRunning ? '⏳ Matching…' : '🔬 Run dry run'}
+            </button>
+          </div>
+
+          {dryRun && (
+            <div style={{ marginTop: 12, padding: '12px 14px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 7 }}>
+              {dryRun.error ? (
+                <p style={{ fontSize: 12, color: C.red, fontFamily: 'monospace' }}>Error: {dryRun.error}</p>
+              ) : (
+                <>
+                  <p style={{ fontSize: 12, color: C.textMid, marginBottom: 10 }}>
+                    {dryRun.sampled} exercises scored · {dryRun.zero_candidates} found nothing in the cache
+                    {dryRun.timed_out ? ' · stopped early on the time budget' : ''}
+                    {' · median '}<strong style={{ color: C.text }}>{dryRun.percentiles?.p50?.toFixed(2)}</strong>
+                  </p>
+
+                  {/* Histogram */}
+                  <p style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Top-match score distribution</p>
+                  {(dryRun.histogram ?? []).map(h => {
+                    const max = Math.max(...(dryRun.histogram ?? []).map(x => x.count), 1)
+                    return (
+                      <div key={h.bucket} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                        <span style={{ fontSize: 10, color: C.textDim, fontFamily: 'monospace', width: 56 }}>{h.bucket}</span>
+                        <div style={{ flex: 1, height: 12, background: C.surface2, borderRadius: 3, overflow: 'hidden' }}>
+                          <div style={{ width: `${(h.count / max) * 100}%`, height: '100%', background: C.accent }} />
+                        </div>
+                        <span style={{ fontSize: 10, color: C.textMid, fontFamily: 'monospace', width: 34, textAlign: 'right' }}>{h.count}</span>
+                      </div>
+                    )
+                  })}
+
+                  {/* Threshold trade-off */}
+                  <p style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '14px 0 6px' }}>
+                    What each threshold would cost
+                  </p>
+                  <div style={{ fontFamily: 'monospace', fontSize: 11 }}>
+                    <p style={{ color: C.textDim, lineHeight: 1.8 }}>threshold · matched locally · needs paid fallback</p>
+                    {(dryRun.tradeoff ?? []).map(t => (
+                      <p key={t.threshold} style={{ color: C.textMid, lineHeight: 1.8 }}>
+                        {t.threshold.toFixed(2)} · {String(t.matched_locally).padStart(4)} ({t.local_rate_pct}%) · {t.needs_fallback}
+                      </p>
+                    ))}
+                  </div>
+
+                  {/* Worked examples */}
+                  {['strong', 'middle', 'weak', 'nothing'].map(bandKey => {
+                    const items = dryRun.examples?.[bandKey] ?? []
+                    if (!items.length) return null
+                    return (
+                      <div key={bandKey} style={{ marginTop: 12 }}>
+                        <p style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{bandKey} matches</p>
+                        {items.map((ex, i) => (
+                          <div key={i} style={{ marginBottom: 6, paddingLeft: 8, borderLeft: `2px solid ${C.border}` }}>
+                            <p style={{ fontSize: 11, color: C.text, fontFamily: 'monospace' }}>{ex.score.toFixed(2)} · {ex.exercise}</p>
+                            <p style={{ fontSize: 11, color: C.textMid }}>→ {ex.matched ?? '(nothing)'}</p>
+                            <p style={{ fontSize: 10, color: C.textDim }}>{(ex.why ?? []).join(' · ')}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })}
                 </>
               )}
             </div>
