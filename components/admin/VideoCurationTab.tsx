@@ -176,6 +176,16 @@ export default function VideoCurationTab() {
   }
 
   async function discoverChannels() {
+    // This route fires 5 search.list calls at 100 units each. It is also what
+    // produced the six mangled channel ids that had to be repaired by hand.
+    // Adding channels by handle costs 1 unit and is exact, so this path now
+    // has to be confirmed with its price on the label.
+    const ok = window.confirm(
+      'Re-discover costs about 500 quota units (5% of the daily budget) and often returns nothing.\n\n' +
+      'Adding channels by handle costs 1 unit each and is exact. Use the "Add channels by handle" box instead.\n\n' +
+      'Run the expensive discovery anyway?'
+    )
+    if (!ok) return
     setDiscovering(true)
     setDiscoverLog(['Searching YouTube for certified fitness channels…'])
     try {
@@ -697,7 +707,7 @@ export default function VideoCurationTab() {
               color: discovering ? C.textDim : hasChannels ? C.textMid : '#000',
               fontSize: 13, fontWeight: 700, fontFamily: 'inherit', whiteSpace: 'nowrap',
             }}>
-            {discovering ? '⏳ Discovering…' : hasChannels ? '↺ Re-discover Channels' : '🔍 Auto-Discover Channels'}
+            {discovering ? '⏳ Discovering…' : hasChannels ? '↺ Re-discover (~500 units)' : '🔍 Auto-Discover (~500 units)'}
           </button>
         </div>
 
