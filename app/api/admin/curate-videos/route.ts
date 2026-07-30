@@ -1,6 +1,16 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
 import { ytFetch, getVideosBatched, beginYtBatch } from '@/lib/youtube'
+import { buildMatchQuery, rankCandidates, CachedVideo } from '@/lib/video-matching'
+
+// Match confidence required before a cached video is proposed without paying
+// for a search. Overridable per request from the curation tab.
+const DEFAULT_MATCH_THRESHOLD = 0.70
+
+// Daily ceiling on paid search.list fallbacks, at 100 units each. 80 calls is
+// 8,000 units. Local matching now costs nothing, so almost the whole 10,000
+// budget is available for the exercises the cache genuinely cannot serve.
+const DEFAULT_FALLBACK_CAP = 80
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -13,19 +23,8 @@ const supabaseAdmin = createClient(
 )
 
 // ─── YouTube helpers (all calls routed through lib/youtube.ts for logging) ─────
-async function searchChannel(channelId: string, query: string, batchId: string): Promise<{ ids: string[]; error?: string }> {
-  // No videoEmbeddable filter here — getVideoDetails already gates on embeddability.
-  const { data, error } = await ytFetch('search', { part: 'id', channelId, q: query, type: 'video', maxResults: 3 }, { batchId })
-  if (data?.error || error) {
-    const reason = data?.error?.errors?.[0]?.reason ?? data?.error?.message ?? error ?? 'unknown'
-    return { ids: [], error: `YT API error (${data?.error?.code ?? ''}): ${reason}` }
-  }
-  const ids = (data?.items ?? []).map((i: { id: { videoId: string } }) => i.id.videoId).filter(Boolean)
-  return { ids }
-}
-
-async function searchGeneral(query: string, batchId: string): Promise<{ ids: string[]; error?: string }> {
-  const { data, error } = await ytFetch('search', { part: 'id', q: query + ' exercise tutorial', type: 'video', maxResults: 5 }, { batchId })
+async function searchGeneral(query: string, batchId: string, isFallback = false): Promise<{ ids: string[]; error?: string }> {
+  const { data, error } = await ytFetch('search', { part: 'id', q: query + ' exercise tutorial', type: 'video', maxResults: 5 }, { batchId, isFallback })
   if (data?.error || error) {
     const reason = data?.error?.errors?.[0]?.reason ?? data?.error?.message ?? error ?? 'unknown'
     return { ids: [], error: `YT API error (${data?.error?.code ?? ''}): ${reason}` }
@@ -114,7 +113,14 @@ Return ONLY valid JSON array, no markdown:
 // ─── Main handler ─────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   try {
-    const { exerciseId, exerciseIds, batchSize = 10, regenerate = false, lane = 'all' } = await request.json().catch(() => ({}))
+    const {
+      exerciseId, exerciseIds, batchSize = 10, regenerate = false, lane = 'all',
+      matchThreshold, fallbackDailyCap,
+    } = await request.json().catch(() => ({}))
+    const threshold = Number.isFinite(Number(matchThreshold))
+      ? Math.min(Math.max(Number(matchThreshold), 0), 1) : DEFAULT_MATCH_THRESHOLD
+    const fallbackCap = Number.isFinite(Number(fallbackDailyCap))
+      ? Math.min(Math.max(Number(fallbackDailyCap), 0), 95) : DEFAULT_FALLBACK_CAP
     const batchId = beginYtBatch()
 
     // Load approved channels
@@ -132,7 +138,7 @@ export async function POST(request: Request) {
         .from('exercise_library')
         .select('id, name_display, how, name_normalized')
         .eq('id', exerciseId)
-      const results = await processExercises(exercises ?? [], channels, regenerate, batchId)
+      const results = await processExercises(exercises ?? [], channels, regenerate, batchId, threshold, fallbackCap)
       return Response.json({ processed: results.length, results })
     }
 
@@ -152,7 +158,7 @@ export async function POST(request: Request) {
         .is('video_url', null)
 
       const filtered = (targeted ?? []).filter((e: Exercise) => !alreadyProposed.has(e.id)).slice(0, batchSize)
-      const results = await processExercises(filtered, channels, regenerate, batchId)
+      const results = await processExercises(filtered, channels, regenerate, batchId, threshold, fallbackCap)
       return Response.json({ processed: results.length, results })
     }
 
@@ -202,7 +208,7 @@ export async function POST(request: Request) {
     }
 
     const batch = sorted.slice(0, batchSize)
-    const results = await processExercises(batch, channels, regenerate, batchId)
+    const results = await processExercises(batch, channels, regenerate, batchId, threshold, fallbackCap)
     return Response.json({ processed: results.length, results })
 
   } catch (err) {
@@ -224,134 +230,140 @@ function buildSearchQuery(name: string): string {
     .trim()
 }
 
-// Returns 2–4 query variations for regeneration: broader terms get more diverse YouTube results
-function buildAlternativeQueries(name: string): string[] {
-  const primary = buildSearchQuery(name)
-  const queries: string[] = [primary]
-
-  // Strip directional/side qualifiers e.g. "Toe-Side to Heel-Side", "Lateral to Medial"
-  const noDirectional = primary
-    .replace(/\b\w+-Side(\s+to\s+\w+-Side)?\b/gi, '')
-    .replace(/\b(clockwise|counterclockwise|lateral|medial|bilateral|unilateral|alternating|contralateral)\b/gi, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-  if (noDirectional && noDirectional !== primary) queries.push(noDirectional)
-
-  // Core 2-word movement name (e.g., "Ankle Circles" from "Ankle Circles Toe-Side to Heel-Side")
-  const words = primary.split(' ')
-  if (words.length > 3) queries.push(words.slice(0, 2).join(' ') + ' exercise tutorial')
-  else if (words.length === 3) queries.push(words.slice(0, 2).join(' '))
-
-  // "How to" prefix for tutorial-focused results
-  const base = noDirectional || primary
-  queries.push('how to ' + base.toLowerCase().split(' ').slice(0, 4).join(' '))
-
-  return [...new Set(queries)].filter(q => q.length >= 5)
+// ─── Local matching (0 quota) ─────────────────────────────────────────────────
+// Replaces search.list as the discovery step. Postgres narrows the cached
+// uploads index by trigram, Node scores precisely, and only the survivors cost
+// a videos.list call (1 unit per 50 ids).
+async function localMatch(ex: Exercise, threshold: number, excludeIds: Set<string>) {
+  const q = buildMatchQuery(ex.name_display)
+  const { data, error } = await supabaseAdmin.rpc('match_channel_videos', { q, match_limit: 30 })
+  if (error || !data?.length) return { ids: [] as string[], topScore: 0 }
+  const ranked = rankCandidates(ex.name_display, (data ?? []) as CachedVideo[])
+    .filter(r => !excludeIds.has(r.video.video_id))
+  const passing = ranked.filter(r => r.score >= threshold).slice(0, 6)
+  return { ids: passing.map(r => r.video.video_id), topScore: ranked[0]?.score ?? 0 }
 }
 
-async function processOne(ex: Exercise, channels: Channel[], regenerate: boolean, batchId: string) {
-    try {
-      const apiErrors: string[] = []
-      const allVideoIds: string[] = []
+type CurationCtx = {
+  regenerate: boolean
+  batchId: string
+  threshold: number
+  fallbackBudget: { remaining: number }
+  channels: Channel[]
+}
 
-      if (regenerate) {
-        // Regenerate: try multiple query variations across ALL approved channels
-        const queries = buildAlternativeQueries(ex.name_display)
-        const channelPool = channels  // all channels, not just top 2
+async function processOne(ex: Exercise, ctx: CurationCtx) {
+  const { regenerate, batchId, threshold, fallbackBudget } = ctx
+  try {
+    const apiErrors: string[] = []
+    let allVideoIds: string[] = []
+    let usedFallback = false
 
-        for (const q of queries) {
-          for (const ch of channelPool) {
-            const { ids, error } = await searchChannel(ch.channel_id, q, batchId)
-            if (error) apiErrors.push(error)
-            allVideoIds.push(...ids)
-            // The stop condition has to be checked HERE, inside the channel loop.
-            // It used to sit only on the outer query loop, so the first query swept
-            // every active channel before anything could stop it: ~15 search.list
-            // calls = ~1,500 quota units for a single regenerate.
-            if (allVideoIds.length >= 9) break
-          }
-          if (allVideoIds.length >= 9) break
-        }
-
-        // Broader fallback: try each query variant against general YouTube
-        if (allVideoIds.length < 3) {
-          for (const q of queries) {
-            const { ids, error } = await searchGeneral(q, batchId)
-            if (error) apiErrors.push(error)
-            allVideoIds.push(...ids)
-            if (allVideoIds.length >= 8) break
-          }
-        }
-      } else {
-        // Normal path: single query, top 2 channels
-        const searchQuery = buildSearchQuery(ex.name_display)
-
-        for (const ch of channels.slice(0, 2)) {
-          const { ids, error } = await searchChannel(ch.channel_id, searchQuery, batchId)
-          if (error) apiErrors.push(error)
-          allVideoIds.push(...ids)
-          if (allVideoIds.length >= 6) break
-        }
-
-        if (allVideoIds.length === 0) {
-          const { ids: fallbackIds, error } = await searchGeneral(searchQuery, batchId)
-          if (error) apiErrors.push(error)
-          allVideoIds.push(...fallbackIds)
-        }
-      }
-
-      const unique = [...new Set(allVideoIds)]
-      const details = await getVideoDetails(unique.slice(0, 12), batchId)
-
-      if (details.length === 0) {
-        const errSuffix = apiErrors.length ? ` [${apiErrors[0]}]` : ''
-        return { exercise: ex.name_display, status: 'no_results', error: errSuffix || undefined }
-      }
-
-      // Score with Claude (strict mode on regenerate to avoid low-quality approvals)
-      const scored = await scoreCandidates(ex.name_display, ex.how ?? '', details, regenerate)
-      const minScore = regenerate ? 0.35 : 0.2
-      const top3 = scored
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 3)
-        .map(s => ({ ...s, detail: details[s.index] }))
-        .filter(s => s.detail && s.score >= minScore)
-
-      if (top3.length === 0) {
-        return { exercise: ex.name_display, status: 'no_good_matches' }
-      }
-
-      // Write candidates to DB
-      const inserts = top3.map(s => ({
-        exercise_id:         ex.id,
-        youtube_video_id:    s.detail.videoId,
-        url:                 s.detail.url,
-        title:               s.detail.title,
-        channel_id:          s.detail.channelId,
-        channel_title:       s.detail.channelTitle,
-        thumbnail_url:       s.detail.thumbnail,
-        duration_seconds:    s.detail.duration,
-        view_count:          s.detail.viewCount,
-        ai_relevance_score:  s.score,
-        ai_reasoning:        s.reasoning,
-        status:              'proposed',
-      }))
-
-      await supabaseAdmin.from('exercise_video_candidates').insert(inserts)
-      return { exercise: ex.name_display, status: 'proposed', candidates: top3.length }
-    } catch (err) {
-      return { exercise: ex.name_display, status: 'error', error: err instanceof Error ? err.message : 'unknown' }
+    // Regenerate must never re-search. It re-ranks the cache and skips whatever
+    // was already proposed, which is what takes it from ~1,500 units to zero.
+    const excludeIds = new Set<string>()
+    if (regenerate) {
+      const { data: prior } = await supabaseAdmin
+        .from('exercise_video_candidates')
+        .select('youtube_video_id')
+        .eq('exercise_id', ex.id)
+      for (const p of (prior ?? []) as { youtube_video_id: string }[]) excludeIds.add(p.youtube_video_id)
     }
+
+    const local = await localMatch(ex, threshold, excludeIds)
+    allVideoIds = local.ids
+
+    // Paid fallback: only when local matching found nothing above the bar, and
+    // only while there is budget left. Visible in the result either way.
+    if (allVideoIds.length === 0) {
+      if (fallbackBudget.remaining <= 0) {
+        return {
+          exercise: ex.name_display, status: 'fallback_capped',
+          topScore: local.topScore,
+          error: `no local match (best ${local.topScore.toFixed(2)}) and the daily search fallback cap is spent`,
+        }
+      }
+      fallbackBudget.remaining -= 1
+      usedFallback = true
+      const { ids, error } = await searchGeneral(buildSearchQuery(ex.name_display), batchId, true)
+      if (error) apiErrors.push(error)
+      allVideoIds = ids
+    }
+
+    const unique = [...new Set(allVideoIds)]
+    const details = await getVideoDetails(unique.slice(0, 12), batchId)
+
+    if (details.length === 0) {
+      const errSuffix = apiErrors.length ? ` [${apiErrors[0]}]` : ''
+      return { exercise: ex.name_display, status: 'no_results', usedFallback, error: errSuffix || undefined }
+    }
+
+    const scored = await scoreCandidates(ex.name_display, ex.how ?? '', details, regenerate)
+    const minScore = regenerate ? 0.35 : 0.2
+    const top3 = scored
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3)
+      .map(s => ({ ...s, detail: details[s.index] }))
+      .filter(s => s.detail && s.score >= minScore)
+
+    if (top3.length === 0) return { exercise: ex.name_display, status: 'no_good_matches', usedFallback }
+
+    const inserts = top3.map(s => ({
+      exercise_id:        ex.id,
+      youtube_video_id:   s.detail.videoId,
+      url:                s.detail.url,
+      title:              s.detail.title,
+      channel_id:         s.detail.channelId,
+      channel_title:      s.detail.channelTitle,
+      thumbnail_url:      s.detail.thumbnail,
+      duration_seconds:   s.detail.duration,
+      view_count:         s.detail.viewCount,
+      ai_relevance_score: s.score,
+      ai_reasoning:       s.reasoning,
+      status:             'proposed',
+    }))
+
+    await supabaseAdmin.from('exercise_video_candidates').insert(inserts)
+    return {
+      exercise: ex.name_display, status: 'proposed', candidates: top3.length,
+      usedFallback, matchScore: Number(local.topScore.toFixed(2)),
+      source: usedFallback ? 'search fallback (100 units)' : 'local cache (0 units)',
+    }
+  } catch (err) {
+    return { exercise: ex.name_display, status: 'error', error: err instanceof Error ? err.message : 'unknown' }
+  }
 }
 
 // Process exercises 4 at a time in parallel to stay within function timeout
-async function processExercises(exercises: Exercise[], channels: Channel[], regenerate = false, batchId = '') {
+async function processExercises(
+  exercises: Exercise[], channels: Channel[], regenerate = false, batchId = '',
+  threshold = DEFAULT_MATCH_THRESHOLD, fallbackCap = DEFAULT_FALLBACK_CAP,
+) {
+  // One shared budget across the whole request, seeded from what today already
+  // spent, so the cap is a real daily ceiling rather than a per-request one.
+  const spentToday = await fallbackCallsToday()
+  const fallbackBudget = { remaining: Math.max(0, fallbackCap - spentToday) }
+  const ctx: CurationCtx = { regenerate, batchId, threshold, fallbackBudget, channels }
+
   const results = []
   const CONCURRENCY = 4
   for (let i = 0; i < exercises.length; i += CONCURRENCY) {
     const chunk = exercises.slice(i, i + CONCURRENCY)
-    const chunkResults = await Promise.all(chunk.map(ex => processOne(ex, channels, regenerate, batchId)))
-    results.push(...chunkResults)
+    results.push(...await Promise.all(chunk.map(ex => processOne(ex, ctx))))
   }
   return results
+}
+
+// Midnight Pacific is when YouTube resets the daily quota.
+async function fallbackCallsToday(): Promise<number> {
+  const now = new Date()
+  const pacific = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }))
+  const midnightPT = new Date(now.getTime() - (pacific.getHours() * 3600 + pacific.getMinutes() * 60 + pacific.getSeconds()) * 1000)
+  const { count } = await supabaseAdmin
+    .from('youtube_api_usage')
+    .select('id', { count: 'exact', head: true })
+    .eq('is_fallback', true)
+    .eq('endpoint', 'search')
+    .gte('created_at', midnightPT.toISOString())
+  return count ?? 0
 }

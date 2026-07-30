@@ -97,6 +97,20 @@ export async function POST(req: Request) {
   for (const ch of list) {
     if (!ch.uploads_playlist_id) { errors.push(`${ch.channel_name}: no uploads playlist`); continue }
 
+    // A full build re-pages a channel from scratch. Running it again over
+    // channels that are already cached costs hundreds of units and adds
+    // nothing: one such run wrote ~18,000 rows and produced 8 new videos.
+    // So build only does the expensive full pass on channels with nothing
+    // cached, and falls back to incremental refresh for the rest.
+    let effectiveMode = mode
+    if (mode === 'build' && ch.channel_id !== resumeChannelId) {
+      const { count } = await supabase
+        .from('youtube_channel_videos')
+        .select('video_id', { count: 'exact', head: true })
+        .eq('channel_id', ch.channel_id)
+      if ((count ?? 0) > 0) effectiveMode = 'refresh'
+    }
+
     let pageToken: string | null =
       (ch.channel_id === resumeChannelId ? resumePageToken : null)
 
@@ -146,7 +160,7 @@ export async function POST(req: Request) {
       // Refresh mode stops at the first video we already hold. The uploads
       // playlist is newest-first, so everything past that point is known.
       let stopHere = false
-      if (mode === 'refresh' && rows.length) {
+      if (effectiveMode === 'refresh' && rows.length) {
         const { data: known } = await supabase
           .from('youtube_channel_videos')
           .select('video_id')
