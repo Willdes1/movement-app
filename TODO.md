@@ -4,6 +4,35 @@
 ---
 
 ## 🔥 Active / Up Next
+- [ ] ⭐ **PRIORITY — "Ask me anything" knowledge base at the top of the Admin portal.**
+  (Added 2026-07-31.) A search bar pinned to the top of `/admin`, above the tabs, labelled
+  something like **"Have any questions? Ask me"** with example prompts visible so it is obvious
+  what it is for. Purpose: Will and his partners can ask how the Admin portal works instead of
+  hunting or asking Will directly.
+
+  **Real questions it must answer well:**
+  - "Remind me how the trimmer works"
+  - "Where do I go to view the approved videos?"
+  - "How do I view the library?"
+  - "How do I export?"
+
+  **Design notes:**
+  - **Ground the answers in real sources, do not let it improvise.** Wrong instructions given to a
+    partner are worse than no instructions. Candidate sources already in the repo:
+    `lib/admin-tabs.ts` (the authoritative tab list), `ARCHITECTURE.md`, `docs/APP_GUIDE.md`,
+    and `components/admin/MarketingGuide.tsx`, which is already an in-app written guide and is the
+    obvious model to generalise.
+  - **Answers should deep-link.** Admin tabs are hash-routed (`/admin#video`, `/admin#trimming`),
+    so "where do I view approved videos" can hand back a clickable link, not just prose.
+  - **Respect partner permissions.** Partners only see the tabs granted to them via
+    `admin_permissions` / `adminTabs`. The assistant must not explain a tab the asker cannot open.
+  - Two viable builds: curated content that is retrieved and summarised (the admin surface is
+    small and fully known, so this may beat embeddings), or the existing pgvector RAG pattern in
+    `lib/knowledge-retrieval.ts`. Decide once the content source is settled.
+  - Must call `logTokens()` like every other AI route.
+  - Related, and should probably share one content source: the athlete/coach side idea in
+    `to-do/onboarding-help-knowledge-base.md` (first-use hover hints + internal KB + "ask the app").
+
 - [ ] 🚨 **Marketing Hub: tables now exist, but nothing has been verified end to end.** All 6
   missing migrations were run on 2026-07-25 (ledger 42/42), so Content Engine, Leads, AI Outreach,
   Ads Studio and coach usage meters are unblocked. But every one of those surfaces shipped against
