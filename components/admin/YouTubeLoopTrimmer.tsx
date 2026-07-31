@@ -53,6 +53,9 @@ export default function YouTubeLoopTrimmer({
   const [end, setEnd] = useState(initialEnd ?? 0)
   const [current, setCurrent] = useState(initialStart ?? 0)
   const [looping, setLooping] = useState(false)
+  // Plain playback, separate from loop preview. Loop preview is locked to the
+  // selected window; this is for scanning the whole video to find the movement.
+  const [playing, setPlaying] = useState(false)
 
   // Refs mirror state so drag handlers never read stale closure values.
   const startRef = useRef(start); startRef.current = start
@@ -127,12 +130,63 @@ export default function YouTubeLoopTrimmer({
     return ratio * durRef.current
   }
 
+  /**
+   * Scrub without touching the loop. Click anywhere on the bar to jump there,
+   * or hold and sweep to scan through the video.
+   *
+   * Previously the only way to move the playhead was to let the video play in
+   * real time, so setting an In point at 0:18 meant sitting through 18 seconds.
+   * Dragging the ⟮ handle did seek, but it moved the In point at the same time,
+   * so you could not explore without changing your selection.
+   */
+  function onBarDown(e: React.PointerEvent) {
+    if (!ready) return
+    e.preventDefault()
+    setLooping(false)
+    const seek = (clientX: number) => {
+      const t = timeFromClientX(clientX)
+      setCurrent(t)
+      playerRef.current?.seekTo(t, true)
+    }
+    seek(e.clientX)
+    const move = (ev: PointerEvent) => seek(ev.clientX)
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+
+  /** Nudge the playhead by a fixed amount. Dragging cannot hit a precise rep. */
+  function nudge(delta: number) {
+    const p = playerRef.current
+    if (!p) return
+    setLooping(false)
+    const t = Math.min(durRef.current, Math.max(0, p.getCurrentTime() + delta))
+    setCurrent(t)
+    p.seekTo(t, true)
+  }
+
+  /** Plain play/pause for scanning, separate from the loop preview. */
+  function togglePlay() {
+    const p = playerRef.current
+    if (!p) return
+    setLooping(false)
+    if (playing) { p.pauseVideo(); setPlaying(false) }
+    else { p.mute(); p.playVideo(); setPlaying(true) }
+  }
+
   function onHandleDown(which: 'start' | 'end') {
     return (e: React.PointerEvent) => {
       e.preventDefault()
+      // The handles sit on top of the bar, so without this the bar's scrub
+      // handler would fire too and fight the drag.
+      e.stopPropagation()
       draggingRef.current = which
       setLooping(false)
       playerRef.current?.pauseVideo()
+      setPlaying(false)
       const move = (ev: PointerEvent) => {
         const t = timeFromClientX(ev.clientX)
         if (draggingRef.current === 'start') setStart(Math.min(t, endRef.current - 0.2))
@@ -153,7 +207,7 @@ export default function YouTubeLoopTrimmer({
     const p = playerRef.current
     if (!p) return
     if (looping) { p.pauseVideo(); setLooping(false) }
-    else { p.seekTo(start, true); p.mute(); p.playVideo(); setLooping(true) }
+    else { p.seekTo(start, true); p.mute(); p.playVideo(); setLooping(true); setPlaying(false) }
   }
 
   const segLen = Math.max(0, end - start)
@@ -179,12 +233,17 @@ export default function YouTubeLoopTrimmer({
       {/* Scrubber */}
       <div
         ref={barRef}
-        style={{ position: 'relative', height: 40, background: C.bg, borderRadius: 8, border: `1px solid ${C.border}`, touchAction: 'none', userSelect: 'none' }}
+        onPointerDown={onBarDown}
+        title="Click or drag anywhere to scrub the video"
+        style={{ position: 'relative', height: 40, background: C.bg, borderRadius: 8, border: `1px solid ${C.border}`, touchAction: 'none', userSelect: 'none', cursor: ready ? 'pointer' : 'default' }}
       >
         {/* selected region */}
-        <div style={{ position: 'absolute', top: 0, bottom: 0, left: pct(start), width: `calc(${pct(end)} - ${pct(start)})`, background: C.accentDim, borderLeft: `2px solid ${C.accent}`, borderRight: `2px solid ${C.accent}` }} />
-        {/* playhead */}
+        <div style={{ position: 'absolute', top: 0, bottom: 0, left: pct(start), width: `calc(${pct(end)} - ${pct(start)})`, background: C.accentDim, borderLeft: `2px solid ${C.accent}`, borderRight: `2px solid ${C.accent}`, pointerEvents: 'none' }} />
+        {/* playhead — now a real grab target, not just a readout */}
         <div style={{ position: 'absolute', top: 0, bottom: 0, left: pct(current), width: 2, background: C.green, pointerEvents: 'none' }} />
+        <div
+          title="Drag to scrub"
+          style={{ position: 'absolute', top: -5, left: pct(current), transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: `8px solid ${C.green}`, pointerEvents: 'none' }} />
         {/* start handle */}
         <div
           onPointerDown={onHandleDown('start')}
@@ -207,7 +266,21 @@ export default function YouTubeLoopTrimmer({
         <span style={{ marginLeft: 'auto', color: C.textDim }}>Playhead: {mmss(current)}</span>
       </div>
 
-      {/* Controls */}
+      {/* Scrub controls — find the moment before marking it */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+        <button onClick={togglePlay} disabled={!ready} style={btn(C.surface2, C.border, C.textMid)}>
+          {playing ? '⏸ Pause' : '▶ Play'}
+        </button>
+        <button onClick={() => nudge(-5)} disabled={!ready} style={btn(C.surface2, C.border, C.textMid)}>⏪ 5s</button>
+        <button onClick={() => nudge(-1)} disabled={!ready} style={btn(C.surface2, C.border, C.textMid)}>◀ 1s</button>
+        <button onClick={() => nudge(-0.2)} disabled={!ready} style={btn(C.surface2, C.border, C.textDim)}>◂ 0.2s</button>
+        <button onClick={() => nudge(0.2)} disabled={!ready} style={btn(C.surface2, C.border, C.textDim)}>0.2s ▸</button>
+        <button onClick={() => nudge(1)} disabled={!ready} style={btn(C.surface2, C.border, C.textMid)}>1s ▶</button>
+        <button onClick={() => nudge(5)} disabled={!ready} style={btn(C.surface2, C.border, C.textMid)}>5s ⏩</button>
+        <span style={{ fontSize: 10, color: C.textDim, marginLeft: 4 }}>Click or drag the bar to scrub</span>
+      </div>
+
+      {/* Loop controls */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
         <button onClick={() => setStart(Math.min(current, end - 0.2))} disabled={!ready} style={btn(C.surface2, C.border, C.textMid)}>⟮ Set In to playhead</button>
         <button onClick={() => setEnd(Math.max(current, start + 0.2))} disabled={!ready} style={btn(C.surface2, C.border, C.textMid)}>Set Out to playhead ⟯</button>
