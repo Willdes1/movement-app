@@ -46,6 +46,7 @@ export const TAB_CATALOG: AdminTab[] = [
   { id: 'tts',           label: 'TTS Audio',          group: 'Content',    sensitive: false },
   { id: 'seed',          label: 'Library Builder',    group: 'Content',    sensitive: false },
   { id: 'cleanup',       label: 'Library Cleanup',    group: 'Content',    sensitive: false },
+  { id: 'trimming',      label: 'Video Trimming',     group: 'Content',    sensitive: false },
   // Dev Tools — sensitive (cost/infra data)
   { id: 'health',        label: 'Health Monitor',     group: 'Dev Tools',  sensitive: true },
   { id: 'architecture',  label: 'Architecture',       group: 'Dev Tools',  sensitive: false },
