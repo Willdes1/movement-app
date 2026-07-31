@@ -12,6 +12,13 @@
   actually did while `content_posts` was missing from 07-21 to 07-25 (it may start generating and
   publishing on its next run now that the table is there). **Standalone item. NOT part of the
   10-task curation queue, and must not be picked up inside it.**
+- [ ] **Dead-video detection on the full-video player.** Shipped 2026-07-31 for the loop player
+  (`LoopPreview`), which reports YouTube error 100/101/150 at zero API quota. The full-video view
+  still uses a plain `<iframe>`, which cannot raise error events. Converting it means moving it
+  onto the IFrame Player API and re-implementing controls, the Shorts audio toggle and the
+  clip start/end range, so it risks breaking working playback for a marginal gain. **Coverage
+  note:** detection only fires where a loop window exists, so it improves automatically as
+  trimming progresses (Task 3). Revisit if dead videos actually start reaching athletes.
 - [ ] **6 of 9 approved YouTube channels have unresolvable channel IDs.** Found 2026-07-25 via the
   index estimator: Squat University, Bob & Brad, E3 Rehab, Prehab Guys, Knees Over Toes Guy and
   Calisthenicmovement all return nothing from `channels.list`, and one stored id is 23 chars when
