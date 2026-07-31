@@ -32,6 +32,32 @@ async function fetchAllRows<T>(
   return { data: out, error: null }
 }
 
+// A paid search fallback must never be invisible, so the run log states per
+// exercise whether the match came from the free cache or cost 100 units.
+type CurationResult = {
+  exercise: string; status: string; candidates?: number; error?: string
+  usedFallback?: boolean; matchScore?: number; source?: string
+}
+
+function fmtResult(r: CurationResult): string {
+  const icon = r.status === 'proposed' ? '✓' : r.status === 'fallback_capped' ? '⏸' : r.status === 'no_results' ? '○' : '⚠'
+  const cost = r.usedFallback ? ' · 💸 search fallback (100 units)' : r.status === 'proposed' ? ' · 🆓 local cache' : ''
+  const score = typeof r.matchScore === 'number' ? ` · match ${r.matchScore.toFixed(2)}` : ''
+  const detail = r.candidates ? `${r.candidates} candidates` : `${r.status}${r.error ? ` ${r.error}` : ''}`
+  return `${icon} ${r.exercise} — ${detail}${score}${cost}`
+}
+
+function summarise(results: CurationResult[]): string[] {
+  const paid = results.filter(r => r.usedFallback).length
+  const free = results.filter(r => r.status === 'proposed' && !r.usedFallback).length
+  const capped = results.filter(r => r.status === 'fallback_capped').length
+  const units = paid * 100 + Math.ceil(results.length / 50)
+  return [
+    `   ${free} from cache (0 units) · ${paid} paid searches (${paid * 100} units) · ${capped} deferred to tomorrow`,
+    `   ≈ ${units} units this run, vs ${results.length * 201} on the old pipeline`,
+  ]
+}
+
 type Channel = {
   channel_id: string; channel_name: string; audience_focus: string; priority: number
 }
@@ -486,10 +512,8 @@ export default function VideoCurationTab() {
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
-      const lines = (data.results ?? []).map((r: { exercise: string; status: string; candidates?: number; error?: string }) =>
-        `${r.status === 'proposed' ? '✓' : r.status === 'no_results' ? '○' : '⚠'} ${r.exercise}${r.candidates ? ` — ${r.candidates} candidates` : ` — ${r.status}${r.error ?? ''}`}`
-      )
-      setRunLog([`Done — ${data.processed} exercises processed`, ...lines])
+      const lines = (data.results ?? []).map(fmtResult)
+      setRunLog([`Done — ${data.processed} exercises processed`, ...summarise(data.results ?? []), ...lines])
       await loadExercises()
     } catch (err) {
       setRunLog(prev => [...prev, `Error: ${err instanceof Error ? err.message : 'Failed'}`])
@@ -513,10 +537,8 @@ export default function VideoCurationTab() {
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
-      const lines = (data.results ?? []).map((r: { exercise: string; status: string; candidates?: number }) =>
-        `${r.status === 'proposed' ? '✓' : r.status === 'no_results' ? '○' : '⚠'} ${r.exercise}${r.candidates ? ` — ${r.candidates} candidates` : ''}`
-      )
-      setRunLog([`Done — ${data.processed} processed`, ...lines])
+      const lines = (data.results ?? []).map(fmtResult)
+      setRunLog([`Done — ${data.processed} processed`, ...summarise(data.results ?? []), ...lines])
       await loadExercises()
     } catch (err) {
       setRunLog(prev => [...prev, `Error: ${err instanceof Error ? err.message : 'Failed'}`])
