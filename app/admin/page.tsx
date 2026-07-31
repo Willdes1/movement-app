@@ -20,6 +20,7 @@ import AccessControlTab from '@/components/admin/AccessControlTab'
 import { GRANTABLE_TABS } from '@/lib/admin-tabs'
 import SpendTab from '@/components/admin/SpendTab'
 import VideoCurationTab from '@/components/admin/VideoCurationTab'
+import LibraryCleanupTab from '@/components/admin/LibraryCleanupTab'
 import PushTab from '@/components/admin/PushTab'
 import StripeTab from '@/components/admin/StripeTab'
 import APIETab from '@/components/admin/APIETab'
@@ -49,7 +50,7 @@ const C = {
 }
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
-type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad' | 'health' | 'media' | 'impersonation' | 'retention' | 'notes' | 'billing' | 'ceo' | 'bugs' | 'kb' | 'study' | 'access' | 'spend' | 'video' | 'push' | 'stripe' | 'mie' | 'tts' | 'conversions' | 'seed' | 'architecture' | 'telemetry'
+type Tab = 'overview' | 'users' | 'activity' | 'todos' | 'ideas' | 'promos' | 'marketing' | 'partners' | 'launchpad' | 'health' | 'media' | 'impersonation' | 'retention' | 'notes' | 'billing' | 'ceo' | 'bugs' | 'kb' | 'study' | 'access' | 'spend' | 'video' | 'push' | 'stripe' | 'mie' | 'tts' | 'conversions' | 'seed' | 'architecture' | 'telemetry' | 'cleanup'
 type TodoRow = { id: string; content: string; category: string; status: string; priority: string; created_at: string; updated_at: string }
 type IdeaRow = { id: string; content: string; category: string; created_at: string }
 type PromoRow = { id: string; code: string; role: string; max_uses: number; uses: number; created_at: string }
@@ -1535,6 +1536,7 @@ const NAV_GROUPS = [
       { id: 'video' as Tab, label: 'Video Curation' },
       { id: 'tts'   as Tab, label: '🎙 TTS Audio' },
       { id: 'seed'  as Tab, label: '🏗️ Library Builder' },
+      { id: 'cleanup' as Tab, label: '🧹 Library Cleanup' },
     ],
   },
   {
@@ -1872,6 +1874,7 @@ export default function AdminPage() {
           {tab === 'video' && <VideoCurationTab />}
           {tab === 'tts'   && <TTSCurationTab />}
           {tab === 'seed'  && <LibrarySeedTab />}
+          {tab === 'cleanup' && <LibraryCleanupTab />}
           {tab === 'push'   && <PushTab />}
           {tab === 'stripe' && <StripeTab />}
           {tab === 'mie'         && <APIETab />}
