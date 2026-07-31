@@ -19,6 +19,10 @@ export interface YTPlayerCtorOptions {
   events?: {
     onReady?: (e: { target: YTPlayer }) => void
     onStateChange?: (e: { data: number; target: YTPlayer }) => void
+    // The player reports dead videos itself: 100 = removed or private,
+    // 101/150 = embedding disabled by the owner. Listening to this detects
+    // broken videos with zero API quota and zero polling.
+    onError?: (e: { data: number; target: YTPlayer }) => void
   }
 }
 export interface YTNamespace {

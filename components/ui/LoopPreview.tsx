@@ -22,7 +22,23 @@ import {
  */
 
 // ── Auto-looping muted YouTube preview of [loopStart, loopEnd] ────────────────
-function YouTubeLoopPlayer({ videoId, loopStart, loopEnd }: { videoId: string; loopStart: number; loopEnd: number }) {
+// Reported once per video per page load, so a grid of broken thumbnails does
+// not spam the alert log with the same dead video.
+const reportedDeadVideos = new Set<string>()
+
+function reportDeadVideo(videoId: string, code: number, exerciseName: string, context: string) {
+  const key = `${videoId}:${code}`
+  if (reportedDeadVideos.has(key)) return
+  reportedDeadVideos.add(key)
+  // Fire and forget. Telemetry must never interrupt the athlete.
+  fetch('/api/video-health/report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ videoId, code, exerciseName, context }),
+  }).catch(() => { /* ignore */ })
+}
+
+function YouTubeLoopPlayer({ videoId, loopStart, loopEnd, onDead }: { videoId: string; loopStart: number; loopEnd: number; onDead?: (code: number) => void }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<YTPlayer | null>(null)
@@ -30,6 +46,7 @@ function YouTubeLoopPlayer({ videoId, loopStart, loopEnd }: { videoId: string; l
   const visibleRef = useRef(true)
   const startRef = useRef(loopStart); startRef.current = loopStart
   const endRef = useRef(loopEnd); endRef.current = loopEnd
+  const deadRef = useRef(onDead); deadRef.current = onDead
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
@@ -52,6 +69,12 @@ function YouTubeLoopPlayer({ videoId, loopStart, loopEnd }: { videoId: string; l
           },
           onStateChange: (e) => {
             if (e.data === window.YT?.PlayerState.ENDED) { e.target.seekTo(startRef.current, true); e.target.playVideo() }
+          },
+          // 100 = removed or private, 101/150 = embedding disabled, 2 = bad id.
+          // 5 is a transient HTML5 hiccup, not a dead video, so it is ignored.
+          onError: (e) => {
+            if (e.data === 5) return
+            deadRef.current?.(e.data)
           },
         },
       })
@@ -125,8 +148,19 @@ export default function LoopPreview({
 }) {
   const [muted, setMuted] = useState(true)
   const [showFull, setShowFull] = useState(false)
+  // Set when the YouTube player reports the video is gone. Treated exactly like
+  // "no video": the athlete sees the placeholder, never a broken black box.
+  const [deadCode, setDeadCode] = useState<number | null>(null)
 
-  const isYouTube = !!url && (source === 'youtube' || source === 'custom')
+  const rawVideoId = url && (source === 'youtube' || source === 'custom') ? extractYouTubeId(url) : null
+  useEffect(() => { setDeadCode(null) }, [rawVideoId])
+
+  const handleDead = (code: number) => {
+    setDeadCode(code)
+    if (rawVideoId) reportDeadVideo(rawVideoId, code, name, compact ? 'compact' : 'full')
+  }
+
+  const isYouTube = !!url && (source === 'youtube' || source === 'custom') && deadCode === null
   const videoId = url && isYouTube ? extractYouTubeId(url) : null
   const isShort = !!url && url.includes('/shorts/')
   const hasLoop = loopStart != null && loopEnd != null && loopEnd > loopStart && !!videoId && !isShort
@@ -176,7 +210,7 @@ export default function LoopPreview({
       <div ref={wrapRef} onClick={onClick} title={name} style={{ position: 'relative', width: w, flexShrink: 0, borderRadius: 8, overflow: 'hidden', background: '#000', cursor: onClick ? 'pointer' : 'default' }}>
         <div style={{ position: 'relative', paddingBottom: isShort ? '150%' : '56.25%', height: 0 }}>
           {showLoopPlayer ? (
-            <YouTubeLoopPlayer videoId={videoId} loopStart={loopStart!} loopEnd={loopEnd!} />
+            <YouTubeLoopPlayer videoId={videoId} loopStart={loopStart!} loopEnd={loopEnd!} onDead={handleDead} />
           ) : (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -214,7 +248,7 @@ export default function LoopPreview({
     <div className="video-sticky" style={{ marginBottom: 14, borderRadius: 10, overflow: 'hidden', background: '#000' }}>
       <div style={{ position: 'relative', paddingBottom: isShort ? '177.78%' : '56.25%', height: 0 }}>
         {showLoop ? (
-          <YouTubeLoopPlayer videoId={videoId} loopStart={loopStart!} loopEnd={loopEnd!} />
+          <YouTubeLoopPlayer videoId={videoId} loopStart={loopStart!} loopEnd={loopEnd!} onDead={handleDead} />
         ) : (
           <iframe
             key={`${videoId}-${muted}`}
