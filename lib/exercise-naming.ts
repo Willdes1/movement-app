@@ -63,7 +63,11 @@ const RULES: Rule[] = [
   { pattern: /\bKB\b/gi,           replacement: 'Kettlebell',      label: 'KB → Kettlebell' },
   { pattern: /\bCBL\b/gi,          replacement: 'Cable',           label: 'CBL → Cable' },
   { pattern: /\bBW\b/gi,           replacement: 'Bodyweight',      label: 'BW → Bodyweight' },
-  { pattern: /\bEZ\b(?!\-?Bar)/gi, replacement: 'EZ-Bar',          label: 'EZ → EZ-Bar' },
+  // The guard must allow for a SPACE. An earlier version used (?!-?Bar), which
+  // only blocked when "Bar" followed immediately, so "EZ Bar Curl" became
+  // "EZ-Bar Bar Curl". Four rows in the live library were renamed that way.
+  { pattern: /\bEZ\b(?!\s*-?\s*Bar\b)/gi, replacement: 'EZ-Bar',    label: 'EZ → EZ-Bar' },
+  { pattern: /\bEZ\s+Bar\b/gi,            replacement: 'EZ-Bar',    label: 'EZ Bar → EZ-Bar' },
   { pattern: /\bMB\b/gi,           replacement: 'Medicine Ball',   label: 'MB → Medicine Ball' },
   { pattern: /\bRes(?:istance)?\s*Bands?\b/gi, replacement: 'Resistance Band', label: 'Res Band → Resistance Band' },
 
@@ -102,6 +106,25 @@ export function proposeName(current: string): NameProposal {
     working = working.replace(rule.pattern, rule.replacement)
     reasons.push(rule.label)
     if (rule.review) { needsReview = true; reviewNote = rule.review }
+  }
+
+  // ── Repair pass ───────────────────────────────────────────────────────────
+  // Cleans up damage a substitution can cause, including damage already written
+  // to the database by an earlier version of these rules. Runs unconditionally
+  // so the cleanup tab proposes a fix for rows that are already wrong.
+  const REPAIRS: [RegExp, string, string][] = [
+    // "EZ-Bar Bar Curl" -> "EZ-Bar Curl". Caused by the old EZ guard.
+    [/\b(EZ|Trap|Safety)-Bar\s+Bar\b/gi, '$1-Bar', 'removed duplicated "Bar"'],
+    // Any word immediately repeated, e.g. "Dumbbell Dumbbell Row".
+    [/\b(\w+)\s+\1\b/gi, '$1', 'removed a repeated word'],
+  ]
+  for (const [pattern, replacement, label] of REPAIRS) {
+    if (pattern.test(working)) {
+      pattern.lastIndex = 0
+      working = working.replace(pattern, replacement)
+      reasons.push(label)
+    }
+    pattern.lastIndex = 0
   }
 
   // Tidy spacing and stray punctuation introduced by substitution.
