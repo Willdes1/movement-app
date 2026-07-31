@@ -142,6 +142,27 @@ export default function VideoCurationTab() {
   const [indexLog, setIndexLog]           = useState<string[]>([])
   const [handleInput, setHandleInput]     = useState('')
 
+  // ── Live quota meter (Task 1 item 4) ───────────────────────────────────────
+  type Quota = {
+    daily_quota: number; used: number; remaining: number; used_pct: number
+    by_endpoint: { endpoint: string; calls: number; units: number }[]
+    fallback_calls_today: number; videos_remaining_via_fallback: number
+    hours_until_reset: number; failures_today: number
+  }
+  const [quota, setQuota] = useState<Quota | null>(null)
+
+  async function loadQuota() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res: Response = await fetch('/api/admin/youtube-quota', {
+        headers: { Authorization: `Bearer ${session?.access_token ?? ''}` },
+      })
+      const d = await res.json()
+      if (!d.error) setQuota(d as Quota)
+    } catch { /* meter is informational; never break the tab */ }
+  }
+  useEffect(() => { loadQuota() }, [])
+
   // ── Matching dry run (zero YouTube quota; picks the confidence threshold)
   type DryRun = {
     sampled: number; zero_candidates: number; timed_out?: boolean
@@ -760,6 +781,51 @@ export default function VideoCurationTab() {
           </div>
         )}
       </div>
+
+      {/* ── Live quota meter ─────────────────────────────────────────────────── */}
+      {quota && (
+        <div style={{ padding: '14px 18px', background: C.surface, border: `1px solid ${quota.used_pct > 80 ? C.red : quota.used_pct > 50 ? C.amberBorder : C.border}`, borderRadius: 10, marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 8 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: C.textMid, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              YouTube quota today
+            </p>
+            <button onClick={loadQuota} style={{ padding: '4px 12px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'transparent', color: C.textDim, fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
+              ↻ Refresh
+            </button>
+          </div>
+          <div style={{ height: 8, background: C.surface2, borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
+            <div style={{ width: `${Math.min(100, quota.used_pct)}%`, height: '100%', background: quota.used_pct > 80 ? C.red : quota.used_pct > 50 ? C.amber : C.green }} />
+          </div>
+          <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+            <div>
+              <p style={{ fontSize: 18, fontWeight: 800, color: C.text }}>{quota.used.toLocaleString()}<span style={{ fontSize: 12, color: C.textDim }}> / {quota.daily_quota.toLocaleString()}</span></p>
+              <p style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase' }}>units used ({quota.used_pct}%)</p>
+            </div>
+            <div>
+              <p style={{ fontSize: 18, fontWeight: 800, color: C.green }}>{quota.remaining.toLocaleString()}</p>
+              <p style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase' }}>remaining</p>
+            </div>
+            <div>
+              <p style={{ fontSize: 18, fontWeight: 800, color: C.textMid }}>~{quota.videos_remaining_via_fallback}</p>
+              <p style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase' }}>more paid searches</p>
+            </div>
+            <div>
+              <p style={{ fontSize: 18, fontWeight: 800, color: C.purple }}>{quota.fallback_calls_today}</p>
+              <p style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase' }}>fallbacks fired</p>
+            </div>
+            <div>
+              <p style={{ fontSize: 18, fontWeight: 800, color: C.textMid }}>{quota.hours_until_reset}h</p>
+              <p style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase' }}>to reset (midnight PT)</p>
+            </div>
+          </div>
+          {quota.by_endpoint?.length > 0 && (
+            <p style={{ fontSize: 11, color: C.textDim, fontFamily: 'monospace', marginTop: 8 }}>
+              {quota.by_endpoint.map(e => `${e.endpoint}: ${e.calls} calls / ${e.units} units`).join('  ·  ')}
+              {quota.failures_today ? `  ·  ${quota.failures_today} failed` : ''}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* ── Uploads index build estimate (Task 1) ───────────────────────────── */}
       {hasChannels && (
