@@ -150,12 +150,36 @@ export default function LibrarySeedTab() {
     return voiced
   }, [authHeaders])
 
-  // Seed one category, then (if auto-audio is on) voice the exercises it just added.
+  /**
+   * Seed one category, looping until the requested count is reached.
+   *
+   * A big count cannot fit in one 60s serverless call: on Sonnet, 40 exercises
+   * is ~10,900 output tokens, which is minutes of generation. The route now
+   * returns a partial batch and flags `truncated`, and this loops until the
+   * count is met, the model runs out of distinct movements, or a pass adds
+   * nothing. Each request stays comfortably inside the wall.
+   */
   async function generateOne(cat: string): Promise<{ added: number; voiced: number }> {
+    let added = 0, voiced = 0
+    for (let pass = 0; pass < 12; pass++) {
+      const remaining = count - added
+      if (remaining <= 0) break
+      const r = await generatePass(cat, remaining)
+      added += r.added
+      voiced += r.voiced
+      // Nothing new came back: the category is exhausted at this count, so
+      // stop rather than paying for more passes that return duplicates.
+      if (r.added === 0 || !r.truncated) break
+    }
+    if (added === 0) markSaturated(cat, count)
+    return { added, voiced }
+  }
+
+  async function generatePass(cat: string, want: number): Promise<{ added: number; voiced: number; truncated: boolean }> {
     const res = await fetch('/api/admin/seed-library', {
       method: 'POST',
       headers: await authHeaders(),
-      body: JSON.stringify({ category: cat, count, model }),
+      body: JSON.stringify({ category: cat, count: want, model }),
     })
     // A timed-out or crashed function returns a plain-text error page, not JSON.
     // Calling res.json() on that threw "Unexpected token 'A', \"An error o\"...",
@@ -173,13 +197,11 @@ export default function LibrarySeedTab() {
     }
     if (!res.ok) throw new Error(String(data.error ?? 'Failed'))
     const added = Number(data.added ?? 0)
-    // Nothing new at this count → remember it so Fill skips it next time (no tokens).
-    if (added === 0) markSaturated(cat, count)
     const names: string[] = Array.isArray(data.insertedNames) ? data.insertedNames : []
     let voiced = 0
     if (autoAudio && names.length) voiced = await voiceNames(names)
     pushLog(cat, { ...data, voiced })
-    return { added, voiced }
+    return { added, voiced, truncated: !!data.truncated }
   }
 
   async function run() {

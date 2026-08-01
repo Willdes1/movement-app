@@ -123,8 +123,15 @@ function parseArray(message: Anthropic.Message): { arr: unknown[]; inTok: number
  * instead of losing the whole batch. Names already produced are fed into the
  * next chunk's avoid list so the chunks do not repeat each other.
  */
-const CHUNK = 12
-const GEN_BUDGET_MS = 42_000
+// Sizing, measured rather than guessed. max_tokens per chunk is count*260+500,
+// and Sonnet writes at roughly 50-80 tokens/sec:
+//   chunk 12 -> 3,620 tokens -> 45-72s   blows the 60s wall on its own
+//   chunk  8 -> 2,580 tokens -> 32-52s   still too close
+//   chunk  6 -> 2,060 tokens -> 26-41s   fits with room to spare
+// One request therefore returns a partial batch and the CLIENT loops. That is
+// what makes a count of 40 on Sonnet possible at all.
+const CHUNK = 6
+const GEN_BUDGET_MS = 30_000
 
 async function generateChunked(
   model: string, category: string, count: number, avoid: string[], startedAt: number,
@@ -390,5 +397,8 @@ export async function POST(req: Request) {
     skipped: candidates.length - toInsert.length,
     queued,
     insertedNames,
+    // The client loops while this is true, so a big count spreads across
+    // several short requests instead of dying on one long one.
+    truncated: !!gen.truncated,
   })
 }
