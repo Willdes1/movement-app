@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
+import LoopPreview from '@/components/ui/LoopPreview'
 
 type Exercise = {
   name_normalized: string
@@ -11,6 +12,15 @@ type Exercise = {
   tip: string | null
   breathing: string | null
   core: string | null
+  // Mobility movements are ordinary exercise_library rows, so they carry the
+  // same video columns as everything else. This page just never asked for them,
+  // which is why a curated and trimmed mobility video still rendered as text.
+  video_url: string | null
+  video_source: string | null
+  loop_start_sec: number | null
+  loop_end_sec: number | null
+  youtube_start_sec: number | null
+  youtube_end_sec: number | null
 }
 
 const AREAS = [
@@ -44,10 +54,11 @@ export default function MobilityPage() {
   useEffect(() => {
     if (!user) return
     // Load mobility/stretching focused exercises
-    supabase
-      .from('exercise_library')
-      .select('name_normalized, name_display, how, tip, breathing, core')
-      .or([
+    // The loop columns may not exist on very old databases, so fall back to a
+    // select without them rather than leaving the page blank.
+    const COLS_WITH_VIDEO = 'name_normalized, name_display, how, tip, breathing, core, video_url, video_source, loop_start_sec, loop_end_sec, youtube_start_sec, youtube_end_sec'
+    const COLS_FALLBACK   = 'name_normalized, name_display, how, tip, breathing, core'
+    const areaFilter = [
         'name_normalized.ilike.%stretch%',
         'name_normalized.ilike.%mobility%',
         'name_normalized.ilike.%foam%',
@@ -65,13 +76,24 @@ export default function MobilityPage() {
         'name_normalized.ilike.%rotation%',
         'name_normalized.ilike.%flexion%',
         'name_normalized.ilike.%extension%',
-      ].join(','))
+    ].join(',')
+
+    const run = (cols: string) => supabase
+      .from('exercise_library')
+      .select(cols)
+      .or(areaFilter)
       .order('name_display', { ascending: true })
       .limit(300)
-      .then(({ data }) => {
-        setExercises((data ?? []) as Exercise[])
-        setLoading(false)
-      })
+
+    run(COLS_WITH_VIDEO).then(async ({ data, error }) => {
+      if (error) {
+        const { data: fb } = await run(COLS_FALLBACK)
+        setExercises((fb ?? []) as unknown as Exercise[])
+      } else {
+        setExercises((data ?? []) as unknown as Exercise[])
+      }
+      setLoading(false)
+    })
   }, [user])
 
   const filtered = useMemo(() => {
@@ -183,22 +205,46 @@ export default function MobilityPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {filtered.map(ex => {
               const isOpen = expandedKey === ex.name_normalized
+              const hasVideo = !!ex.video_url
               return (
-                <button
+                // A div, not a button: the expanded panel contains a video
+                // player, and an iframe cannot legally nest inside a button.
+                <div
                   key={ex.name_normalized}
-                  onClick={() => setExpandedKey(isOpen ? null : ex.name_normalized)}
-                  style={{ width: '100%', textAlign: 'left', padding: '12px 14px', borderRadius: 12, border: `1px solid ${isOpen ? 'var(--accent-border)' : 'var(--border)'}`, background: isOpen ? 'var(--accent-bg)' : 'var(--surface)', cursor: 'pointer', fontFamily: 'inherit' }}
+                  style={{ width: '100%', textAlign: 'left', padding: '12px 14px', borderRadius: 12, border: `1px solid ${isOpen ? 'var(--accent-border)' : 'var(--border)'}`, background: isOpen ? 'var(--accent-bg)' : 'var(--surface)', fontFamily: 'inherit' }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setExpandedKey(isOpen ? null : ex.name_normalized)}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedKey(isOpen ? null : ex.name_normalized) } }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
+                  >
                     <span style={{ fontSize: 15, flexShrink: 0 }}>🧘</span>
                     <p style={{ flex: 1, fontSize: 14, fontWeight: 600, color: isOpen ? 'var(--accent)' : 'var(--text)', lineHeight: 1.3 }}>
                       {ex.name_display}
                     </p>
+                    {hasVideo && (
+                      <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.06em', padding: '2px 7px', borderRadius: 20, color: 'var(--accent)', background: 'var(--accent-bg)', border: '1px solid var(--accent-border)', flexShrink: 0 }}>
+                        VIDEO
+                      </span>
+                    )}
                     <span style={{ fontSize: 11, color: 'var(--text-dim)', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', display: 'inline-block' }}>▶</span>
                   </div>
 
                   {isOpen && (
                     <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {/* Same montage the workout view uses: the trimmed loop
+                          when one is saved, with a tap through to the full video. */}
+                      <LoopPreview
+                        url={ex.video_url}
+                        source={ex.video_source}
+                        name={ex.name_display}
+                        loopStart={ex.loop_start_sec}
+                        loopEnd={ex.loop_end_sec}
+                        clipStart={ex.youtube_start_sec}
+                        clipEnd={ex.youtube_end_sec}
+                      />
                       {ex.how && (
                         <div style={{ padding: '10px 12px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)', textAlign: 'left' }}>
                           <p style={{ fontSize: 9, fontWeight: 800, color: 'var(--text-dim)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 4 }}>HOW TO DO IT</p>
@@ -224,7 +270,7 @@ export default function MobilityPage() {
                       )}
                     </div>
                   )}
-                </button>
+                </div>
               )
             })}
           </div>
