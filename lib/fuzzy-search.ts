@@ -20,7 +20,44 @@ export function normalizeForSearch(s: string): string {
 }
 
 export function searchTokens(s: string): string[] {
-  return (s ?? '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
+  return (s ?? '')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+    // Drop stray single letters. A possessive like "Child's Pose" tokenises to
+    // ["child","s","pose"], and that orphan "s" matched almost any query
+    // containing the letter s, so "streches" was hitting "Child's Pose".
+    // Single DIGITS are kept: "90/90" is meaningful.
+    .filter(t => t.length > 1 || /[0-9]/.test(t))
+}
+
+/** Plurals people actually type that regular stemming gets wrong. */
+const IRREGULAR: Record<string, string> = {
+  calves: 'calf', calf: 'calf',
+  feet: 'foot', foot: 'foot',
+  glutei: 'glute',
+  abs: 'ab', abdominals: 'ab', abdominal: 'ab',
+  lats: 'lat', quads: 'quad', pecs: 'pec', delts: 'delt', traps: 'trap',
+}
+
+/**
+ * Reduce a word to a comparable stem so "hips" finds "Hip Stretch" and
+ * "stretches" finds "Stretch". Plurals are the single most common reason a
+ * search comes up empty, and a plural is not a typo, so it should be a direct
+ * match rather than a "did you mean".
+ */
+export function stem(token: string): string {
+  const t = token.toLowerCase()
+  if (IRREGULAR[t]) return IRREGULAR[t]
+  if (t.length > 4 && t.endsWith('ies')) return `${t.slice(0, -3)}y`
+  if (t.length > 4 && t.endsWith('es')) return t.slice(0, -2)
+  if (t.length > 3 && t.endsWith('s') && !t.endsWith('ss')) return t.slice(0, -1)
+  return t
+}
+
+/** Squashed form with every word stemmed: "Hip Stretches" becomes "hipstretch". */
+function stemmedSquash(s: string): string {
+  return searchTokens(s).map(stem).join('')
 }
 
 /** Standard Levenshtein. Names are short, so the cost is irrelevant. */
@@ -65,10 +102,23 @@ export function scoreName(query: string, name: string): { score: number; fuzzy: 
   if (squashed.startsWith(q)) return { score: 1, fuzzy: false }
   if (squashed.includes(q)) return { score: 0.9, fuzzy: false }
 
-  // 2. Every word the user typed appears somewhere, in any order.
+  // 1b. Same, but with plurals reduced. "hips" should find "Hip Stretch"
+  // outright, not as a suggestion.
+  const qStem = stemmedSquash(query)
+  const nStem = stemmedSquash(name)
+  if (qStem && nStem.startsWith(qStem)) return { score: 0.95, fuzzy: false }
+  if (qStem && nStem.includes(qStem)) return { score: 0.88, fuzzy: false }
+
+  // 2. Every word the user typed appears somewhere, in any order, comparing
+  // stems so "glutes" matches "Glute" and "calves" matches "Calf".
   const qTokens = searchTokens(query)
   const nTokens = searchTokens(name)
-  if (qTokens.length > 0 && qTokens.every(qt => nTokens.some(nt => nt.includes(qt)))) {
+  const nStems = nTokens.map(stem)
+  const wordPresent = (qt: string) => {
+    const s = stem(qt)
+    return nTokens.some(nt => nt.includes(qt)) || nStems.some(ns => ns.includes(s) || s.includes(ns))
+  }
+  if (qTokens.length > 0 && qTokens.every(wordPresent)) {
     return { score: 0.75, fuzzy: false }
   }
 
@@ -92,8 +142,15 @@ export function scoreName(query: string, name: string): { score: number; fuzzy: 
   // For multi-word queries, EVERY word must be close to something in the name.
   // Taking the best single pair instead would let "stretch cat" suggest
   // "90/90 Hip Stretch Long Hold" purely on the word "stretch".
+  // Compare stems as well as raw words. "streches" against "stretch" scores
+  // only 0.62 raw, because the plural ending drags the length apart, but their
+  // stems "strech" and "stretch" differ by one character and score 0.86.
   const perToken = qTokens.map(qt =>
-    nTokens.reduce((best, nt) => Math.max(best, similarity(qt, nt)), 0))
+    nTokens.reduce((best, nt) => Math.max(
+      best,
+      similarity(qt, nt),
+      similarity(stem(qt), stem(nt)),
+    ), 0))
   const allTokensClose = qTokens.length > 0 && perToken.every(s => s >= 0.7)
 
   if (prefixClose || allTokensClose) {
@@ -137,5 +194,9 @@ export function searchItems<T>(
  */
 export function matchesAnyKeyword(name: string, keywords: string[]): boolean {
   const squashed = normalizeForSearch(name)
-  return keywords.some(kw => squashed.includes(normalizeForSearch(kw)))
+  const stemmed = stemmedSquash(name)
+  return keywords.some(kw => {
+    const k = normalizeForSearch(kw)
+    return squashed.includes(k) || stemmed.includes(stemmedSquash(kw))
+  })
 }
