@@ -157,9 +157,22 @@ export default function LibrarySeedTab() {
       headers: await authHeaders(),
       body: JSON.stringify({ category: cat, count, model }),
     })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error ?? 'Failed')
-    const added = data.added ?? 0
+    // A timed-out or crashed function returns a plain-text error page, not JSON.
+    // Calling res.json() on that threw "Unexpected token 'A', \"An error o\"...",
+    // which tells you nothing. Read the body once and report what actually broke.
+    const body = await res.text()
+    let data: Record<string, unknown>
+    try {
+      data = JSON.parse(body)
+    } catch {
+      throw new Error(
+        res.status === 504 || /timeout|An error o/i.test(body)
+          ? `The request timed out before finishing. Try a smaller count, or Haiku, which is much faster. (HTTP ${res.status})`
+          : `Server returned something unexpected (HTTP ${res.status}): ${body.slice(0, 120)}`,
+      )
+    }
+    if (!res.ok) throw new Error(String(data.error ?? 'Failed'))
+    const added = Number(data.added ?? 0)
     // Nothing new at this count → remember it so Fill skips it next time (no tokens).
     if (added === 0) markSaturated(cat, count)
     const names: string[] = Array.isArray(data.insertedNames) ? data.insertedNames : []

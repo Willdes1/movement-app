@@ -41,6 +41,12 @@
   actually did while `content_posts` was missing from 07-21 to 07-25 (it may start generating and
   publishing on its next run now that the table is there). **Standalone item. NOT part of the
   10-task curation queue, and must not be picked up inside it.**
+- [ ] **Import a PDF of movements into the library.** (Added 2026-08-01.) Will has a PDF of
+  movements he wants loaded rather than generated. Needs: upload, extract the movement names,
+  dedup against `exercise_library` (same `name_normalized` key the Library Builder uses), show
+  him the parsed list for approval BEFORE inserting, then generate instructions for the new ones
+  and queue them for video curation, exactly like the seeded path. Reuse
+  `app/api/admin/seed-library` rather than building a parallel insert path.
 - [ ] **Dead-video detection on the full-video player.** Shipped 2026-07-31 for the loop player
   (`LoopPreview`), which reports YouTube error 100/101/150 at zero API quota. The full-video view
   still uses a plain `<iframe>`, which cannot raise error events. Converting it means moving it

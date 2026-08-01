@@ -111,6 +111,45 @@ function parseArray(message: Anthropic.Message): { arr: unknown[]; inTok: number
   return { arr: Array.isArray(arr) ? arr : [], inTok: message.usage.input_tokens, outTok: message.usage.output_tokens }
 }
 
+/**
+ * Generate in chunks against a time budget.
+ *
+ * Asking for 40 in one call sets max_tokens to ~10,900. Sonnet writing that
+ * much routinely runs past the 60s Vercel wall, and a timed-out function
+ * returns a plain-text error page, so the client's res.json() blew up with
+ * "Unexpected token 'A', \"An error o\"... is not valid JSON".
+ *
+ * Chunking keeps each model call short and lets us return whatever completed
+ * instead of losing the whole batch. Names already produced are fed into the
+ * next chunk's avoid list so the chunks do not repeat each other.
+ */
+const CHUNK = 12
+const GEN_BUDGET_MS = 42_000
+
+async function generateChunked(
+  model: string, category: string, count: number, avoid: string[], startedAt: number,
+) {
+  const items: GenItem[] = []
+  let inTok = 0, outTok = 0, truncated = false
+  const seenNames = new Set(avoid.map(a => a.toLowerCase()))
+
+  while (items.length < count) {
+    if (Date.now() - startedAt > GEN_BUDGET_MS) { truncated = true; break }
+    const want = Math.min(CHUNK, count - items.length)
+    const res = await generate(model, category, want, [...seenNames])
+    inTok += res.inTok; outTok += res.outTok
+    if (!res.items.length) break                 // model has run dry for this category
+    for (const it of res.items) {
+      const key = it.name.toLowerCase()
+      if (seenNames.has(key)) continue
+      seenNames.add(key)
+      items.push(it)
+    }
+    if (res.items.length < want) break           // genuinely out of distinct movements
+  }
+  return { items: items.slice(0, count), inTok, outTok, truncated }
+}
+
 // GENERATE — names + full instructions for a category, in one batched call.
 async function generate(model: string, category: string, count: number, avoid: string[]) {
   const avoidBlock = avoid.length
@@ -261,6 +300,7 @@ export async function POST(req: Request) {
     }
   }
 
+  const startedAt = Date.now()
   const category = (body.category ?? '').trim()
   const count = Math.max(1, Math.min(Math.round(Number(body.count) || 20), 40))
   if (!category) return NextResponse.json({ error: 'Pick a sport or category first.' }, { status: 400 })
@@ -276,9 +316,9 @@ export async function POST(req: Request) {
     .limit(300)
   const avoid = (catRows ?? []).map(r => r.name_display as string).filter(Boolean)
 
-  let gen: { items: GenItem[]; inTok: number; outTok: number }
+  let gen: { items: GenItem[]; inTok: number; outTok: number; truncated?: boolean }
   try {
-    gen = await generate(model, category, count, avoid)
+    gen = await generateChunked(model, category, count, avoid, startedAt)
   } catch (err) {
     console.error('seed-library generation failed:', err)
     return NextResponse.json({ error: 'Generation failed — try again in a moment.' }, { status: 502 })
