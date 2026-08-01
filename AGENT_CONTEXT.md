@@ -99,7 +99,93 @@
 
 ---
 
-## 4. What Was Built This Session (2026-07-22 → 07-25)
+## 4. What Was Built This Session (2026-07-25 → 08-01)
+
+**33 commits. Tasks 1, 2 and 3 of the curation queue COMPLETE, Task 4 mostly complete.
+Per-video curation cost went from 201 quota units to ~0. Six SQL migrations run by Will
+(ledger 46). All deployed green.**
+
+### 📺 Task 1 — YouTube quota, DONE (all 6 spec items)
+- **The headline: 201 units/video → ~0.** Discovery no longer calls `search.list`. A cached
+  uploads index (`youtube_channel_videos`, 18,300 videos for **372 units, once**) is matched
+  locally via a pg_trgm prefilter plus scoring in Node. `search.list` fires only when local
+  matching finds nothing, is capped daily (default 80), counts what today already spent, and is
+  labelled in the run log so a paid call is never invisible.
+- **Regenerate: ~1,500 units → 0.** Its stop condition sat on the outer loop, so query #1 swept
+  every approved channel. Shipped as an isolated one-line commit (`499559c`) so the saving was
+  attributable.
+- Key files: `lib/youtube.ts`, `lib/video-matching.ts`, `lib/exercise-abbreviations.ts`,
+  `lib/movement-classification.ts`, `app/api/admin/youtube-{index,index-estimate,quota,
+  repair-channels,add-channels,match-dryrun}/route.ts`.
+- **Live quota meter** in the curation tab. **`docs/youtube-quota-extension.md`** written (Will
+  has since decided NOT to resubmit; doc stays as the compliance record).
+- **Add channels by handle at 1 unit each.** `discover-channels` costs 500/run AND produced six
+  mangled channel ids; its button now carries its price and a confirm.
+- **6 of 9 channels had unresolvable ids** — repaired 5 via `channels.list?forHandle` for 10 units.
+  They were the entire rehab/mobility corpus.
+- **Threshold 0.70**, chosen from a real dry-run histogram, not guessed. Configurable.
+
+### 🎬 Task 2 — dead video detection, DONE at ZERO quota (Will's idea)
+- Instead of polling ~500 videos nightly, listen to what the YouTube player already reports
+  (error 100 = removed/private, 101/150 = embedding disabled). No quota, no cron, no new table.
+  Reports land in `harness_events` → Admin → Telemetry. Only flags videos someone actually opened.
+- Also fixed a real bug: `LoopPreview` had **no error handling**, so a dead video rendered a blank
+  black box. Now falls back to the "coming soon" card.
+- Deferred (in TODO): the full-video `<iframe>` cannot raise error events.
+
+### ✂️ Task 3 — Video Trimming work queue, DONE
+- The trimmer worked; the workflow around it did not. New tab: progress bar, counters, filters,
+  **▶ Next untrimmed**, inline trimmer, **paste a replacement link**, and `trimmed_by`/`trimmed_at`
+  so a teammate can work the queue. SQL `20260731b_trim_status`.
+- **Trimmer scrubbing rebuilt** — the bar had no click handler and the playhead was
+  `pointerEvents:none`, so setting In at 0:18 meant watching 18 seconds. Now click/drag to scrub,
+  plus nudge buttons. Scrubbing deliberately does NOT move In/Out.
+
+### 🧘 Task 4 — mobility, MOSTLY DONE
+- **The premise was wrong**: there are no mobility records. Mobility movements are ordinary
+  `exercise_library` rows, already curatable. `/mobility` simply never SELECTed the video columns,
+  so a curated + trimmed movement still rendered as text. Fixed.
+- **Outstanding**: item 4, the instruction-vs-video contradiction check. Note transcripts are NOT
+  available via the API for third-party videos, so it can only read title + description.
+- Also outstanding and deeper: mobility inside generated plans is free text in
+  `daily_session.morning/cooldown/evening` that never becomes library rows.
+
+### 🧹 Task 6 slice — library cleanup (naming), SHIPPED
+- `lib/exercise-naming.ts` + **Library Cleanup tab**. Proposes full names ("1 DB Chest Fly" →
+  "Single-Arm Dumbbell Chest Fly"), keeps equipment, never invents it, leaves correct names alone.
+  Shows what is attached before you approve: video, TTS, unilateral risk, instructions.
+  **Renaming clears TTS**, because the narration speaks `name_display`. SQL `20260731_exercise_legacy_name`.
+- Will applied 37 renames. Verified: 0 stale audio, 10 audio files cleared, 2 videos requeued.
+- **A rename bug I introduced and repaired**: the EZ guard missed a space, so "EZ Bar Curl" became
+  "EZ-Bar **Bar** Curl" on 4 rows. Fixed the rule AND added a repair pass, since the corrected rule
+  would otherwise leave those rows stranded.
+
+### 🔎 Forgiving search (Will's request)
+- `lib/fuzzy-search.ts` on `/mobility`, `/exercises`, `/browse`. Punctuation-blind ("cat cow"
+  finds "Cat-Cow Stretch"), plural-tolerant ("hips", "calves"), typo suggestions ("pigon" →
+  Pigeon Pose). Verified against 33 realistic queries.
+- Found a hidden bug: the body-area buttons used the same broken matching, so Cat-Cow was missing
+  from T-Spine too. And "Child's Pose" tokenised to `["child","s","pose"]`, that orphan "s"
+  matching almost anything.
+
+### 🐛 Two silent bugs worth remembering
+- **Video Curation was blind to half the library.** PostgREST caps unbounded selects at 1,000 rows;
+  the library holds 2,012. Quota was never the only ceiling.
+- **`/api/tts` re-bills OpenAI even when the audio already exists.** No server read-through check.
+  Logged in `to-do/voice-playback-controls.md` to fix with Task 5.
+
+### 🏗️ Also
+- **Library Builder timeout fixed properly.** 40 on Sonnet is ~10,900 output tokens, minutes of
+  generation, so it 504'd and the client's `res.json()` failed with a cryptic parser error. First
+  fix (chunk 12) did not help — measured: chunk 12 needs 45-72s. Now chunks of 6, returns partial
+  batches, and the client loops. New **Shoulder Mobility** category with shoulder-dislocate-era
+  vocabulary in the prompt.
+- Migration records corrected: the panel said 6 pending; AGENT_CONTEXT had wrongly claimed
+  content_posts/content_scheduling were run. **All now applied, ledger 46.**
+
+---
+
+## Previous Session (2026-07-22 → 07-25)
 
 **Finished the Marketing Hub (TODO #6) end to end, added an in-app guide, then
 started a 10-task work queue beginning with the YouTube quota rework (instrumentation
@@ -143,12 +229,23 @@ exist, so it is unblocked, but **no surface has been verified end to end yet** a
 content cron was firing against a missing table from 07-21 to 07-25. Tracked as a standalone
 TODO.md item. NOT part of the 10-task curation queue.
 
-### ▶️ NEXT
-- **Resume Task 1 refactor** (local matching + cached uploads index + capped gated fallback +
-  quota meter + extension doc). Then Tasks 2 to 10 in order. Do NOT start a task without
-  showing plan + file list and pausing.
-- **Source of truth for the queue is `to-do/youtube-curation-queue.md`**, not memory. It carries
-  dated corrections (the ETag assumption is false; the Task 1 to Task 6 dependency was invented).
+### ▶️ NEXT SESSION — start here
+1. **Task 5, voice playback controls.** Full roadmap already written to
+   `to-do/voice-playback-controls.md`, including three bugs found while mapping it (the /today
+   toggle restarts instead of stopping, two clips can overlap, audio can start AFTER you navigate
+   away) and the `/api/tts` double-billing leak. Plan agreed with Will, not yet built.
+2. Then Task 6 proper (render consolidation + unilateral video re-cleanup), then 7 to 10.
+3. **Then the two PRIORITY items at the top of TODO.md**: onboarding **Shawn Stiffler as CEO**
+   (full admin, GitHub/Supabase, a way to pick up to-do work in Claude Code, welcome email), and
+   the Admin **"Ask me anything"** knowledge base.
+
+**Source of truth for the queue is `to-do/youtube-curation-queue.md`**, not memory. It carries
+dated corrections: the ETag assumption is false (304s cost the same quota as 200s), the Task 1 to
+Task 6 dependency was invented by an earlier summary, and curation is deployed-only by decision.
+
+**Standing rules Will cares about:** read existing code and say what already exists BEFORE
+proposing; show plan + file list then PAUSE; SQL goes to a file AND gets pasted inline for review,
+never auto-applied; counts before any bulk action; no em dashes.
 
 ---
 

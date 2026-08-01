@@ -4,6 +4,42 @@
 ---
 
 ## 🔥 Active / Up Next
+- [ ] ⭐⭐ **PRIORITY after the curation queue — onboard Shawn Stiffler (CEO) as a full admin.**
+  (Added 2026-08-01.) Will = Founder. Shawn = CEO, previously CRO, brings the company-operating
+  experience. He uses VS Code and Claude Code, so he should be able to pick up work from the
+  to-do folder directly, the same way Will does.
+
+  **1. Access.** The system already exists, do not build a new one. `profiles.is_owner` /
+  `is_admin`, the `admin_permissions` table, and the owner-only Access Control tab
+  (`/admin#access`). See [[project_admin_access]].
+  - **Decision Will must make first: owner or partner-with-all-tabs?** An owner can grant and
+    revoke other admins, including Will. A partner with every tab granted has the same day-to-day
+    access without that. Same practical power, different blast radius. Ask before setting it.
+  - The `protect_admin_role` trigger blocks UPDATEs that move a row's role away from `admin`,
+    so check it does not fight the grant.
+
+  **2. Third-party access Will has to do by hand.**
+  - GitHub: add as a collaborator on `Willdes1/movement-app`.
+  - Supabase: invite to the project.
+  - **⚠️ Vercel Hobby does not support team members.** Real blocker for a second person deploying
+    or reading logs. Either upgrade to Pro or accept that Will owns deploys. Decide early.
+  - **Never send keys by email or chat.** Shawn adds his own `.env.local`; note that curation is
+    deployed-only anyway (see `to-do/youtube-curation-queue.md`).
+
+  **3. Working together in Claude Code without colliding.** The repo already carries its own
+  briefing: `CLAUDE.md`, `AGENTS.md`, `AGENT_CONTEXT.md`, the `/start` skill, and the standing
+  process rules in `to-do/youtube-curation-queue.md`. Shawn opens the repo and Claude is already
+  oriented. What is missing is a claim convention so two people do not build the same thing:
+  a WIP marker with initials on a TODO line, one branch per task, and a short note in
+  AGENT_CONTEXT at the end of each session. Design this properly rather than assuming.
+
+  **4. Welcome email.** Draft it when the above is settled. He is analytical, so lead with the
+  architecture and the current state, not enthusiasm. Point at what already exists rather than
+  attaching duplicates: `ARCHITECTURE.md`, `docs/architecture.html`, `AGENT_CONTEXT.md`,
+  `TODO.md`, `docs/APP_GUIDE.md`, the Admin → Architecture tab, and the Launchpad readiness
+  meter. If PDFs are genuinely wanted, generate them from those sources so there is one source
+  of truth, not a second stale copy.
+
 - [ ] ⭐ **PRIORITY — "Ask me anything" knowledge base at the top of the Admin portal.**
   (Added 2026-07-31.) A search bar pinned to the top of `/admin`, above the tabs, labelled
   something like **"Have any questions? Ask me"** with example prompts visible so it is obvious
