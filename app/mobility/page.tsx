@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import LoopPreview from '@/components/ui/LoopPreview'
+import { searchItems, matchesAnyKeyword } from '@/lib/fuzzy-search'
 
 type Exercise = {
   name_normalized: string
@@ -96,25 +97,17 @@ export default function MobilityPage() {
     })
   }, [user])
 
-  const filtered = useMemo(() => {
+  const { filtered, suggestions } = useMemo(() => {
     let base = exercises
 
     if (selectedArea) {
       const area = AREAS.find(a => a.label === selectedArea)
-      if (area) {
-        base = exercises.filter(e => {
-          const name = e.name_display.toLowerCase()
-          return area.keywords.some(kw => name.includes(kw))
-        })
-      }
+      // Punctuation-blind, so the keyword "cat cow" still finds "Cat-Cow Stretch".
+      if (area) base = exercises.filter(e => matchesAnyKeyword(e.name_display, area.keywords))
     }
 
-    if (query.trim()) {
-      const q = query.toLowerCase()
-      base = base.filter(e => e.name_display.toLowerCase().includes(q))
-    }
-
-    return base
+    const { matches, suggestions } = searchItems(base, query, e => e.name_display)
+    return { filtered: matches, suggestions }
   }, [exercises, selectedArea, query])
 
   function selectArea(label: string) {
@@ -199,7 +192,25 @@ export default function MobilityPage() {
         filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-dim)' }}>
             <p style={{ fontSize: 15, marginBottom: 8 }}>No movements found</p>
-            <p style={{ fontSize: 13 }}>Try a different area or search term</p>
+            {suggestions.length > 0 ? (
+              <>
+                {/* A near miss should offer a way forward, not a dead end. */}
+                <p style={{ fontSize: 13, marginBottom: 12 }}>Did you mean:</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+                  {suggestions.map(s => (
+                    <button
+                      key={s.name_normalized}
+                      onClick={() => { setQuery(s.name_display); setExpandedKey(s.name_normalized) }}
+                      style={{ padding: '7px 14px', borderRadius: 20, border: '1px solid var(--accent-border)', background: 'var(--accent-bg)', color: 'var(--accent)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+                    >
+                      {s.name_display}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p style={{ fontSize: 13 }}>Try a different area or search term</p>
+            )}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
