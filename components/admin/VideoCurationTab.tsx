@@ -69,6 +69,9 @@ type Candidate = {
 }
 type Exercise = {
   id: string; name_display: string; name_normalized: string
+  // Shown beside the candidates so a video can be judged against what the
+  // exercise actually says, instead of on its title alone.
+  how?: string | null; breathing?: string | null; tip?: string | null
   video_url: string | null; video_source: string | null
   loop_start_sec?: number | null; loop_end_sec?: number | null
   candidates: Candidate[]
@@ -201,6 +204,17 @@ export default function VideoCurationTab() {
   const [runLog, setRunLog]         = useState<string[]>([])
   const [runningLane, setRunningLane] = useState<string | null>(null)
   const [filter, setFilter]         = useState<'pending' | 'approved' | 'all'>('pending')
+  /**
+   * Rows you have just acted on stay visible even when they no longer match the
+   * filter. Approving or pasting a URL sets video_url, which immediately fails
+   * the "pending" predicate, so the row used to vanish the instant you finished
+   * with it. Keeping it in place means you can confirm the result, and trim it,
+   * without hunting through filters. Cleared on refresh or filter change.
+   */
+  const [justActed, setJustActed]   = useState<Set<string>>(new Set())
+  /** Per-exercise toggle for the written coaching instructions. */
+  const [showCues, setShowCues]     = useState<Set<string>>(new Set())
+  const keepVisible = (id: string) => setJustActed(prev => new Set(prev).add(id))
   const [search, setSearch]         = useState('')
   const [batchSize, setBatchSize]   = useState(10)
   const [pasteUrls, setPasteUrls]   = useState<Record<string, string>>({})
@@ -399,20 +413,29 @@ export default function VideoCurationTab() {
   }
 
   // ── Exercise helpers ───────────────────────────────────────────────────────
-  async function loadExercises() {
-    setLoading(true)
+  /**
+   * `silent` refreshes the data WITHOUT blanking the list.
+   *
+   * Every action called this with the loading flag set, which replaced the
+   * whole list with a one-line "Loading exercises…" paragraph. The page
+   * collapsed to almost nothing, the browser pinned scroll to the top, and
+   * when the list came back you were somewhere else entirely. That is the
+   * jumping.
+   */
+  async function loadExercises(silent = false) {
+    if (!silent) setLoading(true)
     // Loop columns (loop_start_sec/loop_end_sec) may not exist yet if the migration
     // hasn't been run — fall back to a select without them so the tab still loads.
     let exList: Omit<Exercise, 'candidates'>[] | null = null
     const withLoop = await fetchAllRows((f, t) => supabase
       .from('exercise_library')
-      .select('id, name_display, name_normalized, video_url, video_source, loop_start_sec, loop_end_sec')
+      .select('id, name_display, name_normalized, video_url, video_source, loop_start_sec, loop_end_sec, how, breathing, tip')
       .order('name_display')
       .range(f, t))
     if (withLoop.error) {
       const fallback = await fetchAllRows((f, t) => supabase
         .from('exercise_library')
-        .select('id, name_display, name_normalized, video_url, video_source')
+        .select('id, name_display, name_normalized, video_url, video_source, how, breathing, tip')
         .order('name_display')
         .range(f, t))
       exList = (fallback.data ?? []) as unknown as Omit<Exercise, 'candidates'>[]
@@ -535,7 +558,7 @@ export default function VideoCurationTab() {
       if (data.error) throw new Error(data.error)
       const lines = (data.results ?? []).map(fmtResult)
       setRunLog([`Done — ${data.processed} exercises processed`, ...summarise(data.results ?? []), ...lines])
-      await loadExercises()
+      await loadExercises(true)
     } catch (err) {
       setRunLog(prev => [...prev, `Error: ${err instanceof Error ? err.message : 'Failed'}`])
     }
@@ -560,7 +583,7 @@ export default function VideoCurationTab() {
       if (data.error) throw new Error(data.error)
       const lines = (data.results ?? []).map(fmtResult)
       setRunLog([`Done — ${data.processed} processed`, ...summarise(data.results ?? []), ...lines])
-      await loadExercises()
+      await loadExercises(true)
     } catch (err) {
       setRunLog(prev => [...prev, `Error: ${err instanceof Error ? err.message : 'Failed'}`])
     }
@@ -575,13 +598,14 @@ export default function VideoCurationTab() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ exerciseId, regenerate }),
       })
-      await loadExercises()
+      await loadExercises(true)
     } catch { /* ignore */ }
     setActing(null)
   }
 
   async function approve(candidate: Candidate) {
     setActing(candidate.id)
+    keepVisible(candidate.exercise_id)
     await supabase.from('exercise_video_candidates')
       .update({ status: 'superseded' })
       .eq('exercise_id', candidate.exercise_id)
@@ -592,7 +616,7 @@ export default function VideoCurationTab() {
     await supabase.from('exercise_library')
       .update({ video_url: candidate.url, video_source: 'youtube', video_approved_at: new Date().toISOString(), video_approved_by: user?.id })
       .eq('id', candidate.exercise_id)
-    await loadExercises()
+    await loadExercises(true)
     setActing(null)
   }
 
@@ -638,7 +662,8 @@ export default function VideoCurationTab() {
       .in('status', ['proposed', 'queued'])
     setPasteUrls(prev => { const n = { ...prev }; delete n[exerciseId]; return n })
     setPasteTimes(prev => { const n = { ...prev }; delete n[exerciseId]; return n })
-    await loadExercises()
+    keepVisible(exerciseId)
+    await loadExercises(true)
     setActing(null)
   }
 
@@ -648,7 +673,7 @@ export default function VideoCurationTab() {
       .update({ loop_start_sec: startSec, loop_end_sec: endSec })
       .eq('id', exerciseId)
     if (error) alert(`Could not save loop — make sure the loop columns migration has been run in Supabase.\n\n${error.message}`)
-    await loadExercises()
+    await loadExercises(true)
     setActing(null)
   }
 
@@ -657,7 +682,7 @@ export default function VideoCurationTab() {
     await supabase.from('exercise_library')
       .update({ loop_start_sec: null, loop_end_sec: null })
       .eq('id', exerciseId)
-    await loadExercises()
+    await loadExercises(true)
     setActing(null)
   }
 
@@ -689,7 +714,7 @@ export default function VideoCurationTab() {
       })
     } catch { /* ignore */ }
     setEditingApproved(prev => { const n = new Set(prev); n.delete(exerciseId); return n })
-    await loadExercises()
+    await loadExercises(true)
     setActing(null)
   }
 
@@ -704,6 +729,8 @@ export default function VideoCurationTab() {
     if (!matchSearch) return false
     // When searching by name, bypass the tab filter so any exercise is findable
     if (search.trim()) return true
+    // Keep whatever you just finished with in place rather than yanking it away.
+    if (justActed.has(e.id)) return true
     if (filter === 'approved') return !!e.video_url
     if (filter === 'pending')  return !e.video_url && e.candidates.some(c => c.status === 'proposed')
     return true
@@ -1397,7 +1424,7 @@ export default function VideoCurationTab() {
             const proposed = ex.candidates.filter(c => c.status === 'proposed')
             const isActing = acting === ex.id || proposed.some(c => acting === c.id)
             return (
-              <div key={ex.id} style={{ background: C.surface, border: `1px solid ${ex.video_url ? C.greenBorder : C.border}`, borderRadius: 10, overflow: 'hidden' }}>
+              <div key={ex.id} style={{ background: C.surface, border: `1px solid ${justActed.has(ex.id) ? C.accent : ex.video_url ? C.greenBorder : C.border}`, borderRadius: 10, overflow: 'hidden' }}>
                 {/* Exercise header */}
                 <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderBottom: proposed.length > 0 || ex.video_url ? `1px solid ${C.border}` : 'none' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1413,7 +1440,19 @@ export default function VideoCurationTab() {
                       </span>
                     )}
                   </div>
-                  <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                  <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
+                    {(ex.how || ex.breathing || ex.tip) && (
+                      <button
+                        onClick={() => setShowCues(prev => {
+                          const n = new Set(prev)
+                          if (n.has(ex.id)) n.delete(ex.id); else n.add(ex.id)
+                          return n
+                        })}
+                        title="Show the written instructions so you can judge the video against them"
+                        style={{ padding: '5px 12px', borderRadius: 6, border: `1px solid ${showCues.has(ex.id) ? C.accentBorder : C.border}`, background: showCues.has(ex.id) ? C.accentDim : 'transparent', color: showCues.has(ex.id) ? C.accent : C.textDim, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                        {showCues.has(ex.id) ? '✕ Instructions' : '📋 Instructions'}
+                      </button>
+                    )}
                     {ex.video_url && (
                       <>
                         <a href={ex.video_url} target="_blank" rel="noopener noreferrer"
@@ -1445,6 +1484,31 @@ export default function VideoCurationTab() {
                     )}
                   </div>
                 </div>
+
+                {/* Written instructions, so a video can be judged against what
+                    the exercise actually says rather than its title alone. */}
+                {showCues.has(ex.id) && (ex.how || ex.breathing || ex.tip) && (
+                  <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}`, background: 'rgba(59,130,246,0.04)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {ex.how && (
+                      <div>
+                        <p style={{ fontSize: 9, fontWeight: 800, color: C.accent, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 3 }}>How to do it</p>
+                        <p style={{ fontSize: 12, color: C.textMid, lineHeight: 1.6 }}>{ex.how}</p>
+                      </div>
+                    )}
+                    {ex.breathing && (
+                      <div>
+                        <p style={{ fontSize: 9, fontWeight: 800, color: C.textDim, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 3 }}>Breathing</p>
+                        <p style={{ fontSize: 12, color: C.textMid, lineHeight: 1.6 }}>{ex.breathing}</p>
+                      </div>
+                    )}
+                    {ex.tip && (
+                      <div>
+                        <p style={{ fontSize: 9, fontWeight: 800, color: C.textDim, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 3 }}>Coaching tip</p>
+                        <p style={{ fontSize: 12, color: C.textMid, lineHeight: 1.6 }}>{ex.tip}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Approved edit panel */}
                 {ex.video_url && editingApproved.has(ex.id) && (() => {
