@@ -64,6 +64,16 @@ VOICE — write like a real strength coach talking straight to the athlete, not 
 Rules:
 - Every entry must be DISTINCT — no near-duplicates, no left/right variants of the same movement.
 - Use real, established movements only — never invent names.
+- For SHOULDER MOBILITY categories, cover the full modern vocabulary, not just static
+  stretches: Shoulder Dislocates (band, dowel, or PVC), controlled articular rotations,
+  end-range and loaded stretching, weighted hangs and passive hangs, scapular
+  retraction/protraction and elevation/depression work, external and internal rotation at
+  varying degrees of abduction, thoracic extension over a bench or roller, wall slides,
+  prone and supine positions, and overhead capacity work. Prioritise loaded, end-range
+  strengthening over passive holds — building strength through the outer range is what
+  actually changes shoulder capacity.
+- Use the generic, widely-recognised name of a movement. Never name it after a coach,
+  brand, gym, programme, or training system, even when that is how it is popularly known.
 - Names must be clean and library-ready (e.g. "Bulgarian Split Squat", not "Bulgarian Split Squat 3x10").
 - Return exactly the number requested, unless you genuinely run out of distinct, quality movements for the category.
 - Output nothing but the raw JSON array.`

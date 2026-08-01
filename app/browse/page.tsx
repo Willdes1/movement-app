@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
+import { searchItems } from '@/lib/fuzzy-search'
 
 type Exercise = {
   name_normalized: string
@@ -42,11 +43,11 @@ export default function BrowsePage() {
       })
   }, [user])
 
-  const filtered = useMemo(() => {
-    if (!query.trim()) return exercises
-    const q = query.toLowerCase()
-    return exercises.filter(e => e.name_display.toLowerCase().includes(q))
-  }, [exercises, query])
+  // Punctuation-blind and plural-tolerant, so "cat cow" and "hips" both work.
+  const filtered = useMemo(
+    () => searchItems(exercises, query, e => e.name_display).matches,
+    [exercises, query],
+  )
 
   const paginated = filtered.slice(0, (page + 1) * PAGE_SIZE)
   const hasMore = paginated.length < filtered.length

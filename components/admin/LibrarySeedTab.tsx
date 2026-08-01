@@ -24,6 +24,11 @@ const FOCUS = [
   'Mobility & Flexibility', 'Prehab & Rehab', 'Conditioning & HIIT', 'Calisthenics',
   'Plyometrics & Power', 'Balance & Stability', 'Warm-Up Drills', 'Grip & Forearms',
   'Neck & Traps', 'Posture & Postural Health',
+  // Shoulder mobility deserves its own lane rather than living inside the
+  // general mobility bucket. It is the most requested area and it has a large,
+  // well-defined movement vocabulary of its own (dislocates, CARs, end-range
+  // work, loaded stretching).
+  'Shoulder Mobility',
 ]
 
 const ALL_CATEGORIES = [...SPORTS, ...FOCUS]

@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { searchItems } from '@/lib/fuzzy-search'
 import { useAuth } from '@/contexts/AuthContext'
 import LoopPreview from '@/components/ui/LoopPreview'
 
@@ -86,8 +87,12 @@ export default function ExercisesPage() {
   const withVideo    = all.filter(e => !!e.video_url).length
   const withoutVideo = all.length - withVideo
 
+  // Punctuation-blind and plural-tolerant, so "cat cow" and "hips" both work.
+  const searchMatched = new Set(
+    searchItems(all, query, e => e.name_display).matches.map(e => e.name_normalized),
+  )
   const results = all.filter(e => {
-    const matchQ = !query.trim() || e.name_display.toLowerCase().includes(query.toLowerCase())
+    const matchQ = !query.trim() || searchMatched.has(e.name_normalized)
     const matchF =
       filter === 'all'      ? true :
       filter === 'video'    ? !!e.video_url :
