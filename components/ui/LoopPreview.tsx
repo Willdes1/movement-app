@@ -133,7 +133,7 @@ function YouTubeLoopPlayer({ videoId, loopStart, loopEnd, onDead }: { videoId: s
 }
 
 export default function LoopPreview({
-  url, source, name, loopStart, loopEnd, clipStart, clipEnd, compact, lazy, onClick,
+  url, source, name, loopStart, loopEnd, clipStart, clipEnd, compact, lazy, onClick, sticky = true,
 }: {
   url: string | null
   source: string | null
@@ -145,6 +145,13 @@ export default function LoopPreview({
   compact?: boolean
   lazy?: boolean
   onClick?: () => void
+  /**
+   * Pins the player below the app's mobile header while the page scrolls.
+   * Correct on a full page, wrong inside a sheet or modal: the 56px header
+   * offset does not exist there, so the player parks on top of the content.
+   * Containers that scroll internally should pass false and handle it.
+   */
+  sticky?: boolean
 }) {
   const [muted, setMuted] = useState(true)
   const [showFull, setShowFull] = useState(false)
@@ -245,7 +252,7 @@ export default function LoopPreview({
   const showLoop = hasLoop && !showFull
 
   return (
-    <div className="video-sticky" style={{ marginBottom: 14, borderRadius: 10, overflow: 'hidden', background: '#000' }}>
+    <div className={sticky ? 'video-sticky' : undefined} style={{ marginBottom: 14, borderRadius: 10, overflow: 'hidden', background: '#000' }}>
       <div style={{ position: 'relative', paddingBottom: isShort ? '177.78%' : '56.25%', height: 0 }}>
         {showLoop ? (
           <YouTubeLoopPlayer videoId={videoId} loopStart={loopStart!} loopEnd={loopEnd!} onDead={handleDead} />

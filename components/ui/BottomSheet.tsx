@@ -12,7 +12,7 @@ const DISMISS_DISTANCE = 110   // px dragged before it closes on release
 const DISMISS_VELOCITY = 0.5   // px/ms, so a short fast flick also closes it
 
 export default function BottomSheet({
-  onClose, children, header, maxWidth = 480, labelledBy,
+  onClose, children, header, maxWidth = 480, labelledBy, onBodyScroll,
 }: {
   onClose: () => void
   /** Scrolling body. */
@@ -21,6 +21,8 @@ export default function BottomSheet({
   header?: ReactNode
   maxWidth?: number
   labelledBy?: string
+  /** Scroll position of the body, for content that reacts to scrolling. */
+  onBodyScroll?: (scrollTop: number) => void
 }) {
   const [dragY, setDragY] = useState(0)
   const [dragging, setDragging] = useState(false)
@@ -113,6 +115,7 @@ export default function BottomSheet({
         <div
           ref={scrollRef}
           onTouchStart={e => onTouchStart(e, false)}
+          onScroll={onBodyScroll ? e => onBodyScroll(e.currentTarget.scrollTop) : undefined}
           style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch' as never, flexGrow: 1, minHeight: 0 }}
         >
           {children}

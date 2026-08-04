@@ -101,6 +101,7 @@ export default function ExerciseDetailModal({
   const fullKey = `exercise:${data.name_normalized}`
   const [tab, setTab] = useState<'info' | 'history'>('info')
   const [history, setHistory] = useState<SetLogRow[]>([])
+  const [bodyScroll, setBodyScroll] = useState(0)
 
   useEffect(() => {
     if (!userId) return
@@ -113,6 +114,10 @@ export default function ExerciseDetailModal({
       .then(({ data: rows }) => setHistory((rows as SetLogRow[]) ?? []))
   }, [userId, data.name_normalized, historyRefresh])
 
+  // The sheet stays mounted between exercises, so the video has to be restored
+  // when a different one is opened.
+  useEffect(() => { setBodyScroll(0); setTab('info') }, [data.name_normalized])
+
   // Escape, tap-outside and swipe-down all route through BottomSheet.
   const close = () => { stop(); onClose() }
 
@@ -123,6 +128,12 @@ export default function ExerciseDetailModal({
     how: 'var(--text)', breathing: 'var(--text-mid)', core: 'var(--text-mid)', tip: 'var(--accent)',
   }
   const sections = speechSections(data)
+
+  // Video stays put for HOLD px of scroll, then fades out over FADE px.
+  const VIDEO_HOLD = 36
+  const VIDEO_FADE = 150
+  const videoFade = Math.min(Math.max((bodyScroll - VIDEO_HOLD) / VIDEO_FADE, 0), 1)
+
   const isReadingFull = activeKey === fullKey && (speaking || ttsLoading)
   const isLoadingFull = activeKey === fullKey && ttsLoading
 
@@ -179,6 +190,7 @@ export default function ExerciseDetailModal({
       <style>{`@keyframes tts-pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }`}</style>
       <BottomSheet
         onClose={close}
+        onBodyScroll={setBodyScroll}
         labelledBy="exercise-sheet-title"
         header={
           <div style={{ padding: '10px 24px 0' }}>
@@ -216,7 +228,24 @@ export default function ExerciseDetailModal({
               <SetHistoryView history={history} />
             ) : (
             <>
-            <LoopPreview url={data.video_url ?? null} source={data.video_source ?? null} name={data.name_display} loopStart={data.loop_start_sec} loopEnd={data.loop_end_sec} clipStart={data.youtube_start_sec} clipEnd={data.youtube_end_sec} />
+            {/* The player holds its position for the first bit of scroll, then
+                fades and lifts away so it never sits on top of the coaching
+                cues. Scrolling back to the top brings it straight back. It is
+                sticky rather than collapsed on purpose: changing its height
+                mid-scroll would shove the content the reader is looking at. */}
+            <div
+              style={{
+                position: 'sticky',
+                top: 0,
+                zIndex: 5,
+                opacity: 1 - videoFade,
+                transform: `translateY(${-videoFade * 18}px)`,
+                pointerEvents: videoFade > 0.6 ? 'none' : 'auto',
+                transition: 'opacity 0.12s linear',
+              }}
+            >
+              <LoopPreview sticky={false} url={data.video_url ?? null} source={data.video_source ?? null} name={data.name_display} loopStart={data.loop_start_sec} loopEnd={data.loop_end_sec} clipStart={data.youtube_start_sec} clipEnd={data.youtube_end_sec} />
+            </div>
 
             {lastLog !== undefined && (
               <div style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)', marginBottom: 14 }}>
