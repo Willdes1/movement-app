@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-30T21:44:58.892Z",
-  "count": 44,
+  "generatedAt": "2026-08-04T16:50:09.427Z",
+  "count": 46,
   "files": [
     "20260526_pgvector_knowledge.sql",
     "20260527_coach_invites.sql",
@@ -45,6 +45,8 @@
     "20260724_youtube_api_usage.sql",
     "20260725_youtube_uploads_index.sql",
     "20260729_match_channel_videos.sql",
-    "20260729b_match_channel_videos_v2.sql"
+    "20260729b_match_channel_videos_v2.sql",
+    "20260731_exercise_legacy_name.sql",
+    "20260731b_trim_status.sql"
   ]
 }

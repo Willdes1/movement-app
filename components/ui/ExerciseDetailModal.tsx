@@ -2,6 +2,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import LoopPreview from '@/components/ui/LoopPreview'
 import { useTTS } from '@/hooks/useTTS'
+import { buildSpeechText, speechSections } from '@/lib/speech-text'
 import { supabase } from '@/lib/supabase'
 
 // Reusable expanded-exercise popup, shared by the calendar day view, the coached
@@ -90,7 +91,11 @@ export default function ExerciseDetailModal({
   userId?: string
   historyRefresh?: number
 }) {
-  const { speak, stop, speaking, loading: ttsLoading, gender, toggleGender } = useTTS()
+  const { toggle: ttsToggle, stop, stopIf, speaking, loading: ttsLoading, activeKey, gender, toggleGender } = useTTS()
+  // Audio lives above this component now, so closing the modal has to stop it
+  // explicitly. Scoped to our own key so it never kills playback that another
+  // surface started.
+  const fullKey = `exercise:${data.name_normalized}`
   const [tab, setTab] = useState<'info' | 'history'>('info')
   const [history, setHistory] = useState<SetLogRow[]>([])
 
@@ -113,22 +118,22 @@ export default function ExerciseDetailModal({
 
   const close = () => { stop(); onClose() }
 
-  const sections = [
-    { label: 'HOW TO PERFORM', text: data.how, color: 'var(--text)' },
-    { label: 'BREATHING', text: data.breathing, color: 'var(--text-mid)' },
-    { label: 'CORE ENGAGEMENT', text: data.core, color: 'var(--text-mid)' },
-    { label: 'COMMON MISTAKES', text: data.tip, color: 'var(--accent)' },
-  ].filter(s => !!s.text)
+  // Stop our own audio if the modal disappears without close() running.
+  useEffect(() => () => stopIf(fullKey), [fullKey, stopIf])
+
+  const SECTION_COLOR: Record<string, string> = {
+    how: 'var(--text)', breathing: 'var(--text-mid)', core: 'var(--text-mid)', tip: 'var(--accent)',
+  }
+  const sections = speechSections(data)
+  const isReadingFull = activeKey === fullKey && (speaking || ttsLoading)
+  const isLoadingFull = activeKey === fullKey && ttsLoading
 
   function readAloud() {
-    if (speaking || ttsLoading) { stop(); return }
     const preUrl = gender === 'male' ? data.tts_url_male : data.tts_url_female
-    const parts = [data.name_display]
-    if (data.how) parts.push(data.how)
-    if (data.breathing) parts.push('Breathing: ' + data.breathing)
-    if (data.core) parts.push('Core engagement: ' + data.core)
-    if (data.tip) parts.push('Common mistake: ' + data.tip)
-    speak(parts.join('. '), { preGeneratedUrl: preUrl ?? undefined, nameNormalized: preUrl ? undefined : data.name_normalized })
+    void ttsToggle(fullKey, buildSpeechText(data), {
+      preGeneratedUrl: preUrl ?? undefined,
+      nameNormalized: preUrl ? undefined : data.name_normalized,
+    })
   }
 
   return (
@@ -147,8 +152,8 @@ export default function ExerciseDetailModal({
                 <button onClick={toggleGender} title={`Voice: ${gender}. Tap to switch.`} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 8px', fontSize: 11, color: 'var(--text-dim)', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
                   {gender === 'male' ? '♂' : '♀'}
                 </button>
-                <button onClick={readAloud} title={speaking ? 'Stop' : ttsLoading ? 'Loading…' : 'Read aloud'} style={{ background: speaking ? 'var(--accent)' : 'var(--surface2)', border: `1px solid ${speaking ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 8, padding: '5px 10px', fontSize: 16, cursor: ttsLoading ? 'wait' : 'pointer', lineHeight: 1, animation: speaking ? 'tts-pulse 1.2s ease-in-out infinite' : 'none', opacity: ttsLoading ? 0.6 : 1 }}>
-                  {ttsLoading ? '⏳' : speaking ? '🔊' : '🔈'}
+                <button onClick={readAloud} title={isReadingFull ? 'Stop' : 'Read aloud'} style={{ background: isReadingFull ? 'var(--accent)' : 'var(--surface2)', border: `1px solid ${isReadingFull ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 8, padding: '5px 10px', fontSize: 16, cursor: isLoadingFull ? 'wait' : 'pointer', lineHeight: 1, animation: isReadingFull && !isLoadingFull ? 'tts-pulse 1.2s ease-in-out infinite' : 'none', opacity: isLoadingFull ? 0.6 : 1 }}>
+                  {isLoadingFull ? '⏳' : isReadingFull ? '🔊' : '🔈'}
                 </button>
                 <button onClick={close} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--text-dim)', cursor: 'pointer', lineHeight: 1 }}>×</button>
               </div>
@@ -196,10 +201,10 @@ export default function ExerciseDetailModal({
             {footer}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: footer ? 14 : 0 }}>
-              {sections.map(({ label, text, color }) => (
-                <div key={label} style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)' }}>
+              {sections.map(({ id, label, body }) => (
+                <div key={id} style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)' }}>
                   <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--text-dim)', marginBottom: 5, textTransform: 'uppercase' }}>{label}</p>
-                  <p style={{ fontSize: 13, color, lineHeight: 1.65 }}>{text}</p>
+                  <p style={{ fontSize: 13, color: SECTION_COLOR[id], lineHeight: 1.65 }}>{body}</p>
                 </div>
               ))}
             </div>

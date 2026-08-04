@@ -22,11 +22,53 @@ function getSupabase() {
 
 const ALLOWED_VOICES = ['onyx', 'nova', 'alloy', 'echo', 'fable', 'shimmer']
 
+// Read-through cache. When the caller names an exercise we already voiced, the
+// file is sitting in storage and there is no reason to pay OpenAI for it again.
+// Until this existed the only thing preventing a double charge was the client
+// remembering to pass preGeneratedUrl, so every caller that did not know the URL
+// re-billed the whole narration on every tap.
+async function cachedAudio(name_normalized: string, voice: string): Promise<ArrayBuffer | null> {
+  try {
+    const supabase = getSupabase() as any
+    const col = voice === 'nova' ? 'tts_url_female' : 'tts_url_male'
+    const { data } = await supabase
+      .from('exercise_library')
+      .select(col)
+      .eq('name_normalized', name_normalized)
+      .maybeSingle()
+
+    const url = data?.[col]
+    if (!url) return null
+
+    const res = await fetch(url)
+    if (!res.ok) return null
+    return await res.arrayBuffer()
+  } catch {
+    // Never let the cache path break playback: fall through and generate.
+    return null
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const { text, voice = 'onyx', name_normalized } = await request.json()
     if (!text?.trim()) return Response.json({ error: 'text required' }, { status: 400 })
     if (!ALLOWED_VOICES.includes(voice)) return Response.json({ error: 'invalid voice' }, { status: 400 })
+
+    // Safe because callers only pass name_normalized alongside the canonical
+    // full narration (lib/speech-text.ts). Partial reads must omit it.
+    if (name_normalized) {
+      const hit = await cachedAudio(name_normalized, voice)
+      if (hit) {
+        return new Response(hit, {
+          headers: {
+            'Content-Type': 'audio/mpeg',
+            'Cache-Control': 'private, max-age=3600',
+            'X-TTS-Cache': 'hit',
+          },
+        })
+      }
+    }
 
     // Generate audio
     const sent = text.slice(0, 4096)
@@ -76,6 +118,7 @@ export async function POST(request: Request) {
       headers: {
         'Content-Type': 'audio/mpeg',
         'Cache-Control': 'private, max-age=3600',
+        'X-TTS-Cache': 'miss',
       },
     })
   } catch (err) {

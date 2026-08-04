@@ -1,11 +1,12 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { trackEvent } from '@/lib/track'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCoached } from '@/contexts/CoachedContext'
 import { useTTS } from '@/hooks/useTTS'
+import { buildSpeechText } from '@/lib/speech-text'
 import LoopPreview from '@/components/ui/LoopPreview'
 import { inferEquipment, REST_GUIDANCE } from '@/lib/workout-display'
 
@@ -73,8 +74,13 @@ export default function CoachedSessionCard(
   const { coachName, assignment, program, weeks, coachLibrary, coachVoiceReady } = useCoached()
   const userId = effectiveUserId ?? user?.id ?? ''
 
-  const { speak, stop, speaking, loading: ttsLoading, gender } = useTTS()
-  const [speakingKey, setSpeakingKey] = useState<string | null>(null)
+  const { toggle: ttsToggle, stop, speaking, loading: ttsLoading, activeKey, gender } = useTTS()
+  // The coach's cloned voice needs a round trip before the provider has anything
+  // to play, so this covers that window: it keeps the button lit and lets a
+  // second tap cancel a request that has not started playing yet.
+  const [pendingKey, setPendingKey] = useState<string | null>(null)
+  const voiceReqRef = useRef(0)
+  useEffect(() => () => { voiceReqRef.current++ }, [])
   const [lib, setLib] = useState<Record<string, LibEntry>>({})
 
   const [openLog, setOpenLog] = useState<number | null>(null)
@@ -177,22 +183,29 @@ export default function CoachedSessionCard(
 
   async function speakExercise(rawName: string) {
     const key = normalizeExName(rawName)
-    if (speakingKey === key) { stop(); setSpeakingKey(null); return }
-    setSpeakingKey(key)
+    if ((activeKey ?? pendingKey) === key) {
+      voiceReqRef.current++
+      setPendingKey(null)
+      stop()
+      return
+    }
+    const req = ++voiceReqRef.current
     const c = coachLibrary[key]
     const g = lib[key]
     const { name } = splitMovement(rawName)
     const how = c?.instructions ?? g?.how
     const tip = c?.notes ?? g?.tip
-    const parts = [name]
-    if (how) parts.push(how)
-    if (tip) parts.push('Coaching tip: ' + tip)
-    const text = parts.join('. ')
+    // Coach overrides only carry how/tip, so breathing and core come from the
+    // global library either way.
+    const text = buildSpeechText({
+      name_display: name, how, breathing: g?.breathing, core: g?.core, tip,
+    })
 
     // Coach's cloned voice wins when ready — they hear THEIR coach read the cues.
     // Cached per (coach, exercise) server-side, so this is a fast CDN URL after the
     // first play. Any failure falls through to the default TTS path below.
     if (coachVoiceReady) {
+      setPendingKey(key)
       try {
         const { data: { session } } = await supabase.auth.getSession()
         const res = await fetch('/api/coach/voice/speak', {
@@ -202,22 +215,32 @@ export default function CoachedSessionCard(
         })
         if (res.ok) {
           const data = await res.json()
+          // Bail if the card unmounted or the athlete tapped again while we waited.
+          if (voiceReqRef.current !== req) return
           if (data.url) {
-            await speak(text, { preGeneratedUrl: data.url })
-            setSpeakingKey(null)
+            setPendingKey(null)
+            await ttsToggle(key, text, { preGeneratedUrl: data.url })
             return
           }
         }
       } catch {
         // fall through to default narrator
       }
+      setPendingKey(null)
+      if (voiceReqRef.current !== req) return
     }
 
     // Default narrator. Only reuse the global pre-generated audio when the coach
     // hasn't overridden the cues.
     const preUrl = !c ? (gender === 'male' ? g?.tts_url_male : g?.tts_url_female) : undefined
-    await speak(text, { preGeneratedUrl: preUrl ?? undefined, nameNormalized: preUrl ? undefined : key })
-    setSpeakingKey(null)
+    // Only let the server save this audio onto the shared exercise_library row
+    // when the narration IS the global one. With a coach override in play the
+    // text is that coach's private wording, and saving it would hand their cues
+    // to every other athlete on the platform.
+    await ttsToggle(key, text, {
+      preGeneratedUrl: preUrl ?? undefined,
+      nameNormalized: !c && !preUrl ? key : undefined,
+    })
   }
 
   async function toggleLog(idx: number, movement: string) {
@@ -382,7 +405,7 @@ export default function CoachedSessionCard(
         {todayDay.movements.map((mv, i) => {
           const { name, scheme } = splitMovement(mv)
           const key = normalizeExName(mv)
-          const isSpeaking = speakingKey === key && (speaking || ttsLoading)
+          const isSpeaking = pendingKey === key || (activeKey === key && (speaking || ttsLoading))
           const last = lastLogs[key]
           const isOpen = openLog === i
           const media = resolveMedia(key)

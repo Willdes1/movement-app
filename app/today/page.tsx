@@ -10,6 +10,7 @@ import PushNotificationBanner from '@/components/PushNotificationBanner'
 import CoachedSessionCard from '@/components/CoachedSessionCard'
 import { useStreak } from '@/lib/useStreak'
 import { useTTS } from '@/hooks/useTTS'
+import { buildSpeechText } from '@/lib/speech-text'
 import { inferEquipment, timeCommitment } from '@/lib/workout-display'
 import { displayName } from '@/lib/name'
 
@@ -72,9 +73,8 @@ export default function TodayPage() {
   const { activeRecovery } = useTheme()
   const router = useRouter()
 
-  const { speak, stop, speaking, loading: ttsLoading, gender } = useTTS()
-  const [speakingKey, setSpeakingKey] = useState<string | null>(null)
-  const [exerciseLib, setExerciseLib] = useState<Record<string, { how: string | null; tip: string | null; tts_url_male: string | null; tts_url_female: string | null; video_url: string | null; video_source: string | null; youtube_start_sec: number | null; youtube_end_sec: number | null; loop_start_sec: number | null; loop_end_sec: number | null }>>({})
+  const { toggle: ttsToggle, activeKey, speaking, loading: ttsLoading, gender } = useTTS()
+  const [exerciseLib, setExerciseLib] = useState<Record<string, { how: string | null; breathing: string | null; core: string | null; tip: string | null; tts_url_male: string | null; tts_url_female: string | null; video_url: string | null; video_source: string | null; youtube_start_sec: number | null; youtube_end_sec: number | null; loop_start_sec: number | null; loop_end_sec: number | null }>>({})
 
   const [firstName, setFirstName] = useState<string | null>(null)
   const [currentWeek, setCurrentWeek] = useState<number | null>(null)
@@ -133,7 +133,7 @@ export default function TodayPage() {
     if (!normalized.length) return
     supabase
       .from('exercise_library')
-      .select('name_normalized, how, tip, tts_url_male, tts_url_female, video_url, video_source, youtube_start_sec, youtube_end_sec, loop_start_sec, loop_end_sec')
+      .select('name_normalized, how, breathing, core, tip, tts_url_male, tts_url_female, video_url, video_source, youtube_start_sec, youtube_end_sec, loop_start_sec, loop_end_sec')
       .in('name_normalized', normalized)
       .then(({ data }) => {
         const map: typeof exerciseLib = {}
@@ -161,18 +161,19 @@ export default function TodayPage() {
       .replace(/[-–—]/g, ' ').replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '_')
   }
 
-  async function speakExercise(rawName: string) {
+  function speakExercise(rawName: string) {
     const key = normalizeExName(rawName)
-    if (speakingKey === key) { stop(); setSpeakingKey(null); return }
-    setSpeakingKey(key)
     const lib = exerciseLib[key]
-    const displayName = rawName.replace(/\s+\d+[×x]\d+.*/i, '').replace(/\s+\d+\s+sets?.*/i, '').trim()
-    const parts = [displayName]
-    if (lib?.how) parts.push(lib.how)
-    if (lib?.tip) parts.push('Coaching tip: ' + lib.tip)
+    const nameDisplay = rawName.replace(/\s+\d+[×x]\d+.*/i, '').replace(/\s+\d+\s+sets?.*/i, '').trim()
+    const text = buildSpeechText({
+      name_display: nameDisplay,
+      how: lib?.how, breathing: lib?.breathing, core: lib?.core, tip: lib?.tip,
+    })
     const preUrl = gender === 'male' ? lib?.tts_url_male : lib?.tts_url_female
-    await speak(parts.join('. '), { preGeneratedUrl: preUrl ?? undefined, nameNormalized: preUrl ? undefined : key })
-    setSpeakingKey(null)
+    // The provider owns start/stop state now. It used to be tracked locally and
+    // cleared the moment speak() resolved, which is when playback BEGINS, so the
+    // button went idle instantly and a second tap restarted the clip.
+    void ttsToggle(key, text, { preGeneratedUrl: preUrl ?? undefined, nameNormalized: preUrl ? undefined : key })
   }
 
   const isRecovering = !!activeRecovery
@@ -313,7 +314,7 @@ export default function TodayPage() {
                         <div style={{ padding: '8px 12px' }}>
                           {block.exercises.map((ex, ei) => {
                             const exKey = normalizeExName(ex)
-                            const isSpeaking = speakingKey === exKey && (speaking || ttsLoading)
+                            const isSpeaking = activeKey === exKey && (speaking || ttsLoading)
                             return (
                               <div key={ei} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', borderBottom: ei < block.exercises.length - 1 ? '1px solid var(--border)' : 'none' }}>
                                 <div style={{ width: 4, height: 4, borderRadius: '50%', background: cfg.color, flexShrink: 0 }} />

@@ -10,6 +10,7 @@ import ImpersonationBanner from '@/components/ui/ImpersonationBanner'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { CoachedProvider } from '@/contexts/CoachedContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
+import { TTSProvider } from '@/contexts/TTSContext'
 import { PlanGenerationProvider } from '@/components/PlanGenerationContext'
 import GenerationBanner from '@/components/GenerationBanner'
 import ReportBugButton from '@/components/ReportBugButton'
@@ -93,6 +94,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AuthProvider>
           <CoachedProvider>
           <ThemeProvider>
+            <TTSProvider>
             <PlanGenerationProvider>
               <div className="grain" />
               <Sidebar />
@@ -115,6 +117,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <ServiceWorkerRegistrar />
               <ProductTracker />
             </PlanGenerationProvider>
+            </TTSProvider>
           </ThemeProvider>
           </CoachedProvider>
         </AuthProvider>
