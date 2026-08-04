@@ -11,7 +11,8 @@ import CoachedSessionCard from '@/components/CoachedSessionCard'
 import { useStreak } from '@/lib/useStreak'
 import { useTTS } from '@/hooks/useTTS'
 import { buildSpeechText } from '@/lib/speech-text'
-import { currentWeek as programCurrentWeek, isProgramElapsed, programEndDate } from '@/lib/program-progress'
+import { currentWeek as programCurrentWeek, isProgramElapsed, programEndDate, daysSince, GAP_DAYS } from '@/lib/program-progress'
+import ProgramResumeActions from '@/components/ProgramResumeActions'
 import { inferEquipment, timeCommitment } from '@/lib/workout-display'
 import { displayName } from '@/lib/name'
 
@@ -79,6 +80,8 @@ export default function TodayPage() {
   const [todayPlan, setTodayPlan] = useState<DayPlan | null>(null)
   const [hasProgram, setHasProgram] = useState(false)
   const [programEnded, setProgramEnded] = useState<Date | null>(null)
+  const [gapDays, setGapDays] = useState<number | null>(null)
+  const [gapDismissed, setGapDismissed] = useState(false)
   const [profileReady, setProfileReady] = useState(false)
   const [weekGenerated, setWeekGenerated] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -112,6 +115,24 @@ export default function TodayPage() {
         return
       }
       setProgramEnded(null)
+
+      // Still inside the program but nothing has happened for a while. Their
+      // calendar week and their real week have quietly drifted apart, so ask
+      // rather than let them keep scrolling past days they never did.
+      const [{ data: lastDone }, { data: lastLogged }] = await Promise.all([
+        supabase.from('day_completions').select('created_at')
+          .eq('program_id', prog.id).eq('user_id', userId)
+          .order('created_at', { ascending: false }).limit(1).maybeSingle(),
+        supabase.from('workout_logs').select('logged_at')
+          .eq('user_id', userId)
+          .order('logged_at', { ascending: false }).limit(1).maybeSingle(),
+      ])
+      const lastActivity = [lastDone?.created_at, lastLogged?.logged_at]
+        .filter(Boolean).sort().at(-1) as string | undefined
+      // No activity at all falls back to the program start, so someone who
+      // generated a plan and never opened it still gets asked.
+      const idle = daysSince(lastActivity ?? prog.start_date)
+      setGapDays(idle !== null && idle >= GAP_DAYS ? idle : null)
 
       const week = programCurrentWeek(prog.start_date)
       setCurrentWeek(week)
@@ -221,23 +242,10 @@ export default function TodayPage() {
           </h1>
           <p style={{ color: 'var(--text-dim)', fontSize: 14, lineHeight: 1.65, marginBottom: 28 }}>
             Nice work{firstName ? `, ${firstName}` : ''}. This program finished on{' '}
-            {programEnded.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}. Pick up
-            where you left off with a fresh block built around where you are now.
+            {programEnded.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}. You can
+            carry on with the plan you already have, or build something new.
           </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 360, margin: '0 auto' }}>
-            <button
-              onClick={() => router.push('/plan')}
-              style={{ padding: '15px 20px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%)', color: '#fff', fontWeight: 900, fontSize: 15, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 6px 24px var(--accent-shadow)' }}
-            >
-              Start a new block →
-            </button>
-            <button
-              onClick={() => router.push('/log')}
-              style={{ padding: '13px 20px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-mid)', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}
-            >
-              Look back at what you did
-            </button>
-          </div>
+          <ProgramResumeActions onDone={loadData} />
         </div>
       </div>
     )
@@ -246,6 +254,31 @@ export default function TodayPage() {
   return (
     <div className="page-content">
       <PushNotificationBanner />
+
+      {/* Back after a break. Their plan is fine, the dates are just stale. */}
+      {!coached && gapDays !== null && !gapDismissed && (
+        <div style={{ margin: '16px 16px 0', padding: '20px 18px', background: 'var(--surface)', border: '1px solid var(--accent-border, var(--border))', borderRadius: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 6 }}>
+            <span style={{ fontSize: 20, lineHeight: 1 }}>👋</span>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>
+                Welcome back{firstName ? `, ${firstName}` : ''}
+              </p>
+              <p style={{ fontSize: 12.5, color: 'var(--text-dim)', lineHeight: 1.6 }}>
+                It has been about {gapDays} days. Your program kept moving without you, so the
+                week it is showing is not the week you were on. Want to line it back up?
+              </p>
+            </div>
+            <button onClick={() => setGapDismissed(true)} aria-label="Dismiss" style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 18, cursor: 'pointer', lineHeight: 1, padding: 0 }}>×</button>
+          </div>
+          <div style={{ marginTop: 14 }}>
+            <ProgramResumeActions onDone={loadData} showNewBlock={false} />
+          </div>
+          <button onClick={() => setGapDismissed(true)} style={{ display: 'block', margin: '10px auto 0', background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+            Leave it as it is
+          </button>
+        </div>
+      )}
 
       {/* Header */}
       <div style={{ padding: '24px 16px 16px' }}>

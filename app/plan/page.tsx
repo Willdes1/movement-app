@@ -9,6 +9,7 @@ import { usePlan } from '@/lib/usePlan'
 import UpgradeModal from '@/components/UpgradeModal'
 import BottomSheet from '@/components/ui/BottomSheet'
 import { isProgramElapsed } from '@/lib/program-progress'
+import ProgramResumeActions from '@/components/ProgramResumeActions'
 import { updateStreak } from '@/lib/useStreak'
 
 type DailyBlock = { label: string; duration: string; exercises: string[]; tip?: string }
@@ -464,6 +465,10 @@ export default function PlanPage() {
     const today = new Date().toISOString().split('T')[0]
     await supabase.from('training_programs').update({ start_date: today, status: 'active', rebuild_count: newCount }).eq('id', program.id)
     await supabase.from('weekly_plans').delete().eq('program_id', program.id)
+    // Completions are keyed by (program_id, week_number, day_index) and the id
+    // does not change here, so without this every day ticked off in the old
+    // block came back already marked complete in the new one.
+    await supabase.from('day_completions').delete().eq('program_id', program.id).eq('user_id', userId)
     const updated = { ...program, startDate: today, status: 'active', rebuildCount: newCount }
     setProgram(updated); setWeekPlans({}); setCurrentWeek(1); setViewingWeek(1); setProgramComplete(false)
     const profile = await fetchProfile()
@@ -605,7 +610,14 @@ export default function PlanPage() {
         <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Program Complete!</h1>
         <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 32, lineHeight: 1.6 }}>You finished all 13 weeks. That&apos;s a serious achievement. What&apos;s next?</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* Free routes first. Rebuilding costs a full generation, so it should
+              not be the only way back onto a plan they already own. */}
+          <ProgramResumeActions showNewBlock={false} />
+          <div style={{ height: 1, background: 'var(--border)', margin: '6px 0' }} />
           <button onClick={continueProgram} style={{ padding: '14px', borderRadius: 12, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>{isFF ? 'Continue for Another Month →' : 'Continue for Another 3 Months →'}</button>
+          <p style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5, marginTop: -6 }}>
+            Replaces all {isFF ? 4 : 13} weeks with a newly generated program. Takes a couple of minutes.
+          </p>
           <button onClick={restartProgram} style={{ padding: '14px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Start a Fresh Plan</button>
           {Object.keys(weekPlans).length > 0 && (
             <button onClick={() => setDismissedComplete(true)} style={{ padding: '10px', borderRadius: 12, border: 'none', background: 'none', color: 'var(--text-dim)', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
