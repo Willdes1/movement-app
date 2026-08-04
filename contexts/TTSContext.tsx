@@ -24,13 +24,28 @@ export type SpeakOpts = {
    * or the row's full-narration file gets overwritten with a fragment.
    */
   nameNormalized?: string
+  /** Play only this window of the clip. See SpeakItem.slice. */
+  slice?: { start: number; end: number }
 }
 
 export type SpeakItem = {
   text: string
   preGeneratedUrl?: string
   nameNormalized?: string
+  /**
+   * Play only part of the resolved clip, as fractions of its length.
+   * This is how a single instruction section gets read without generating a
+   * second file: the whole narration is already one MP3, so reading one section
+   * is a seek into audio we have paid for, not a new request.
+   */
+  slice?: { start: number; end: number }
 }
+
+// A section boundary is estimated from character position, so it can land a
+// beat early or late. Widening the window either side means the listener hears
+// a little of the neighbouring sentence rather than losing their own.
+const SLICE_LEAD_IN = 0.3
+const SLICE_TAIL = 0.25
 
 export const TTS_SPEEDS = [0.75, 1, 1.25, 1.5] as const
 
@@ -129,6 +144,9 @@ export function TTSProvider({ children }: { children: React.ReactNode }) {
   const [queueLength, setQueueLength] = useState(0)
   const [elapsed, setElapsed] = useState(0)
   const [duration, setDuration] = useState(0)
+  // Active slice in seconds, so progress can be reported relative to the
+  // section being played rather than to the whole file.
+  const [slice, setSlice] = useState<{ start: number; end: number } | null>(null)
 
   const [gender, setGenderState] = useState<TTSGender>('male')
   const [speed, setSpeedState] = useState(1)
@@ -141,6 +159,10 @@ export function TTSProvider({ children }: { children: React.ReactNode }) {
   const queueIdxRef = useRef(-1)
   const speedRef = useRef(1)
   const genderRef = useRef<TTSGender>('male')
+  // Second at which the current slice should stop, and the callback that runs
+  // when a clip finishes. Both are read by the shared timeupdate handler.
+  const sliceEndRef = useRef<number | null>(null)
+  const finishRef = useRef<(() => void) | null>(null)
   // Bumped on every stop or new request. Any in-flight work whose token no
   // longer matches throws its result away, so a response that lands after you
   // navigated away or tapped something else can never start playing.
@@ -164,6 +186,8 @@ export function TTSProvider({ children }: { children: React.ReactNode }) {
     setQueueLength(0)
     setElapsed(0)
     setDuration(0)
+    setSlice(null)
+    sliceEndRef.current = null
     activeKeyRef.current = null
     queueRef.current = []
     queueIdxRef.current = -1
@@ -190,7 +214,15 @@ export function TTSProvider({ children }: { children: React.ReactNode }) {
     if (!audioRef.current) {
       const audio = new Audio()
       audio.preload = 'auto'
-      audio.ontimeupdate = () => setElapsed(audio.currentTime)
+      audio.ontimeupdate = () => {
+        setElapsed(audio.currentTime)
+        const stopAt = sliceEndRef.current
+        if (stopAt != null && audio.currentTime >= stopAt) {
+          sliceEndRef.current = null
+          audio.pause()
+          finishRef.current?.()
+        }
+      }
       audio.onloadedmetadata = () => setDuration(Number.isFinite(audio.duration) ? audio.duration : 0)
       audioRef.current = audio
     }
@@ -200,9 +232,24 @@ export function TTSProvider({ children }: { children: React.ReactNode }) {
   const seek = useCallback((fraction: number) => {
     const audio = audioRef.current
     if (!audio || !audio.duration || !Number.isFinite(audio.duration)) return
-    audio.currentTime = Math.min(Math.max(fraction, 0), 1) * audio.duration
+    const clamped = Math.min(Math.max(fraction, 0), 1)
+    // Scrubbing a section stays inside that section.
+    const from = slice?.start ?? 0
+    const to = slice?.end ?? audio.duration
+    audio.currentTime = from + clamped * (to - from)
     setElapsed(audio.currentTime)
-  }, [])
+  }, [slice])
+
+  // Metadata is needed before a slice can be converted from fractions to
+  // seconds. Bounded so a stalled load cannot hang playback.
+  function whenReady(audio: HTMLAudioElement): Promise<void> {
+    if (audio.readyState >= 1) return Promise.resolve()
+    return new Promise(resolve => {
+      const done = () => { clearTimeout(timer); audio.removeEventListener('loadedmetadata', done); resolve() }
+      const timer = setTimeout(done, 4000)
+      audio.addEventListener('loadedmetadata', done, { once: true })
+    })
+  }
 
   // Resolve one queue item to a playable URL. Pre-generated files are free;
   // anything else goes through /api/tts (which now checks storage before it
@@ -251,6 +298,17 @@ export function TTSProvider({ children }: { children: React.ReactNode }) {
       if (!url || tokenRef.current !== token) return
 
       const audio = getAudio()
+      const finish = () => {
+        if (tokenRef.current !== token) return
+        const next = queueIdxRef.current + 1
+        if (next < queueRef.current.length) {
+          void playIndexRef.current(next, token)
+        } else {
+          resetState()
+        }
+      }
+      finishRef.current = finish
+
       audio.onplay = () => {
         if (tokenRef.current !== token) return
         setLoading(false)
@@ -261,23 +319,36 @@ export function TTSProvider({ children }: { children: React.ReactNode }) {
       // It settles when playback BEGINS, so the button flipped back to idle a
       // few milliseconds in and the next tap restarted the clip. Only `ended`
       // means done.
-      audio.onended = () => {
-        if (tokenRef.current !== token) return
-        const next = queueIdxRef.current + 1
-        if (next < queueRef.current.length) {
-          void playIndexRef.current(next, token)
-        } else {
-          resetState()
-        }
-      }
+      audio.onended = finish
       audio.onerror = () => {
         if (tokenRef.current !== token) return
         resetState()
       }
 
-      audio.src = url
-      audio.currentTime = 0
+      if (audio.src !== url) audio.src = url
       audio.playbackRate = speedRef.current
+      sliceEndRef.current = null
+
+      if (item.slice) {
+        await whenReady(audio)
+        if (tokenRef.current !== token) return
+        const total = Number.isFinite(audio.duration) ? audio.duration : 0
+        if (total > 0) {
+          const from = Math.max(0, item.slice.start * total - SLICE_LEAD_IN)
+          const to = Math.min(total, item.slice.end * total + SLICE_TAIL)
+          audio.currentTime = from
+          sliceEndRef.current = to
+          setSlice({ start: from, end: to })
+        } else {
+          // Duration never arrived. Reading the whole thing beats reading nothing.
+          audio.currentTime = 0
+          setSlice(null)
+        }
+      } else {
+        audio.currentTime = 0
+        setSlice(null)
+      }
+
       await audio.play()
       // Safari resets playbackRate when a new source starts.
       audio.playbackRate = speedRef.current
@@ -307,7 +378,7 @@ export function TTSProvider({ children }: { children: React.ReactNode }) {
 
   const speak = useCallback(async (text: string, opts?: SpeakOpts) => {
     await speakQueue(
-      [{ text, preGeneratedUrl: opts?.preGeneratedUrl, nameNormalized: opts?.nameNormalized }],
+      [{ text, preGeneratedUrl: opts?.preGeneratedUrl, nameNormalized: opts?.nameNormalized, slice: opts?.slice }],
       opts,
     )
   }, [speakQueue])
@@ -315,7 +386,7 @@ export function TTSProvider({ children }: { children: React.ReactNode }) {
   const toggle = useCallback(async (key: string, items: SpeakItem[] | string, opts?: SpeakOpts) => {
     if (activeKeyRef.current === key) { stop(); return }
     const list = typeof items === 'string'
-      ? [{ text: items, preGeneratedUrl: opts?.preGeneratedUrl, nameNormalized: opts?.nameNormalized }]
+      ? [{ text: items, preGeneratedUrl: opts?.preGeneratedUrl, nameNormalized: opts?.nameNormalized, slice: opts?.slice }]
       : items
     await speakQueue(list, { ...opts, key })
   }, [stop, speakQueue])
@@ -374,11 +445,15 @@ export function TTSProvider({ children }: { children: React.ReactNode }) {
     gender, toggleGender, setGender, speed, setSpeed,
   ])
 
-  const progressValue = useMemo<TTSProgressValue>(() => ({
-    elapsed,
-    duration,
-    progress: duration > 0 ? Math.min(elapsed / duration, 1) : 0,
-  }), [elapsed, duration])
+  // Reported relative to the slice when one is playing, so reading a single
+  // section shows a bar that runs 0 to 100 rather than 40 to 60.
+  const progressValue = useMemo<TTSProgressValue>(() => {
+    const from = slice?.start ?? 0
+    const to = slice?.end ?? duration
+    const span = Math.max(to - from, 0)
+    const at = Math.min(Math.max(elapsed - from, 0), span)
+    return { elapsed: at, duration: span, progress: span > 0 ? at / span : 0 }
+  }, [elapsed, duration, slice])
 
   return (
     <TTSContext.Provider value={value}>

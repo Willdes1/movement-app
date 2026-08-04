@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { usePlanGeneration } from '@/components/PlanGenerationContext'
 import { usePlan } from '@/lib/usePlan'
 import UpgradeModal from '@/components/UpgradeModal'
+import BottomSheet from '@/components/ui/BottomSheet'
 import { updateStreak } from '@/lib/useStreak'
 
 type DailyBlock = { label: string; duration: string; exercises: string[]; tip?: string }
@@ -905,15 +906,18 @@ export default function PlanPage() {
 
       {/* Exercise detail modal */}
       {selectedExercise && (
-        <div onClick={() => setSelectedExercise(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, border: '1px solid var(--border)', borderBottom: 'none', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ padding: '20px 24px 0', flexShrink: 0 }}>
+        <BottomSheet
+          onClose={() => setSelectedExercise(null)}
+          header={
+            <div style={{ padding: '10px 24px 0' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                 <p style={{ fontWeight: 800, fontSize: 17, lineHeight: 1.3, paddingRight: 12 }}>{selectedExercise.name_display}</p>
-                <button onClick={() => setSelectedExercise(null)} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--text-dim)', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}>×</button>
+                <button onClick={() => setSelectedExercise(null)} aria-label="Close" style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--text-dim)', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}>×</button>
               </div>
             </div>
-            <div style={{ overflowY: 'auto', padding: '0 24px 40px', flexGrow: 1 }}>
+          }
+        >
+            <div style={{ padding: '0 24px 40px' }}>
               <div style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)', marginBottom: 14 }}>
                 <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--text-dim)', marginBottom: 6, textTransform: 'uppercase' }}>Last Session</p>
                 {lastLog ? (
@@ -947,8 +951,7 @@ export default function PlanPage() {
                 </button>
               </div>
             </div>
-          </div>
-        </div>
+        </BottomSheet>
       )}
 
       {/* Missed days modal */}

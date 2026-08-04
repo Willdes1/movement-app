@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import LoopPreview from '@/components/ui/LoopPreview'
+import BottomSheet from '@/components/ui/BottomSheet'
 import { useTTS } from '@/hooks/useTTS'
 import { useTTSProgress } from '@/contexts/TTSContext'
 import { buildSpeechText, speechSections } from '@/lib/speech-text'
@@ -112,12 +113,7 @@ export default function ExerciseDetailModal({
       .then(({ data: rows }) => setHistory((rows as SetLogRow[]) ?? []))
   }, [userId, data.name_normalized, historyRefresh])
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') { stop(); onClose() } }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, stop])
-
+  // Escape, tap-outside and swipe-down all route through BottomSheet.
   const close = () => { stop(); onClose() }
 
   // Stop our own audio if the modal disappears without close() running.
@@ -161,22 +157,34 @@ export default function ExerciseDetailModal({
     })
   }
 
-  function readSection(id: string, label: string, spoken: string) {
-    // Deliberately no nameNormalized: this is a fragment, and saving it would
-    // overwrite the exercise's full narration with a single section.
-    void ttsToggle(`${fullKey}:${id}`, spoken, { label: `${data.name_display}, ${label.toLowerCase()}` })
+  function readSection(id: string, label: string) {
+    const bounds = sectionBounds.find(b => b.id === id)
+    if (!bounds) return
+    const preUrl = gender === 'male' ? data.tts_url_male : data.tts_url_female
+    // Reading one section costs nothing extra. The whole narration is a single
+    // file, so this seeks into the audio we already have rather than asking
+    // OpenAI for a second recording of text it has already read.
+    void ttsToggle(`${fullKey}:${id}`, buildSpeechText(data), {
+      label: `${data.name_display}, ${label.toLowerCase()}`,
+      slice: { start: bounds.start, end: bounds.end },
+      preGeneratedUrl: preUrl ?? undefined,
+      // No cached file yet, so this generates the full narration once and saves
+      // it. Every later section tap on this exercise is then free.
+      nameNormalized: preUrl ? undefined : data.name_normalized,
+    })
   }
 
   return (
     <>
       <style>{`@keyframes tts-pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }`}</style>
-      <div onClick={close} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000 }}>
-        <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, border: '1px solid var(--border)', borderBottom: 'none', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}>
-          {/* Header */}
-          <div style={{ padding: '20px 24px 0', flexShrink: 0 }}>
+      <BottomSheet
+        onClose={close}
+        labelledBy="exercise-sheet-title"
+        header={
+          <div style={{ padding: '10px 24px 0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
               <div style={{ flex: 1, paddingRight: 12 }}>
-                <p style={{ fontWeight: 800, fontSize: 17, lineHeight: 1.3 }}>{data.name_display}</p>
+                <p id="exercise-sheet-title" style={{ fontWeight: 800, fontSize: 17, lineHeight: 1.3 }}>{data.name_display}</p>
                 {generating && <p style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4, fontWeight: 600 }}>Generating coaching details…</p>}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
@@ -186,13 +194,13 @@ export default function ExerciseDetailModal({
                 <button onClick={readAloud} title={isReadingFull ? 'Stop' : 'Read aloud'} style={{ background: isReadingFull ? 'var(--accent)' : 'var(--surface2)', border: `1px solid ${isReadingFull ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 8, padding: '5px 10px', fontSize: 16, cursor: isLoadingFull ? 'wait' : 'pointer', lineHeight: 1, animation: isReadingFull && !isLoadingFull ? 'tts-pulse 1.2s ease-in-out infinite' : 'none', opacity: isLoadingFull ? 0.6 : 1 }}>
                   {isLoadingFull ? '⏳' : isReadingFull ? '🔊' : '🔈'}
                 </button>
-                <button onClick={close} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--text-dim)', cursor: 'pointer', lineHeight: 1 }}>×</button>
+                <button onClick={close} aria-label="Close" style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--text-dim)', cursor: 'pointer', lineHeight: 1 }}>×</button>
               </div>
             </div>
           </div>
-
-          {/* Body */}
-          <div style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch' as never, padding: '0 24px 40px', flexGrow: 1 }}>
+        }
+      >
+        <div style={{ padding: '0 24px 40px' }}>
             {/* History tab appears only once the user has logged sets */}
             {history.length > 0 && (
               <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
@@ -232,7 +240,7 @@ export default function ExerciseDetailModal({
             {footer}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: footer ? 14 : 0 }}>
-              {sections.map(({ id, label, body, spoken }) => {
+              {sections.map(({ id, label, body }) => {
                 const live = liveSectionId === id
                 const sectionPlaying = activeKey === `${fullKey}:${id}` && (speaking || ttsLoading)
                 return (
@@ -240,7 +248,7 @@ export default function ExerciseDetailModal({
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
                       <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: live ? 'var(--accent)' : 'var(--text-dim)', textTransform: 'uppercase', flex: 1 }}>{label}</p>
                       <button
-                        onClick={() => readSection(id, label, spoken)}
+                        onClick={() => readSection(id, label)}
                         title={sectionPlaying ? 'Stop' : `Read ${label.toLowerCase()}`}
                         aria-label={sectionPlaying ? 'Stop' : `Read ${label.toLowerCase()}`}
                         style={{ background: 'none', border: 'none', padding: '2px 4px', cursor: 'pointer', fontSize: 13, lineHeight: 1, color: sectionPlaying ? 'var(--accent)' : 'var(--text-dim)', flexShrink: 0 }}
@@ -255,9 +263,8 @@ export default function ExerciseDetailModal({
             </div>
             </>
             )}
-          </div>
         </div>
-      </div>
+      </BottomSheet>
     </>
   )
 }
