@@ -11,6 +11,7 @@ import CoachedSessionCard from '@/components/CoachedSessionCard'
 import { useStreak } from '@/lib/useStreak'
 import { useTTS } from '@/hooks/useTTS'
 import { buildSpeechText } from '@/lib/speech-text'
+import { currentWeek as programCurrentWeek, isProgramElapsed, programEndDate } from '@/lib/program-progress'
 import { inferEquipment, timeCommitment } from '@/lib/workout-display'
 import { displayName } from '@/lib/name'
 
@@ -48,12 +49,9 @@ function getPhaseInfo(week: number) {
   return { label: 'Maintenance', color: 'var(--yellow)' }
 }
 
-function getCurrentWeek(startDate: string): number {
-  const start = new Date(startDate)
-  const now = new Date()
-  const diffDays = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-  return Math.min(Math.max(Math.floor(diffDays / 7) + 1, 1), 13)
-}
+// getCurrentWeek moved to lib/program-progress.ts. It used to clamp to 13 here
+// with no way to tell "week 13" apart from "week 40", which is why this page
+// kept serving a week 13 workout for programs that ended months ago.
 
 function getDayLabel() { return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()] }
 function getDateLabel() { return new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) }
@@ -80,6 +78,7 @@ export default function TodayPage() {
   const [currentWeek, setCurrentWeek] = useState<number | null>(null)
   const [todayPlan, setTodayPlan] = useState<DayPlan | null>(null)
   const [hasProgram, setHasProgram] = useState(false)
+  const [programEnded, setProgramEnded] = useState<Date | null>(null)
   const [profileReady, setProfileReady] = useState(false)
   const [weekGenerated, setWeekGenerated] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -104,7 +103,17 @@ export default function TodayPage() {
       if (!prog) { setHasProgram(false); return }
 
       setHasProgram(true)
-      const week = getCurrentWeek(prog.start_date)
+
+      // Past the end of the program there is no "today" to show. Serving the
+      // last week again would be a lie, and it is what made Home disagree with
+      // the Calendar, which correctly had nothing for these dates.
+      if (isProgramElapsed(prog.start_date)) {
+        setProgramEnded(programEndDate(prog.start_date))
+        return
+      }
+      setProgramEnded(null)
+
+      const week = programCurrentWeek(prog.start_date)
       setCurrentWeek(week)
 
       const { data: weekPlan } = await supabase
@@ -198,6 +207,40 @@ export default function TodayPage() {
 
   if (authLoading || loading || coachedLoading) {
     return <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-dim)' }}>Loading...</div>
+  }
+
+  // The 13 weeks are behind them. Home used to hide this by replaying the final
+  // week forever, which sent Start Session to a day the Calendar did not have.
+  if (!coached && programEnded) {
+    return (
+      <div className="page-content">
+        <div style={{ padding: '48px 16px', maxWidth: 560, margin: '0 auto', textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🏆</div>
+          <h1 style={{ fontSize: 26, fontWeight: 900, letterSpacing: '-0.02em', marginBottom: 10 }}>
+            Your 13 weeks are complete
+          </h1>
+          <p style={{ color: 'var(--text-dim)', fontSize: 14, lineHeight: 1.65, marginBottom: 28 }}>
+            Nice work{firstName ? `, ${firstName}` : ''}. This program finished on{' '}
+            {programEnded.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}. Pick up
+            where you left off with a fresh block built around where you are now.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 360, margin: '0 auto' }}>
+            <button
+              onClick={() => router.push('/plan')}
+              style={{ padding: '15px 20px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%)', color: '#fff', fontWeight: 900, fontSize: 15, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 6px 24px var(--accent-shadow)' }}
+            >
+              Start a new block →
+            </button>
+            <button
+              onClick={() => router.push('/log')}
+              style={{ padding: '13px 20px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-mid)', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              Look back at what you did
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

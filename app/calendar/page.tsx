@@ -11,6 +11,7 @@ import ExerciseDetailModal from '@/components/ui/ExerciseDetailModal'
 import TrackWorkout from '@/components/ui/TrackWorkout'
 import { useCoached } from '@/contexts/CoachedContext'
 import CoachedCalendar from '@/components/CoachedCalendar'
+import { programEndDate } from '@/lib/program-progress'
 
 type RecoveryDailyBlock = { label: string; duration: string; exercises: string[] }
 type RecoveryDailySession = {
@@ -529,9 +530,7 @@ function CalendarInner() {
   const startDow = (new Date(year, month, 1).getDay() + 6) % 7 // Mon=0
   const todayKey = dateKey(new Date())
 
-  const programEnd = program
-    ? (() => { const d = new Date(program.startDate); d.setDate(d.getDate() + TOTAL_WEEKS * 7 - 1); return d })()
-    : null
+  const programEnd = program ? programEndDate(program.startDate, TOTAL_WEEKS) : null
 
   const cells: (number | null)[] = [
     ...Array(startDow).fill(null),

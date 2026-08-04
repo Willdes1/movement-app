@@ -8,6 +8,7 @@ import { usePlanGeneration } from '@/components/PlanGenerationContext'
 import { usePlan } from '@/lib/usePlan'
 import UpgradeModal from '@/components/UpgradeModal'
 import BottomSheet from '@/components/ui/BottomSheet'
+import { isProgramElapsed } from '@/lib/program-progress'
 import { updateStreak } from '@/lib/useStreak'
 
 type DailyBlock = { label: string; duration: string; exercises: string[]; tip?: string }
@@ -153,6 +154,9 @@ export default function PlanPage() {
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [programComplete, setProgramComplete] = useState(false)
+  // Lets a finished athlete look back at the block they just did instead of
+  // being trapped on the completion screen.
+  const [dismissedComplete, setDismissedComplete] = useState(false)
   const [showRegenModal, setShowRegenModal] = useState(false)
   const [regenInstructions, setRegenInstructions] = useState('')
   const [profileReady, setProfileReady] = useState(false)
@@ -294,7 +298,11 @@ export default function PlanPage() {
       const week = getCurrentWeek(prog.startDate)
       setCurrentWeek(week)
       setViewingWeek(1)
-      if (week >= TOTAL_WEEKS) setProgramComplete(true)
+      // Elapsed, not "in the final week". Being inside week 13 still means you
+      // have that week to train, so this used to fire a week early. It also used
+      // to be gated on the viewing week having no plan, which meant anyone who
+      // generated all 13 weeks up front could never reach this screen at all.
+      setProgramComplete(isProgramElapsed(prog.startDate))
       const [{ data: plans }, { data: compData }] = await Promise.all([
         supabase.from('weekly_plans').select('week_number, plan').eq('program_id', prog.id),
         supabase.from('day_completions').select('week_number, day_index').eq('program_id', prog.id).eq('user_id', userId),
@@ -590,7 +598,7 @@ export default function PlanPage() {
     )
   }
 
-  if (programComplete && !weekPlans[viewingWeek]) {
+  if (programComplete && !dismissedComplete) {
     return (
       <div style={{ padding: '60px 24px', maxWidth: 600, margin: '0 auto', textAlign: 'center' }}>
         <div style={{ fontSize: 48, marginBottom: 16 }}>🏆</div>
@@ -599,6 +607,11 @@ export default function PlanPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <button onClick={continueProgram} style={{ padding: '14px', borderRadius: 12, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>{isFF ? 'Continue for Another Month →' : 'Continue for Another 3 Months →'}</button>
           <button onClick={restartProgram} style={{ padding: '14px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Start a Fresh Plan</button>
+          {Object.keys(weekPlans).length > 0 && (
+            <button onClick={() => setDismissedComplete(true)} style={{ padding: '10px', borderRadius: 12, border: 'none', background: 'none', color: 'var(--text-dim)', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+              Look at the program I just finished
+            </button>
+          )}
         </div>
       </div>
     )
