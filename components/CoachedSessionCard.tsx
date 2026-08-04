@@ -219,7 +219,7 @@ export default function CoachedSessionCard(
           if (voiceReqRef.current !== req) return
           if (data.url) {
             setPendingKey(null)
-            await ttsToggle(key, text, { preGeneratedUrl: data.url })
+            await ttsToggle(key, text, { label: name, preGeneratedUrl: data.url })
             return
           }
         }
@@ -238,6 +238,7 @@ export default function CoachedSessionCard(
     // text is that coach's private wording, and saving it would hand their cues
     // to every other athlete on the platform.
     await ttsToggle(key, text, {
+      label: name,
       preGeneratedUrl: preUrl ?? undefined,
       nameNormalized: !c && !preUrl ? key : undefined,
     })

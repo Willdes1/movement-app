@@ -1,7 +1,8 @@
 'use client'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import LoopPreview from '@/components/ui/LoopPreview'
 import { useTTS } from '@/hooks/useTTS'
+import { useTTSProgress } from '@/contexts/TTSContext'
 import { buildSpeechText, speechSections } from '@/lib/speech-text'
 import { supabase } from '@/lib/supabase'
 
@@ -92,6 +93,7 @@ export default function ExerciseDetailModal({
   historyRefresh?: number
 }) {
   const { toggle: ttsToggle, stop, stopIf, speaking, loading: ttsLoading, activeKey, gender, toggleGender } = useTTS()
+  const { progress } = useTTSProgress()
   // Audio lives above this component now, so closing the modal has to stop it
   // explicitly. Scoped to our own key so it never kills playback that another
   // surface started.
@@ -128,12 +130,41 @@ export default function ExerciseDetailModal({
   const isReadingFull = activeKey === fullKey && (speaking || ttsLoading)
   const isLoadingFull = activeKey === fullKey && ttsLoading
 
+  // Where each section sits in the full narration, as a fraction of the whole.
+  // Reading everything plays ONE file (the pre-generated one when it exists), so
+  // nothing tells us which section is being spoken. TTS pacing is near constant,
+  // so character position is a good proxy and it costs nothing.
+  const sectionBounds = useMemo(() => {
+    const total = buildSpeechText(data).length || 1
+    let cursor = data.name_display.length + 2
+    return speechSections(data).map(s => {
+      const start = cursor / total
+      cursor += s.spoken.length + 2
+      return { id: s.id, start, end: Math.min(cursor / total, 1) }
+    })
+  }, [data])
+
+  const liveSectionId = (() => {
+    if (activeKey?.startsWith(`${fullKey}:`)) return activeKey.slice(fullKey.length + 1)
+    if (activeKey !== fullKey || !speaking) return null
+    return sectionBounds.find(b => progress >= b.start && progress < b.end)?.id ?? null
+  })()
+
   function readAloud() {
     const preUrl = gender === 'male' ? data.tts_url_male : data.tts_url_female
     void ttsToggle(fullKey, buildSpeechText(data), {
+      label: data.name_display,
       preGeneratedUrl: preUrl ?? undefined,
+      // No cached file means this call generates one, and passing the slug also
+      // saves it onto the row, so the next athlete hears it for free.
       nameNormalized: preUrl ? undefined : data.name_normalized,
     })
+  }
+
+  function readSection(id: string, label: string, spoken: string) {
+    // Deliberately no nameNormalized: this is a fragment, and saving it would
+    // overwrite the exercise's full narration with a single section.
+    void ttsToggle(`${fullKey}:${id}`, spoken, { label: `${data.name_display}, ${label.toLowerCase()}` })
   }
 
   return (
@@ -201,12 +232,26 @@ export default function ExerciseDetailModal({
             {footer}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: footer ? 14 : 0 }}>
-              {sections.map(({ id, label, body }) => (
-                <div key={id} style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)' }}>
-                  <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--text-dim)', marginBottom: 5, textTransform: 'uppercase' }}>{label}</p>
-                  <p style={{ fontSize: 13, color: SECTION_COLOR[id], lineHeight: 1.65 }}>{body}</p>
-                </div>
-              ))}
+              {sections.map(({ id, label, body, spoken }) => {
+                const live = liveSectionId === id
+                const sectionPlaying = activeKey === `${fullKey}:${id}` && (speaking || ttsLoading)
+                return (
+                  <div key={id} style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: `1px solid ${live ? 'var(--accent)' : 'var(--border)'}`, transition: 'border-color 0.25s ease' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                      <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: live ? 'var(--accent)' : 'var(--text-dim)', textTransform: 'uppercase', flex: 1 }}>{label}</p>
+                      <button
+                        onClick={() => readSection(id, label, spoken)}
+                        title={sectionPlaying ? 'Stop' : `Read ${label.toLowerCase()}`}
+                        aria-label={sectionPlaying ? 'Stop' : `Read ${label.toLowerCase()}`}
+                        style={{ background: 'none', border: 'none', padding: '2px 4px', cursor: 'pointer', fontSize: 13, lineHeight: 1, color: sectionPlaying ? 'var(--accent)' : 'var(--text-dim)', flexShrink: 0 }}
+                      >
+                        {sectionPlaying ? '🔊' : '🔈'}
+                      </button>
+                    </div>
+                    <p style={{ fontSize: 13, color: SECTION_COLOR[id], lineHeight: 1.65 }}>{body}</p>
+                  </div>
+                )
+              })}
             </div>
             </>
             )}

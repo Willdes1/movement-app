@@ -21,6 +21,7 @@ import JoinLinkRedeemer from '@/components/JoinLinkRedeemer'
 import AppMain from '@/components/AppMain'
 import ServiceWorkerRegistrar from '@/components/ServiceWorkerRegistrar'
 import ProductTracker from '@/components/ProductTracker'
+import TTSMiniPlayer from '@/components/ui/TTSMiniPlayer'
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -110,6 +111,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <div className="mobile-nav-wrapper">
                 <BottomNav />
               </div>
+              <TTSMiniPlayer />
               <ReportBugButton />
               <OnboardingModal />
               <CoachWinBackModal />

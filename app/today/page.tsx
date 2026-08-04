@@ -173,7 +173,7 @@ export default function TodayPage() {
     // The provider owns start/stop state now. It used to be tracked locally and
     // cleared the moment speak() resolved, which is when playback BEGINS, so the
     // button went idle instantly and a second tap restarted the clip.
-    void ttsToggle(key, text, { preGeneratedUrl: preUrl ?? undefined, nameNormalized: preUrl ? undefined : key })
+    void ttsToggle(key, text, { label: nameDisplay, preGeneratedUrl: preUrl ?? undefined, nameNormalized: preUrl ? undefined : key })
   }
 
   const isRecovering = !!activeRecovery

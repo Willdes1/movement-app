@@ -234,6 +234,18 @@ input, textarea, select { transition: border-color 0.2s; }
 /* Sticky video player — sits below the mobile header instead of sliding under it */
 .video-sticky { position: sticky; top: calc(56px + env(safe-area-inset-top, 0px)); z-index: 10; }
 
+/* Read-aloud controls. Only mounted while audio is playing. On mobile it rides
+   above the bottom nav; on desktop it clears the sidebar. */
+.tts-mini-player {
+  position: fixed; left: 0; right: 0;
+  bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  padding: 10px 14px;
+  background: rgba(13,17,23,0.97);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border);
+  z-index: 90;
+}
+
 @media (min-width: 768px) {
   .app-sidebar { display: flex; }
   .app-main { margin-left: 230px; padding-bottom: 0; padding-top: 0; }
@@ -243,6 +255,7 @@ input, textarea, select { transition: border-color 0.2s; }
   .feed-grid { grid-template-columns: 1fr 1fr; gap: 16px; }
   .app-mobile-header { display: none; }
   .video-sticky { top: 0; }
+  .tts-mini-player { left: 230px; bottom: 0; padding: 10px 20px; }
 }
 
 /* ── COACH PORTAL RESPONSIVE ── */

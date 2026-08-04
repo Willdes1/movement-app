@@ -1,5 +1,5 @@
 'use client'
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 
 // One audio element for the whole app.
@@ -14,6 +14,8 @@ export type TTSGender = 'male' | 'female'
 export type SpeakOpts = {
   /** Identity of the thing being read, so the UI can show which row is live. */
   key?: string
+  /** Human name for the mini player, e.g. the exercise display name. */
+  label?: string
   /** Skip the API entirely and play this pre-generated file. */
   preGeneratedUrl?: string
   /**
@@ -40,7 +42,11 @@ type TTSValue = {
   /** Start, or stop if this key is already the live one. */
   toggle: (key: string, items: SpeakItem[] | string, opts?: SpeakOpts) => Promise<void>
   stop: () => void
-  /** Stop only if `key` is what is currently playing. Safe to call on unmount. */
+  /**
+   * Stop only if `key` is playing, or anything namespaced under it
+   * ("exercise:squat" also matches "exercise:squat:breathing").
+   * Safe to call on unmount.
+   */
   stopIf: (key: string) => void
   pause: () => void
   resume: () => void
@@ -51,9 +57,13 @@ type TTSValue = {
   loading: boolean
   /** Which key is live (loading or speaking), or null. */
   activeKey: string | null
+  /** What is playing, for the mini player. */
+  activeLabel: string | null
   /** Index into the current queue, or -1. */
   sectionIndex: number
   queueLength: number
+  /** Jump within the current clip. 0 to 1. */
+  seek: (fraction: number) => void
 
   gender: TTSGender
   toggleGender: () => void
@@ -63,6 +73,12 @@ type TTSValue = {
 }
 
 const TTSContext = createContext<TTSValue | null>(null)
+
+// Playback position ticks several times a second. It lives in its own context so
+// that only the components drawing a progress bar re-render at that rate, not
+// every page that happens to own a speaker button.
+type TTSProgressValue = { progress: number; elapsed: number; duration: number }
+const TTSProgressContext = createContext<TTSProgressValue>({ progress: 0, elapsed: 0, duration: 0 })
 
 // Session cache of blob URLs, bounded so a long session cannot leak memory.
 // Evicted entries get revoked; entries still in the map stay reusable.
@@ -79,13 +95,17 @@ function cacheGet(key: string): string | undefined {
   return url
 }
 
-function cacheSet(key: string, url: string) {
+// `inUse` is whatever the audio element currently points at. Evicting and
+// revoking the clip that is playing would be a self-inflicted bug, so it gets
+// skipped and the next-oldest goes instead.
+function cacheSet(key: string, url: string, inUse?: string) {
   if (audioCache.size >= MAX_CACHED_CLIPS) {
-    const oldest = audioCache.keys().next().value
-    if (oldest !== undefined) {
+    for (const oldest of audioCache.keys()) {
       const stale = audioCache.get(oldest)
+      if (stale === inUse) continue
       audioCache.delete(oldest)
       if (stale) URL.revokeObjectURL(stale)
+      break
     }
   }
   audioCache.set(key, url)
@@ -104,8 +124,11 @@ export function TTSProvider({ children }: { children: React.ReactNode }) {
   const [paused, setPaused] = useState(false)
   const [loading, setLoading] = useState(false)
   const [activeKey, setActiveKey] = useState<string | null>(null)
+  const [activeLabel, setActiveLabel] = useState<string | null>(null)
   const [sectionIndex, setSectionIndex] = useState(-1)
   const [queueLength, setQueueLength] = useState(0)
+  const [elapsed, setElapsed] = useState(0)
+  const [duration, setDuration] = useState(0)
 
   const [gender, setGenderState] = useState<TTSGender>('male')
   const [speed, setSpeedState] = useState(1)
@@ -136,8 +159,11 @@ export function TTSProvider({ children }: { children: React.ReactNode }) {
     setPaused(false)
     setLoading(false)
     setActiveKey(null)
+    setActiveLabel(null)
     setSectionIndex(-1)
     setQueueLength(0)
+    setElapsed(0)
+    setDuration(0)
     activeKeyRef.current = null
     queueRef.current = []
     queueIdxRef.current = -1
@@ -156,16 +182,26 @@ export function TTSProvider({ children }: { children: React.ReactNode }) {
   }, [resetState])
 
   const stopIf = useCallback((key: string) => {
-    if (activeKeyRef.current === key) stop()
+    const live = activeKeyRef.current
+    if (live === key || live?.startsWith(`${key}:`)) stop()
   }, [stop])
 
   const getAudio = useCallback(() => {
     if (!audioRef.current) {
       const audio = new Audio()
       audio.preload = 'auto'
+      audio.ontimeupdate = () => setElapsed(audio.currentTime)
+      audio.onloadedmetadata = () => setDuration(Number.isFinite(audio.duration) ? audio.duration : 0)
       audioRef.current = audio
     }
     return audioRef.current
+  }, [])
+
+  const seek = useCallback((fraction: number) => {
+    const audio = audioRef.current
+    if (!audio || !audio.duration || !Number.isFinite(audio.duration)) return
+    audio.currentTime = Math.min(Math.max(fraction, 0), 1) * audio.duration
+    setElapsed(audio.currentTime)
   }, [])
 
   // Resolve one queue item to a playable URL. Pre-generated files are free;
@@ -193,7 +229,7 @@ export function TTSProvider({ children }: { children: React.ReactNode }) {
     if (tokenRef.current !== token) return null
 
     const blobUrl = URL.createObjectURL(blob)
-    cacheSet(cacheKey, blobUrl)
+    cacheSet(cacheKey, blobUrl, audioRef.current?.src)
     return blobUrl
   }, [])
 
@@ -264,6 +300,7 @@ export function TTSProvider({ children }: { children: React.ReactNode }) {
     activeKeyRef.current = opts?.key ?? null
     setQueueLength(usable.length)
     setActiveKey(opts?.key ?? null)
+    setActiveLabel(opts?.label ?? null)
     setLoading(true)
     await playIndex(0, token)
   }, [stop, playIndex])
@@ -327,13 +364,27 @@ export function TTSProvider({ children }: { children: React.ReactNode }) {
     stop()
   }, [pathname, stop])
 
+  const value = useMemo<TTSValue>(() => ({
+    speak, speakQueue, toggle, stop, stopIf, pause, resume, seek,
+    speaking, paused, loading, activeKey, activeLabel, sectionIndex, queueLength,
+    gender, toggleGender, setGender, speed, setSpeed,
+  }), [
+    speak, speakQueue, toggle, stop, stopIf, pause, resume, seek,
+    speaking, paused, loading, activeKey, activeLabel, sectionIndex, queueLength,
+    gender, toggleGender, setGender, speed, setSpeed,
+  ])
+
+  const progressValue = useMemo<TTSProgressValue>(() => ({
+    elapsed,
+    duration,
+    progress: duration > 0 ? Math.min(elapsed / duration, 1) : 0,
+  }), [elapsed, duration])
+
   return (
-    <TTSContext.Provider value={{
-      speak, speakQueue, toggle, stop, stopIf, pause, resume,
-      speaking, paused, loading, activeKey, sectionIndex, queueLength,
-      gender, toggleGender, setGender, speed, setSpeed,
-    }}>
-      {children}
+    <TTSContext.Provider value={value}>
+      <TTSProgressContext.Provider value={progressValue}>
+        {children}
+      </TTSProgressContext.Provider>
     </TTSContext.Provider>
   )
 }
@@ -342,4 +393,8 @@ export function useTTS(): TTSValue {
   const ctx = useContext(TTSContext)
   if (!ctx) throw new Error('useTTS must be used inside <TTSProvider>')
   return ctx
+}
+
+export function useTTSProgress(): TTSProgressValue {
+  return useContext(TTSProgressContext)
 }
