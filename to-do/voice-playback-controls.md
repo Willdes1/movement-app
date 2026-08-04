@@ -1,6 +1,25 @@
 # Task 5: Voice playback controls
 
-Roadmap saved 2026-08-01. Plan agreed, not yet built.
+Roadmap saved 2026-08-01. **SHIPPED 2026-08-04** in two commits: `0865ff7`
+(provider + the three bugs + the billing leak) and `0218ff3` (per-section
+playback, highlighting, speed, voice). All five spec items done. No SQL.
+
+Two decisions worth carrying forward:
+
+- **Play-all stays one file.** Splitting the narration into four billable
+  requests would have given a real per-section index for highlighting. Instead
+  the playing section is derived from playback position against each section's
+  share of the text, which is free and keeps using the already-paid-for MP3.
+  Per-section buttons are the only extra API calls, and only on request.
+- **Section reads never pass `name_normalized`.** That parameter is what tells
+  `/api/tts` to save the audio onto the `exercise_library` row, so passing it
+  for a fragment would overwrite the exercise's full narration.
+
+Found and fixed while building, beyond the roadmap: a coach's overridden cues
+could be saved onto the shared library row and served to every other athlete.
+
+Still open, listed under "worth doing alongside" below: `/browse`, `/recovery`
+and `/mobility` have no read-aloud control.
 
 ---
 
