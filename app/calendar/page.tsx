@@ -240,6 +240,11 @@ function dateKey(d: Date): string {
   return d.toISOString().split('T')[0]
 }
 
+/** "22 April 2026" from a YYYY-MM-DD key, read at midday so the zone cannot shift the day. */
+function fmtDay(key: string): string {
+  return new Date(key.split('T')[0] + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+}
+
 function planDayToDate(startDate: string, weekNum: number, dayIndex: number): Date {
   const start = new Date(startDate)
   const d = new Date(start)
@@ -324,7 +329,10 @@ function CalendarInner() {
 
       const program: Program = { id: prog.id, startDate: prog.start_date }
       setProgram(program)
-      setViewMonth(new Date(prog.start_date))
+      // Deliberately does NOT jump the grid to the program's start month. This
+      // used to, and because it resolves after the ?date effect below it also
+      // clobbered it, so an athlete in August was shown April every time.
+      // The month follows the selected day, which defaults to today.
 
       const [{ data: plans }, { data: compData }] = await Promise.all([
         supabase.from('weekly_plans').select('week_number, plan').eq('program_id', prog.id),
@@ -405,6 +413,13 @@ function CalendarInner() {
     const d = new Date(dateParam + 'T12:00:00')
     setViewMonth(new Date(d.getFullYear(), d.getMonth(), 1))
   }, [dateParam])
+
+  // Focus mode has to follow the URL, not just its initial value. Start Session
+  // and the Calendar tab are the same route, so going from one to the other
+  // never remounts this component: focus mode stayed switched on and the tab
+  // rendered an empty page with nothing but a View Calendar button.
+  const focusParam = searchParams.get('focus') === '1'
+  useEffect(() => { setFocusMode(focusParam) }, [focusParam])
 
   useEffect(() => {
     setLastLog(null)
@@ -525,6 +540,8 @@ function CalendarInner() {
   while (cells.length % 7 !== 0) cells.push(null)
 
   const selectedEntry = selectedKey ? dayMap[selectedKey] : null
+  // Past the final day of the 13 weeks with nothing to follow it.
+  const programExpired = !!programEnd && new Date() > programEnd
 
   // Coached athletes get the coach's program as their calendar — the AI plan is
   // paused in the background. (Wait for coached state to resolve to avoid a flash.)
@@ -570,6 +587,39 @@ function CalendarInner() {
             13-week program · tap any day for details
           </p>
         </>
+      )}
+
+      {/* No session for the selected day. Without this the page rendered
+          absolutely nothing: Start Session sends you here with today's date,
+          and once the 13 weeks have elapsed today is not in the program, so
+          the day view below had no entry to draw and the main call to action
+          led to a blank screen. */}
+      {!selectedEntry && (
+        <div style={{ padding: '32px 24px', textAlign: 'center', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, marginBottom: 16 }}>
+          <div style={{ fontSize: 34, marginBottom: 12 }}>{programExpired ? '🏁' : '📭'}</div>
+          <p style={{ fontSize: 17, fontWeight: 800, marginBottom: 8 }}>
+            {programExpired ? 'Your 13 weeks are complete' : 'Nothing scheduled for this day'}
+          </p>
+          <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, marginBottom: 20, maxWidth: 380, marginLeft: 'auto', marginRight: 'auto' }}>
+            {programExpired
+              ? `This program ran from ${fmtDay(program.startDate)} to ${programEnd ? fmtDay(dateKey(programEnd)) : ''}. Start a new block to keep training.`
+              : 'This day sits outside your current program. Pick a day inside it, or head back to your plan.'}
+          </p>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => router.push('/plan')}
+              style={{ padding: '12px 24px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              {programExpired ? 'Start a new block →' : 'Go to Your Plan →'}
+            </button>
+            {focusMode && (
+              <button
+                onClick={() => setFocusMode(false)}
+                style={{ padding: '12px 24px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text-mid)', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}
+              >📅 View Calendar</button>
+            )}
+          </div>
+        </div>
       )}
 
       {!focusMode && (<>
