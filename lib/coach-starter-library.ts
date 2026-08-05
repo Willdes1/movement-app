@@ -84,7 +84,11 @@ export const STARTER_EXERCISES: StarterGroup[] = [
   },
   {
     key: 'core',
-    label: 'Core',
+    label: 'Core and Abs',
+    // Two halves on purpose. The first six are bracing and anti-rotation work,
+    // which is what a coach programmes for trunk stability. The rest are the
+    // plain, old-school ab movements every client already knows by name, so a
+    // coach can find "crunch" where they expect to find it.
     exercises: [
       'Plank',
       'Side Plank',
@@ -92,6 +96,16 @@ export const STARTER_EXERCISES: StarterGroup[] = [
       'Cable Crunch',
       'Dead Bug',
       'Pallof Press',
+      'Crunch',
+      'Sit-Up',
+      'Reverse Crunch',
+      'Bicycle Crunch',
+      'Lying Leg Raise',
+      'Russian Twist',
+      'Flutter Kick',
+      'Mountain Climber',
+      'V-Up',
+      'Ab Wheel Rollout',
     ],
   },
   {
