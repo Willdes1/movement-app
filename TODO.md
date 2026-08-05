@@ -100,6 +100,46 @@
 - [x] **Knee Rehab playbook** — 4-phase: Protect → Stability → Strength → Return to Sport (includes hop test clearance). Live at /recovery/knee.
 - [x] Build out Browse & Learn page (exercise library + articles)
 
+## 🆕 Added 2026-08-05 (Will's coach-onboarding batch)
+
+> Sequencing Will set: finish the curation queue, then Shawn (CEO), then the Ask Me Anything KB,
+> then Marketing Hub verification. **Billing and pricing (Stripe + whatever Apple requires so
+> pricing is final) comes before Paul.** Will may interrupt any task with a magic phrase below.
+
+- [ ] ⭐ **1. Onboard Paul, trainer + physical therapist, possible partner** — Full spec:
+  `to-do/paul-onboarding.md`. **MAGIC PHRASE: "It's time to onboard Paul."** When Will says it,
+  pause the current roadmap task, run that file end to end, then resume. Six steps: account,
+  permissions, video curation access, full Coach Portal access, walk the coach onboarding, gather
+  feedback. Steps 2 and 3 are largely built already (`admin_permissions` + Access Control tab +
+  the `video` grant; Video Trimming already carries `trimmed_by`/`trimmed_at` for exactly this).
+  Open: owner vs partner-with-all-tabs vs narrow grant.
+
+- [ ] **2. Interactive Coach Portal onboarding preview** — Full spec:
+  `to-do/coach-onboarding-preview.md`. **MAGIC PHRASE: "Let's see our onboarding process for the
+  Coach Portal."** A clickable walkthrough of the real coach onboarding, with working next
+  buttons, so Will can review it himself and walk Paul through it as a brand-new coach. Preview
+  the REAL `components/coach/OnboardingOverlay.tsx`, do not build a mock that will drift.
+
+- [ ] **3. Standard starter exercise + workout library for every new coach** — Full spec:
+  `to-do/coach-starter-library.md`. Bench press, chest press, squats, deadlifts, RDLs, dips,
+  shoulder press to start, expanding over time. **Seed from the existing 2,050-row
+  `exercise_library` and generate nothing**: those movements are already written and already paid
+  for, which is Will's explicit token rule. Generation only as a fallback for a movement we
+  genuinely lack, written back so it is paid for once.
+
+- [ ] **4. Editable exercise instructions, tips and headers for coaches** — Same file as #3.
+  Coaches must be able to rewrite instructions, adjust tips, remove sections and add or change
+  headers. Partly exists: `CoachInstructionFields` plus the coach field template
+  (`20260630_coach_field_template.sql`) already controls which fields show and in what order.
+  ⚠️ **Open question: "standard TSS information".** TTS (the narration we already have per
+  exercise, free to reuse) or TSS (Training Stress Score, a load metric the app does not model
+  at all)? Ask before building.
+
+- [ ] **5 + 6. Hover tooltips for new users, that retire once used** — NOT a new file. Already
+  specified in `to-do/onboarding-help-knowledge-base.md`, including the `user_feature_seen`
+  design that makes a hint vanish after the user interacts with the feature. Will's addition:
+  the first build should target **new coaches**, where confusion is most expensive.
+
 ## 🆕 Added 2026-07-20 (Will's 8-item batch)
 
 - [ ] **1. Admin-only Education Knowledge Base (ChatGPT-Projects style)** — A permanent, subject-focused study section in the Admin Portal that talks to the APIE engine + our pgvector library. One-button generation of lessons, explanations, and study material grounded in expert fitness / PT / sports-science content (e.g. the ISSA CFT textbook by Frederick C. Hatfield, Ph.D. as a foundational reference). Long-term goal: get Will to PT-level knowledge (educational) and a CPT cert. Admin-only. **NOTE: the Study Hub (built 2026-06-18, `components/admin/StudyHubTab.tsx`) is already most of this — multi-KB, per-subject scoped prompt, one-tap structured generation grounded in `retrieveKnowledge()`.** This item = extend Study Hub toward the "permanent project prompt per subject" feel + seed the ISSA foundational KB. See [[knowledge-base-admin]], [[ceo-education-agent]].

@@ -37,3 +37,23 @@ DB table of help entries, keyed by UI element / feature). That single source pow
 ## Sequencing
 Do this AROUND the onboarding work (it IS onboarding, done well). Not blocking the coached-mode
 epic — but flagged priority so it's not forgotten.
+
+---
+
+## Re-raised by Will 2026-08-05, specifically for coaches
+
+Will asked for these again in the context of onboarding new coaches. They are
+the same two surfaces already described above, so they are recorded here rather
+than duplicated into a new file:
+
+- **Hover tooltips for new users.** A coach hovers a button, feature or
+  unfamiliar section and a small window explains what it does and how to use it.
+- **The tooltip disappears once they have interacted with it.** Clicking the
+  feature or completing the related action retires the hint, because they have
+  now learned it.
+
+That is exactly the `user_feature_seen` design in the vision section above.
+Will's framing adds one thing worth keeping: the primary audience for the first
+build is **new coaches**, not athletes, because that is where the confusion is
+most expensive. Ties into `to-do/coach-onboarding-preview.md` and
+`to-do/paul-onboarding.md` (Paul is the first real coach to test it).
