@@ -1,6 +1,7 @@
 'use client'
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
+import StarterLibraryPanel from '@/components/admin/StarterLibraryPanel'
 
 // Admin "Library Builder" — preload the exercise library across every sport +
 // training focus. Generate one category at a time, "Fill Every Category" to loop
@@ -341,6 +342,11 @@ export default function LibrarySeedTab() {
         Each run generates real exercises <strong style={{ color: K.text }}>with full instructions</strong>, skips anything you
         already have, and queues the new ones for the Video Curator.
       </p>
+
+      {/* The coach-facing slice of the same job: are the standard movements
+          every new coach expects actually ready to hand over? Self-hides once
+          they all have instructions and audio. */}
+      <StarterLibraryPanel />
 
       {/* Live pipeline counters */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginBottom: 22, maxWidth: 720 }}>
