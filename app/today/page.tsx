@@ -11,7 +11,7 @@ import CoachedSessionCard from '@/components/CoachedSessionCard'
 import { useStreak } from '@/lib/useStreak'
 import { useTTS } from '@/hooks/useTTS'
 import { buildSpeechText } from '@/lib/speech-text'
-import { currentWeek as programCurrentWeek, isProgramElapsed, programEndDate, daysSince, GAP_DAYS } from '@/lib/program-progress'
+import { currentWeek as programCurrentWeek, isProgramElapsed, programEndDate, daysSince, weeksAdrift, ADRIFT_WEEKS, localDateKey } from '@/lib/program-progress'
 import ProgramResumeActions from '@/components/ProgramResumeActions'
 import { inferEquipment, timeCommitment } from '@/lib/workout-display'
 import { displayName } from '@/lib/name'
@@ -119,20 +119,28 @@ export default function TodayPage() {
       // Still inside the program but nothing has happened for a while. Their
       // calendar week and their real week have quietly drifted apart, so ask
       // rather than let them keep scrolling past days they never did.
-      const [{ data: lastDone }, { data: lastLogged }] = await Promise.all([
-        supabase.from('day_completions').select('created_at')
-          .eq('program_id', prog.id).eq('user_id', userId)
-          .order('created_at', { ascending: false }).limit(1).maybeSingle(),
+      const [{ data: comps }, { data: lastLogged }] = await Promise.all([
+        supabase.from('day_completions').select('week_number, day_index, created_at')
+          .eq('program_id', prog.id).eq('user_id', userId),
         supabase.from('workout_logs').select('logged_at')
           .eq('user_id', userId)
           .order('logged_at', { ascending: false }).limit(1).maybeSingle(),
       ])
-      const lastActivity = [lastDone?.created_at, lastLogged?.logged_at]
-        .filter(Boolean).sort().at(-1) as string | undefined
-      // No activity at all falls back to the program start, so someone who
-      // generated a plan and never opened it still gets asked.
-      const idle = daysSince(lastActivity ?? prog.start_date)
-      setGapDays(idle !== null && idle >= GAP_DAYS ? idle : null)
+      const completions = comps ?? []
+      const adrift = weeksAdrift(prog.start_date, completions, undefined, new Date())
+      if (adrift >= ADRIFT_WEEKS) {
+        // Days-since is only for the wording. The trigger is the drift above,
+        // because resuming moves your dates and not your history: gating on
+        // "days since you trained" left this prompt on screen after it had
+        // already done its job.
+        const lastActivity = [
+          ...completions.map(c => (c as { created_at?: string }).created_at),
+          lastLogged?.logged_at,
+        ].filter(Boolean).sort().at(-1) as string | undefined
+        setGapDays(daysSince(lastActivity ?? prog.start_date))
+      } else {
+        setGapDays(null)
+      }
 
       const week = programCurrentWeek(prog.start_date)
       setCurrentWeek(week)
@@ -265,8 +273,9 @@ export default function TodayPage() {
                 Welcome back{firstName ? `, ${firstName}` : ''}
               </p>
               <p style={{ fontSize: 12.5, color: 'var(--text-dim)', lineHeight: 1.6 }}>
-                It has been about {gapDays} days. Your program kept moving without you, so the
-                week it is showing is not the week you were on. Want to line it back up?
+                {gapDays && gapDays >= 7 ? `It has been about ${gapDays} days. ` : ''}
+                Your program kept moving without you, so the week it is showing is not the week
+                you were on. Want to line it back up?
               </p>
             </div>
             <button onClick={() => setGapDismissed(true)} aria-label="Dismiss" style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 18, cursor: 'pointer', lineHeight: 1, padding: 0 }}>×</button>
@@ -415,7 +424,7 @@ export default function TodayPage() {
                 ))}
               </div>
             )}
-            <Link href={`/calendar?date=${new Date().toISOString().split('T')[0]}`} style={{ display: 'block', padding: '14px', borderRadius: 12, background: 'var(--surface2)', color: 'var(--text)', fontWeight: 700, fontSize: 14, textAlign: 'center', textDecoration: 'none', border: '1px solid var(--border)' }}>
+            <Link href={`/calendar?date=${localDateKey()}`} style={{ display: 'block', padding: '14px', borderRadius: 12, background: 'var(--surface2)', color: 'var(--text)', fontWeight: 700, fontSize: 14, textAlign: 'center', textDecoration: 'none', border: '1px solid var(--border)' }}>
               View Today in Calendar →
             </Link>
           </>
@@ -456,7 +465,7 @@ export default function TodayPage() {
               <span style={{ fontSize: 14 }}>✨</span>
               <p style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.5, margin: 0 }}><strong style={{ color: 'var(--text-mid)' }}>For you:</strong> {tip}</p>
             </div>
-            <Link href={`/calendar?date=${new Date().toISOString().split('T')[0]}&focus=1`} style={{ display: 'block', padding: '14px', borderRadius: 12, background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%)', color: '#fff', fontWeight: 900, fontSize: 14, textAlign: 'center', textDecoration: 'none', letterSpacing: '0.03em', textTransform: 'uppercase', boxShadow: '0 6px 24px var(--accent-shadow)' }}>
+            <Link href={`/calendar?date=${localDateKey()}&focus=1`} style={{ display: 'block', padding: '14px', borderRadius: 12, background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%)', color: '#fff', fontWeight: 900, fontSize: 14, textAlign: 'center', textDecoration: 'none', letterSpacing: '0.03em', textTransform: 'uppercase', boxShadow: '0 6px 24px var(--accent-shadow)' }}>
               ▶ Start Session
             </Link>
           </>

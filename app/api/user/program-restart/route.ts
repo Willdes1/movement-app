@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { resumeWeek, startDateForResume, TOTAL_WEEKS } from '@/lib/program-progress'
+import { resumeWeek, startDateForResume, TOTAL_WEEKS, localDateKey, parseDateKey } from '@/lib/program-progress'
 
 export const runtime = 'nodejs'
 
@@ -30,10 +30,15 @@ export async function POST(req: Request) {
   const { data: { user } } = await anonClient.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { mode } = await req.json().catch(() => ({})) as { mode?: 'resume' | 'fresh' }
+  const { mode, today } = await req.json().catch(() => ({})) as { mode?: 'resume' | 'fresh'; today?: string }
   if (mode !== 'resume' && mode !== 'fresh') {
     return NextResponse.json({ error: 'mode must be resume or fresh' }, { status: 400 })
   }
+
+  // The athlete's own date, because this server runs in UTC. Without it an
+  // evening resume in the Americas would set a start date of tomorrow.
+  const todayKey = /^\d{4}-\d{2}-\d{2}$/.test(today ?? '') ? today! : localDateKey()
+  const nowLocal = parseDateKey(todayKey)
 
   const supabase = createClient(SUPA_URL, SERVICE_KEY)
 
@@ -50,7 +55,7 @@ export async function POST(req: Request) {
 
   if (mode === 'fresh') {
     await supabase.from('day_completions').delete().eq('program_id', prog.id).eq('user_id', user.id)
-    const startDate = new Date().toISOString().slice(0, 10)
+    const startDate = todayKey
     const { error } = await supabase
       .from('training_programs')
       .update({ start_date: startDate, status: 'active' })
@@ -71,7 +76,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Program already complete', complete: true }, { status: 409 })
   }
 
-  const startDate = startDateForResume(week)
+  const startDate = startDateForResume(week, nowLocal)
   const { error } = await supabase
     .from('training_programs')
     .update({ start_date: startDate, status: 'active' })

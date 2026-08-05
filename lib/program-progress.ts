@@ -73,7 +73,7 @@ export function resumeWeek(
  */
 export function startDateForResume(week: number, now: Date = new Date()): string {
   const d = new Date(now.getTime() - (week - 1) * DAYS_PER_WEEK * DAY_MS)
-  return d.toISOString().slice(0, 10)
+  return localDateKey(d)
 }
 
 /** Days since the athlete last completed a day or logged a workout. */
@@ -82,5 +82,46 @@ export function daysSince(iso: string | null, now: Date = new Date()): number | 
   return Math.floor((now.getTime() - new Date(iso).getTime()) / DAY_MS)
 }
 
-/** A lapse long enough to be worth asking about rather than silently drifting. */
-export const GAP_DAYS = 10
+/**
+ * How far the program has run ahead of the athlete: the week it thinks they are
+ * on, minus the week they actually left off at.
+ *
+ * This, and not "days since you last trained", is what the resume prompt keys
+ * on. Days-since never changes when you resume, because resuming moves your
+ * dates, not your history, so a prompt gated on it would reappear on every
+ * refresh until the athlete trained again. Drift goes to zero the moment the
+ * dates are lined up, which is exactly when the prompt should stop asking.
+ */
+export function weeksAdrift(
+  startDate: string,
+  completions: { week_number: number; day_index: number }[],
+  totalWeeks = TOTAL_WEEKS,
+  now: Date = new Date(),
+): number {
+  const left = resumeWeek(completions, totalWeeks)
+  if (left === null) return 0
+  return Math.max(elapsedWeek(startDate, now) - left, 0)
+}
+
+/** Enough drift to be worth asking about rather than letting it widen silently. */
+export const ADRIFT_WEEKS = 2
+
+/**
+ * YYYY-MM-DD in the athlete's own timezone.
+ *
+ * toISOString() is UTC, so west of Greenwich it returns tomorrow's date all
+ * evening, and a date-only string fed back into new Date() is read as UTC
+ * midnight and lands on the previous day. Both directions produced off-by-one
+ * days on the calendar.
+ */
+export function localDateKey(d: Date = new Date()): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** Parse a YYYY-MM-DD key at midday local, so no offset can shift the day. */
+export function parseDateKey(key: string): Date {
+  return new Date(key.split('T')[0] + 'T12:00:00')
+}

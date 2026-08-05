@@ -8,7 +8,7 @@ import { usePlanGeneration } from '@/components/PlanGenerationContext'
 import { usePlan } from '@/lib/usePlan'
 import UpgradeModal from '@/components/UpgradeModal'
 import BottomSheet from '@/components/ui/BottomSheet'
-import { isProgramElapsed } from '@/lib/program-progress'
+import { isProgramElapsed, localDateKey, parseDateKey } from '@/lib/program-progress'
 import ProgramResumeActions from '@/components/ProgramResumeActions'
 import { updateStreak } from '@/lib/useStreak'
 
@@ -64,11 +64,12 @@ const PLAN_BLOCK_META: Record<string, { icon: string; label: string; color: stri
   evening:  { icon: '🌙', label: 'EVENING',  color: '#6366f1' },
 }
 
+// Local throughout, so the link this builds points at the same day the Calendar
+// keys that workout under. See localDateKey for why UTC was off by one.
 function getDayCalendarDate(startDate: string, weekNum: number, dayIdx: number): string {
-  const start = new Date(startDate)
-  const d = new Date(start)
+  const d = parseDateKey(startDate)
   d.setDate(d.getDate() + (weekNum - 1) * 7 + dayIdx)
-  return d.toISOString().split('T')[0]
+  return localDateKey(d)
 }
 
 function getPhaseInfo(week: number) {
@@ -260,7 +261,7 @@ export default function PlanPage() {
     let prog = program
     if (!prog) {
       setGenerating(true)
-      const today = new Date().toISOString().split('T')[0]
+      const today = localDateKey()
       const { data: newProg } = await supabase.from('training_programs').insert({ user_id: userId, start_date: today, total_weeks: 13, status: 'active' }).select('id, start_date, total_weeks, status').single()
       setGenerating(false)
       if (!newProg) return
@@ -462,7 +463,7 @@ export default function PlanPage() {
     const currentCount = program.rebuildCount ?? 0
     if (isFF && currentCount >= 2) { setShowRebuildBlockedModal(true); return }
     const newCount = currentCount + 1
-    const today = new Date().toISOString().split('T')[0]
+    const today = localDateKey()
     await supabase.from('training_programs').update({ start_date: today, status: 'active', rebuild_count: newCount }).eq('id', program.id)
     await supabase.from('weekly_plans').delete().eq('program_id', program.id)
     // Completions are keyed by (program_id, week_number, day_index) and the id

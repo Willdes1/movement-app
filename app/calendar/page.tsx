@@ -11,7 +11,7 @@ import ExerciseDetailModal from '@/components/ui/ExerciseDetailModal'
 import TrackWorkout from '@/components/ui/TrackWorkout'
 import { useCoached } from '@/contexts/CoachedContext'
 import CoachedCalendar from '@/components/CoachedCalendar'
-import { programEndDate } from '@/lib/program-progress'
+import { programEndDate, localDateKey, parseDateKey } from '@/lib/program-progress'
 
 type RecoveryDailyBlock = { label: string; duration: string; exercises: string[] }
 type RecoveryDailySession = {
@@ -237,9 +237,12 @@ function getPhaseInfo(week: number) {
   return { label: 'Maintenance', color: 'var(--yellow)' }
 }
 
-function dateKey(d: Date): string {
-  return d.toISOString().split('T')[0]
-}
+// Local, not UTC. toISOString() returns tomorrow's date all evening west of
+// Greenwich, and a date-only string read back through new Date() is treated as
+// UTC midnight and lands on the previous day. Between them the grid was keyed
+// off one day from the day-of-week it then looked the workout up by, so Home
+// and the Calendar showed different sessions for the same date.
+const dateKey = localDateKey
 
 /** "22 April 2026" from a YYYY-MM-DD key, read at midday so the zone cannot shift the day. */
 function fmtDay(key: string): string {
@@ -247,8 +250,7 @@ function fmtDay(key: string): string {
 }
 
 function planDayToDate(startDate: string, weekNum: number, dayIndex: number): Date {
-  const start = new Date(startDate)
-  const d = new Date(start)
+  const d = parseDateKey(startDate)
   d.setDate(d.getDate() + (weekNum - 1) * 7 + dayIndex)
   return d
 }
@@ -275,7 +277,7 @@ function CalendarInner() {
   const [weekPlans, setWeekPlans] = useState<Record<number, DayPlan[]>>({})
   const [loading, setLoading] = useState(true)
   const [viewMonth, setViewMonth] = useState(new Date())
-  const [selectedKey, setSelectedKey] = useState<string | null>(() => new Date().toISOString().split('T')[0])
+  const [selectedKey, setSelectedKey] = useState<string | null>(() => localDateKey())
   // Reset progressive reveal when the selected day changes.
   useEffect(() => { setRevealed(0); setExpandedOpt(new Set()) }, [selectedKey])
   // Surface the next optional section as the user scrolls past the current bottom.

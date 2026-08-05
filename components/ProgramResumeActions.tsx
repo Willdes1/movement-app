@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { localDateKey } from '@/lib/program-progress'
 
 // The two free ways back onto an existing program after a break.
 //
@@ -29,7 +30,9 @@ export default function ProgramResumeActions({
       const res = await fetch('/api/user/program-restart', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ mode }),
+        // The athlete's own date. The server runs in UTC, so without this an
+        // evening resume in the Americas would start the program tomorrow.
+        body: JSON.stringify({ mode, today: localDateKey() }),
       })
       const data = await res.json()
       if (!res.ok) {
