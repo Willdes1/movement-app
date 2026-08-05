@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import UnilateralAuditPanel from '@/components/admin/UnilateralAuditPanel'
 
 /**
  * Task 6 (naming slice): review and approve exercise renames.
@@ -133,6 +134,12 @@ export default function LibraryCleanupTab() {
           names, approve the ones you want, and nothing else changes.
         </p>
       </div>
+
+      {/* Task 6 item 4. Separate from the rename list on purpose: this covers
+          the WHOLE library, including exercises that were always named
+          correctly and so never appear as a rename proposal. Their videos were
+          the ones that could not be requeued from here at all. */}
+      <UnilateralAuditPanel />
 
       {!report && (
         <button onClick={load} disabled={loading}
