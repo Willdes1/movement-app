@@ -83,3 +83,54 @@ export async function GET(req: Request) {
     items,
   })
 }
+
+// Send the named videos back to the curation queue: approval cleared, so they
+// reappear as un-curated and get matched again against the corrected name.
+//
+// Only the ids explicitly sent. There is no "requeue everything" here on
+// purpose, and the UI makes you confirm the count first.
+export async function POST(req: Request) {
+  const auth = await verifyAdmin(req, 'video')
+  if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
+
+  const body = await req.json().catch(() => ({}))
+  const ids: string[] = Array.isArray(body.ids) ? body.ids.slice(0, 500) : []
+  if (!ids.length) return Response.json({ error: 'No exercises selected' }, { status: 400 })
+
+  const { data: rows, error: readErr } = await auth.supabase
+    .from('exercise_library')
+    .select('id, name_display, video_url')
+    .in('id', ids)
+  if (readErr) return Response.json({ error: readErr.message }, { status: 500 })
+
+  const requeued: string[] = []
+  const skipped: string[] = []
+  const failed: { name: string; error: string }[] = []
+
+  for (const row of (rows ?? []) as { id: string; name_display: string; video_url: string | null }[]) {
+    // Nothing to send back if there is no approved video on it.
+    if (!row.video_url) { skipped.push(row.name_display); continue }
+
+    const { error } = await auth.supabase
+      .from('exercise_library')
+      .update({
+        video_url: null,
+        video_source: null,
+        video_approved_at: null,
+        video_approved_by: null,
+        // Trim windows describe the video that was just removed, so they have
+        // to go with it. The rename path clears loop_* but leaves youtube_*
+        // behind, which strands a clip window pointing at nothing.
+        loop_start_sec: null,
+        loop_end_sec: null,
+        youtube_start_sec: null,
+        youtube_end_sec: null,
+      })
+      .eq('id', row.id)
+
+    if (error) failed.push({ name: row.name_display, error: error.message })
+    else requeued.push(row.name_display)
+  }
+
+  return Response.json({ requeued: requeued.length, skipped: skipped.length, failed, names: requeued })
+}

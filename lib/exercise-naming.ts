@@ -71,21 +71,37 @@ const RULES: Rule[] = [
   { pattern: /\bMB\b/gi,           replacement: 'Medicine Ball',   label: 'MB → Medicine Ball' },
   { pattern: /\bRes(?:istance)?\s*Bands?\b/gi, replacement: 'Resistance Band', label: 'Res Band → Resistance Band' },
 
-  // Modifiers
-  { pattern: /\bAlt\.?\b/gi,  replacement: 'Alternating', label: 'Alt → Alternating' },
-  { pattern: /\bRev\.?\b/gi,  replacement: 'Reverse',     label: 'Rev → Reverse' },
-  { pattern: /\bIso\.?\b/gi,  replacement: 'Isometric',   label: 'Iso → Isometric' },
-  { pattern: /\bEcc\.?\b/gi,  replacement: 'Eccentric',   label: 'Ecc → Eccentric' },
-  { pattern: /\bAbd\.?\b/gi,  replacement: 'Abduction',   label: 'Abd → Abduction' },
-  { pattern: /\bAdd\.?\b/gi,  replacement: 'Adduction',   label: 'Add → Adduction',
+  // Modifiers.
+  //
+  // Note the shape: \bAlt\b\.? and NOT \bAlt\.?\b. The second one looks right
+  // and cannot work. In "Alt. DB Curls" the \.? consumes the dot and then \b
+  // has to match between "." and " ", which are both non-word characters, so
+  // there is no boundary there. The regex backtracks, matches "Alt" alone and
+  // leaves the dot behind: "Alt. DB Curls" became "Alternating. Dumbbell
+  // Curls", which the narration then reads with a full stop in the middle.
+  // Putting \b before the optional dot lets the dot actually be consumed.
+  { pattern: /\bAlt\b\.?/gi,  replacement: 'Alternating', label: 'Alt → Alternating' },
+  { pattern: /\bRev\b\.?/gi,  replacement: 'Reverse',     label: 'Rev → Reverse' },
+  { pattern: /\bIso\b\.?/gi,  replacement: 'Isometric',   label: 'Iso → Isometric' },
+  { pattern: /\bEcc\b\.?/gi,  replacement: 'Eccentric',   label: 'Ecc → Eccentric' },
+  { pattern: /\bAbd\b\.?/gi,  replacement: 'Abduction',   label: 'Abd → Abduction' },
+  { pattern: /\bAdd\b\.?/gi,  replacement: 'Adduction',   label: 'Add → Adduction',
     review: '"Add" is ambiguous. Confirm this means adduction.' },
 
   // Rotation: "Ext Rot" must be handled before bare "Ext", because Ext means
   // External here and Extension everywhere else.
-  { pattern: /\bExt\.?\s*Rot\.?\b/gi, replacement: 'External Rotation', label: 'Ext Rot → External Rotation' },
-  { pattern: /\bInt\.?\s*Rot\.?\b/gi, replacement: 'Internal Rotation', label: 'Int Rot → Internal Rotation' },
-  { pattern: /\bExt\.?\b/gi,          replacement: 'Extension',         label: 'Ext → Extension',
+  { pattern: /\bExt\b\.?\s*Rot\b\.?/gi, replacement: 'External Rotation', label: 'Ext Rot → External Rotation' },
+  { pattern: /\bInt\b\.?\s*Rot\b\.?/gi, replacement: 'Internal Rotation', label: 'Int Rot → Internal Rotation' },
+  { pattern: /\bExt\b\.?/gi,            replacement: 'Extension',         label: 'Ext → Extension',
     review: '"Ext" can mean Extension or External. Confirm which.' },
+
+  // Repair pass for names already applied with the broken rule above. A full
+  // stop after one of these words, mid-name or trailing, is always that
+  // artifact: exercise names are labels, not sentences. Without this the
+  // corrected rule would leave those rows stranded, because their names no
+  // longer contain the abbreviation it matches on.
+  { pattern: /\b(Alternating|Reverse|Isometric|Eccentric|Abduction|Adduction|Extension|External|Internal|Rotation)\.(?=\s|$)/g,
+    replacement: '$1', label: 'strip stray full stop left by the old Alt./Rev. rule' },
 ]
 
 /** Unilateral without any equipment stated: we refuse to guess. */
