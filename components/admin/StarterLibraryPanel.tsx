@@ -19,13 +19,12 @@ const C = {
   text: '#e6edf3', textMid: '#b1bac4', textDim: '#6e7681',
 }
 
-type NearMatch = { libraryName: string; score: number; hasInstructions: boolean; hasTts: boolean; hasVideo: boolean }
-
 type Ex = {
   name: string
   inLibrary: boolean
-  nearMatch: NearMatch | null
+  matchedBy: 'exact' | 'variant' | null
   libraryName: string | null
+  libraryKey: string | null
   hasInstructions: boolean
   hasFullInstructions: boolean
   hasTts: boolean
@@ -41,7 +40,8 @@ type Scan = {
   with_tts: number
   with_video: number
   probably_renames: number
-  rename_candidates: { ours: string; library: string; score: number }[]
+  rename_candidates: { ours: string; library: string }[]
+  tts_targets: string[]
   needs_creating: string[]
   needs_instructions: string[]
   needs_tts: string[]
@@ -55,6 +55,8 @@ export default function StarterLibraryPanel() {
   const [loading, setLoading] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [filling, setFilling] = useState(false)
+  const [fillLog, setFillLog] = useState<string[]>([])
 
   async function run() {
     setLoading(true); setError(null)
@@ -69,6 +71,41 @@ export default function StarterLibraryPanel() {
       setError(err instanceof Error ? err.message : 'scan failed')
     }
     setLoading(false)
+  }
+
+  // Generate the missing narration, reusing the existing batch TTS route rather
+  // than a second copy of that pipeline. That route is time-budgeted and returns
+  // what is left, so the loop just keeps calling until nothing remains.
+  async function fillAudio() {
+    if (!scan?.tts_targets.length) return
+    setFilling(true)
+    setFillLog([`Generating audio for ${scan.tts_targets.length} movements…`])
+    let done = 0
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const headers = { Authorization: `Bearer ${session?.access_token ?? ''}`, 'Content-Type': 'application/json' }
+      let remaining = [...scan.tts_targets]
+      // Hard stop so a route that stops making progress cannot spin forever.
+      for (let round = 0; round < 40 && remaining.length; round++) {
+        const res = await fetch('/api/admin/generate-tts', {
+          method: 'POST', headers, body: JSON.stringify({ targets: remaining }),
+        })
+        const d = await res.json()
+        if (d.error) { setFillLog(l => [...l, `Error: ${d.error}`]); break }
+        const made: number = d.generated ?? 0
+        done += made
+        setFillLog(l => [...l.slice(0, 1), `${done} of ${scan.tts_targets.length} done…`])
+        if (!made) break
+        const rescan = await fetch('/api/admin/starter-library', { headers })
+        const fresh = await rescan.json() as Scan
+        remaining = fresh.tts_targets ?? []
+        setScan(fresh)
+      }
+      setFillLog(l => [...l, `✓ Finished. ${done} generated.`])
+    } catch (err) {
+      setFillLog(l => [...l, `Error: ${err instanceof Error ? err.message : 'fill failed'}`])
+    }
+    setFilling(false)
   }
 
   const complete = scan
@@ -125,7 +162,7 @@ export default function StarterLibraryPanel() {
               { n: scan.total, l: 'standard movements', c: C.textMid },
               { n: scan.in_library, l: 'already in library', c: C.green },
               { n: scan.needs_creating.length, l: 'genuinely missing', c: scan.needs_creating.length ? C.red : C.textDim },
-              { n: scan.probably_renames, l: 'named differently', c: scan.probably_renames ? C.green : C.textDim },
+              { n: scan.probably_renames, l: 'matched by variant', c: scan.probably_renames ? C.green : C.textDim },
               { n: scan.with_instructions, l: 'have instructions', c: C.green },
               { n: scan.with_tts, l: 'have audio', c: scan.with_tts === scan.total ? C.green : C.amber },
               { n: scan.with_video, l: 'have video', c: C.accent },
@@ -140,6 +177,29 @@ export default function StarterLibraryPanel() {
           <div style={{ height: 6, background: C.surface2, borderRadius: 3, overflow: 'hidden', marginBottom: 16 }}>
             <div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? C.green : C.amber, borderRadius: 3 }} />
           </div>
+
+          {scan.tts_targets.length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <button
+                onClick={fillAudio}
+                disabled={filling}
+                style={{ width: '100%', padding: '12px', borderRadius: 8, border: 'none', background: C.green, color: '#0d1117', fontWeight: 800, fontSize: 13.5, cursor: filling ? 'wait' : 'pointer', fontFamily: 'inherit' }}
+              >
+                {filling ? 'Generating…' : `Generate the missing audio (${scan.tts_targets.length})`}
+              </button>
+              <p style={{ fontSize: 11, color: C.textDim, textAlign: 'center', marginTop: 6, lineHeight: 1.5 }}>
+                Roughly {(scan.tts_targets.length * 2 * 700 * 15 / 1_000_000).toFixed(2)} dollars, once.
+                Both voices, using the instructions we already wrote. Runs in rounds so it cannot time out.
+              </p>
+              {fillLog.length > 0 && (
+                <div style={{ marginTop: 10, padding: '10px 12px', background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 8 }}>
+                  {fillLog.map((l, i) => (
+                    <p key={i} style={{ fontSize: 12, lineHeight: 1.7, color: l.startsWith('Error') ? C.red : l.startsWith('✓') ? C.green : C.textMid }}>{l}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {(scan.needs_creating.length > 0 || scan.needs_instructions.length > 0 || scan.needs_tts.length > 0) && (
             <div style={{ background: 'rgba(245,158,11,0.07)', border: `1px solid ${C.amber}`, borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
@@ -177,14 +237,12 @@ export default function StarterLibraryPanel() {
                   <div key={e.name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderBottom: `1px solid ${C.border}`, fontSize: 12.5 }}>
                     <span style={{ flex: 1, color: e.inLibrary ? C.text : C.textDim, fontWeight: 600 }}>
                       {e.name}
-                      {e.libraryName && e.libraryName !== e.name && (
-                        <span style={{ color: C.textDim, fontWeight: 400 }}> · library calls it &quot;{e.libraryName}&quot;</span>
+                      {e.matchedBy === 'variant' && e.libraryName && (
+                        <span style={{ color: C.green, fontWeight: 400 }}> · library calls it &quot;{e.libraryName}&quot;</span>
                       )}
                     </span>
                     {!e.inLibrary
-                      ? e.nearMatch
-                        ? <span style={{ fontSize: 10, fontWeight: 800, color: C.green }}>IS &quot;{e.nearMatch.libraryName}&quot;</span>
-                        : <span style={{ fontSize: 10, fontWeight: 800, color: C.red }}>NOT IN LIBRARY</span>
+                      ? <span style={{ fontSize: 10, fontWeight: 800, color: C.red }}>NOT IN LIBRARY</span>
                       : <>
                           <span title="written instructions" style={{ fontSize: 11, color: e.hasInstructions ? C.green : C.red }}>{e.hasInstructions ? '✓ cues' : '✗ cues'}</span>
                           <span title="narration audio" style={{ fontSize: 11, color: e.hasTts ? C.green : C.amber }}>{e.hasTts ? '✓ audio' : '✗ audio'}</span>
