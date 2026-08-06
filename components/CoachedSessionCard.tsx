@@ -171,10 +171,15 @@ export default function CoachedSessionCard(
     const g = lib[key]
     if (g) return {
       isCoach: false,
-      kind: g.video_url ? 'youtube' : null,
-      url: g.video_url, ytSource: g.video_source,
-      clipStart: g.youtube_start_sec, clipEnd: g.youtube_end_sec,
-      loopStart: g.loop_start_sec, loopEnd: g.loop_end_sec,
+      // Deliberately no video, even though the global library has one.
+      // A coached athlete only ever sees footage their coach chose. Decision
+      // from Will 2026-08-05: coaches pick their own demos, and inheriting ours
+      // would leave them clearing out choices they never made. Instructions
+      // still come through, so the athlete is never left with nothing.
+      kind: null,
+      url: null, ytSource: null,
+      clipStart: null, clipEnd: null,
+      loopStart: null, loopEnd: null,
       how: g.how, breathing: g.breathing, core: g.core, tip: g.tip,
       customFields: [],
     }

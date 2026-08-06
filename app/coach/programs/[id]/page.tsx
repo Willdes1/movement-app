@@ -245,13 +245,21 @@ export default function ProgramDetailPage() {
     if (!toAdd.length) { setImportResult({ imported: 0, total: all.length }); setImporting(false); return }
     // Pre-fill standard cues from the global library
     const { data: globalRows } = await supabase
-      .from('exercise_library').select('name_normalized, how, breathing, core, tip')
+      .from('exercise_library').select('name_normalized, name_display, how, breathing, core, tip')
       .in('name_normalized', toAdd.map(([k]) => k))
     const gMap = new Map((globalRows ?? []).map(r => [r.name_normalized as string, r]))
     const rows = toAdd.map(([k, display]) => {
       const g = gMap.get(k)
       return {
-        coach_id: user.id, name: display, name_normalized: k,
+        coach_id: user.id,
+        // Prefer the library's cleaned-up name over whatever the program called
+        // it. Importing the raw program text is how coach libraries filled up
+        // with "Alt. DB Curls" and "1-Arm Cross Cable Laterals" while the
+        // athlete library had already been tidied: these are separate tables
+        // holding separate copies, so cleaning one never reaches the other.
+        // Falls back to the program's own wording when we have no match.
+        name: (g?.name_display as string | undefined) ?? display,
+        name_normalized: k,
         how: g?.how ?? null, breathing: g?.breathing ?? null, core: g?.core ?? null, tip: g?.tip ?? null,
         custom_fields: [],
       }
