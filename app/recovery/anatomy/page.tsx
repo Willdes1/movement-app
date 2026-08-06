@@ -2,6 +2,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
+import { EXERCISE_DISPLAY_COLUMNS } from '@/lib/exercise-columns'
 
 type Exercise = {
   name_normalized: string
@@ -37,11 +38,11 @@ export default function AnatomyExplorerPage() {
     if (!user || libLoaded) return
     supabase
       .from('exercise_library')
-      .select('name_normalized, name_display, how, tip, breathing')
+      .select(EXERCISE_DISPLAY_COLUMNS)
       .order('name_display', { ascending: true })
       .limit(800)
       .then(({ data }) => {
-        setExercises((data ?? []) as Exercise[])
+        setExercises((data ?? []) as unknown as Exercise[])
         setLibLoaded(true)
       })
   }, [user, libLoaded])

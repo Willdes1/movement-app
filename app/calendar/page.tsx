@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { supabase } from '@/lib/supabase'
+import { EXERCISE_DISPLAY_COLUMNS } from '@/lib/exercise-columns'
 import { trackEvent } from '@/lib/track'
 import LoopPreview from '@/components/ui/LoopPreview'
 import { inferEquipment, REST_GUIDANCE } from '@/lib/workout-display'
@@ -362,11 +363,11 @@ function CalendarInner() {
       if (normalizedNames.length > 0) {
         const { data: libData } = await supabase
           .from('exercise_library')
-          .select('name_normalized, name_display, how, breathing, core, tip, video_url, video_source, youtube_start_sec, youtube_end_sec, loop_start_sec, loop_end_sec, tts_url_male, tts_url_female')
+          .select(EXERCISE_DISPLAY_COLUMNS)
           .in('name_normalized', normalizedNames)
         if (libData) {
           const libMap: Record<string, ExerciseDetail> = {}
-          libData.forEach(e => { libMap[e.name_normalized] = e as ExerciseDetail })
+          ;(libData as unknown as ExerciseDetail[]).forEach(e => { libMap[e.name_normalized] = e })
           setExerciseLibrary(libMap)
         }
       }

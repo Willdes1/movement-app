@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import { EXERCISE_DISPLAY_COLUMNS } from '@/lib/exercise-columns'
 import { trackEvent } from '@/lib/track'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCoached } from '@/contexts/CoachedContext'
@@ -110,11 +111,11 @@ export default function CoachedSessionCard(
     if (!normalized.length) return
     supabase
       .from('exercise_library')
-      .select('name_normalized, how, breathing, core, tip, tts_url_male, tts_url_female, video_url, video_source, youtube_start_sec, youtube_end_sec, loop_start_sec, loop_end_sec')
+      .select(EXERCISE_DISPLAY_COLUMNS)
       .in('name_normalized', normalized)
       .then(({ data }) => {
         const map: Record<string, LibEntry> = {}
-        data?.forEach(e => { map[e.name_normalized] = e })
+        ;(data as unknown as (LibEntry & { name_normalized: string })[] | null)?.forEach(e => { map[e.name_normalized] = e })
         setLib(map)
       })
   }, [todayDay])

@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useCoached } from '@/contexts/CoachedContext'
 import { supabase } from '@/lib/supabase'
+import { EXERCISE_DISPLAY_COLUMNS, type ExerciseDisplayRow } from '@/lib/exercise-columns'
 import PushNotificationBanner from '@/components/PushNotificationBanner'
 import CoachedSessionCard from '@/components/CoachedSessionCard'
 import { useStreak } from '@/lib/useStreak'
@@ -171,11 +172,11 @@ export default function TodayPage() {
     if (!normalized.length) return
     supabase
       .from('exercise_library')
-      .select('name_normalized, how, breathing, core, tip, tts_url_male, tts_url_female, video_url, video_source, youtube_start_sec, youtube_end_sec, loop_start_sec, loop_end_sec')
+      .select(EXERCISE_DISPLAY_COLUMNS)
       .in('name_normalized', normalized)
       .then(({ data }) => {
         const map: typeof exerciseLib = {}
-        data?.forEach(e => { map[e.name_normalized] = e })
+        ;(data as unknown as ExerciseDisplayRow[] | null)?.forEach(e => { map[e.name_normalized] = e })
         setExerciseLib(map)
       })
   // eslint-disable-next-line react-hooks/exhaustive-deps
