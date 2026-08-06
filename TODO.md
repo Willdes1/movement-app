@@ -120,14 +120,14 @@
   buttons, so Will can review it himself and walk Paul through it as a brand-new coach. Preview
   the REAL `components/coach/OnboardingOverlay.tsx`, do not build a mock that will drift.
 
-- [ ] **3. Standard starter exercise + workout library for every new coach** — Full spec:
+- [x] **3. Standard starter exercise + workout library for every new coach** — ✅ Built 2026-08-05/06. 52 movements seeded into any empty coach library on first open, cues included, video blank, zero token cost (copied from the existing 2,050-row library). `lib/coach-starter-library.ts`, `app/api/coach/seed-library`, admin coverage scan in Library Builder. ORIGINAL SPEC BELOW: — Full spec:
   `to-do/coach-starter-library.md`. Bench press, chest press, squats, deadlifts, RDLs, dips,
   shoulder press to start, expanding over time. **Seed from the existing 2,050-row
   `exercise_library` and generate nothing**: those movements are already written and already paid
   for, which is Will's explicit token rule. Generation only as a fallback for a movement we
   genuinely lack, written back so it is paid for once.
 
-- [ ] **4. Editable exercise instructions, tips and headers for coaches** — Same file as #3.
+- [x] **4. Editable exercise instructions, tips and headers for coaches** — ✅ 2026-08-05. Sets/reps/rest removed from the coach library (a catalogue, not a prescription) and moved into the builder per program: how many sets, how many reps, rest between sets, how much weight. "standard TSS" confirmed by Will as TTS. ORIGINAL SPEC BELOW: — Same file as #3.
   Coaches must be able to rewrite instructions, adjust tips, remove sections and add or change
   headers. Partly exists: `CoachInstructionFields` plus the coach field template
   (`20260630_coach_field_template.sql`) already controls which fields show and in what order.
