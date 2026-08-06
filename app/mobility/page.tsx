@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
+import ReadAloudButton from '@/components/ui/ReadAloudButton'
 import { EXERCISE_DISPLAY_COLUMNS } from '@/lib/exercise-columns'
 import LoopPreview from '@/components/ui/LoopPreview'
 import { searchItems, matchesAnyKeyword } from '@/lib/fuzzy-search'
@@ -236,6 +237,7 @@ export default function MobilityPage() {
                         VIDEO
                       </span>
                     )}
+                    <ReadAloudButton exercise={ex} size={13} />
                     <span style={{ fontSize: 11, color: 'var(--text-dim)', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', display: 'inline-block' }}>▶</span>
                   </div>
 

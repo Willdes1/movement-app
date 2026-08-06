@@ -1,30 +1,17 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { EXERCISE_DISPLAY_COLUMNS } from '@/lib/exercise-columns'
+import ReadAloudButton from '@/components/ui/ReadAloudButton'
+import { EXERCISE_DISPLAY_COLUMNS, type ExerciseDisplayRow } from '@/lib/exercise-columns'
 import { searchItems } from '@/lib/fuzzy-search'
 import { useAuth } from '@/contexts/AuthContext'
 import LoopPreview from '@/components/ui/LoopPreview'
 
-type ExerciseRow = {
-  name_normalized: string
-  name_display: string
-  video_url: string | null
-  video_source: string | null
-  youtube_start_sec?: number | null
-  youtube_end_sec?: number | null
-  loop_start_sec?: number | null
-  loop_end_sec?: number | null
-}
-
-type ExerciseDetail = ExerciseRow & {
-  how: string | null
-  breathing: string | null
-  core: string | null
-  tip: string | null
-  youtube_start_sec?: number | null
-  youtube_end_sec?: number | null
-}
+// The list query fetches the full display shape now, so the type says so.
+// It used to declare only names and video, which meant a row carried coaching
+// cues at runtime that nothing was allowed to touch.
+type ExerciseRow = ExerciseDisplayRow
+type ExerciseDetail = ExerciseDisplayRow
 
 // VideoPlayer + extractYouTubeId moved to components/ui/LoopPreview.tsx + lib/youtube-iframe.ts
 
@@ -252,6 +239,7 @@ export default function ExercisesPage() {
                       <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {ex.name_display}
                       </span>
+                      <ReadAloudButton exercise={ex} size={13} />
                       {hasVideo && (
                         <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: 'rgba(34,197,94,0.1)', color: 'var(--green)', border: '1px solid rgba(34,197,94,0.25)' }}>
                           VIDEO

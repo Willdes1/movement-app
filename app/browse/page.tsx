@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
+import ReadAloudButton from '@/components/ui/ReadAloudButton'
 import { EXERCISE_DISPLAY_COLUMNS } from '@/lib/exercise-columns'
 import { searchItems } from '@/lib/fuzzy-search'
 
@@ -127,7 +128,8 @@ export default function BrowsePage() {
                 <p style={{ flex: 1, fontSize: 14, fontWeight: 600, color: selected?.name_normalized === ex.name_normalized ? 'var(--accent)' : 'var(--text)', lineHeight: 1.3 }}>
                   {ex.name_display}
                 </p>
-                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                  <ReadAloudButton exercise={ex} size={13} />
                   {ex.video_url && <span style={{ fontSize: 10, color: 'var(--accent)' }}>▶</span>}
                   {ex.how && <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>📝</span>}
                 </div>
