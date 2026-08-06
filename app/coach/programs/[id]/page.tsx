@@ -239,8 +239,15 @@ export default function ProgramDetailPage() {
     const all = [...seen.entries()] // [normKey, display]
     // Dedup against what's already in the coach's library
     const { data: existing } = await supabase
-      .from('coach_exercise_library').select('name').eq('coach_id', user.id)
-    const have = new Set((existing ?? []).map(e => normKey(e.name as string)))
+      .from('coach_exercise_library').select('name, name_normalized').eq('coach_id', user.id)
+    // Dedup on the stored key, not on the display name. Deriving the key from
+    // the name meant that renaming "Alt. DB Curls" to "Alternating Dumbbell
+    // Curls" changed what this matched against, so the next import of a program
+    // still calling it "Alt. DB Curls" would insert a second copy. The stored
+    // key survives renaming. Older rows without one fall back to the old
+    // behaviour so nothing regresses.
+    const have = new Set((existing ?? []).map(e =>
+      (e.name_normalized as string | null) ?? normKey(e.name as string)))
     const toAdd = all.filter(([k]) => !have.has(k))
     if (!toAdd.length) { setImportResult({ imported: 0, total: all.length }); setImporting(false); return }
     // Pre-fill standard cues from the global library

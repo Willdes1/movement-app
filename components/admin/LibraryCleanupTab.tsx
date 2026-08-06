@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import UnilateralAuditPanel from '@/components/admin/UnilateralAuditPanel'
+import CoachLibraryCleanupPanel from '@/components/admin/CoachLibraryCleanupPanel'
 
 /**
  * Task 6 (naming slice): review and approve exercise renames.
@@ -140,6 +141,10 @@ export default function LibraryCleanupTab() {
           correctly and so never appear as a rename proposal. Their videos were
           the ones that could not be requeued from here at all. */}
       <UnilateralAuditPanel />
+
+      {/* Coach libraries are separate copies, so the rename list below never
+          reaches them. This is the same job for those rows. */}
+      <CoachLibraryCleanupPanel />
 
       {!report && (
         <button onClick={load} disabled={loading}
