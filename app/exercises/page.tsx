@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { EXERCISE_DISPLAY_COLUMNS } from '@/lib/exercise-columns'
 import { searchItems } from '@/lib/fuzzy-search'
 import { useAuth } from '@/contexts/AuthContext'
 import LoopPreview from '@/components/ui/LoopPreview'
@@ -52,13 +53,11 @@ export default function ExercisesPage() {
 
   useEffect(() => {
     (async () => {
-      // loop_start_sec/loop_end_sec may not exist yet (migration not run) — fall back gracefully.
-      const cols = 'name_normalized, name_display, video_url, video_source, youtube_start_sec, youtube_end_sec'
-      const withLoop = await supabase.from('exercise_library').select(`${cols}, loop_start_sec, loop_end_sec`).order('name_display')
-      const { data } = withLoop.error
-        ? await supabase.from('exercise_library').select(cols).order('name_display')
-        : withLoop
-      setAll((data ?? []) as ExerciseRow[])
+      // The loop columns exist now, so the old retry-with-fewer-columns dance is
+      // gone. It doubled the round trip on any failure and swallowed the real
+      // error behind a silent second attempt.
+      const { data } = await supabase.from('exercise_library').select(EXERCISE_DISPLAY_COLUMNS).order('name_display')
+      setAll((data ?? []) as unknown as ExerciseRow[])
       setLoading(false)
     })()
   }, [])
@@ -66,12 +65,8 @@ export default function ExercisesPage() {
   async function loadDetail(ex: ExerciseRow) {
     if (details[ex.name_normalized]) return
     setFetching(ex.name_normalized)
-    const cols = 'name_normalized, name_display, how, breathing, core, tip, video_url, video_source, youtube_start_sec, youtube_end_sec'
-    const withLoop = await supabase.from('exercise_library').select(`${cols}, loop_start_sec, loop_end_sec`).eq('name_normalized', ex.name_normalized).single()
-    const { data } = withLoop.error
-      ? await supabase.from('exercise_library').select(cols).eq('name_normalized', ex.name_normalized).single()
-      : withLoop
-    if (data) setDetails(prev => ({ ...prev, [ex.name_normalized]: data as ExerciseDetail }))
+    const { data } = await supabase.from('exercise_library').select(EXERCISE_DISPLAY_COLUMNS).eq('name_normalized', ex.name_normalized).single()
+    if (data) setDetails(prev => ({ ...prev, [ex.name_normalized]: data as unknown as ExerciseDetail }))
     setFetching(null)
   }
 

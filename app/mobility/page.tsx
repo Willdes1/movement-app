@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
+import { EXERCISE_DISPLAY_COLUMNS } from '@/lib/exercise-columns'
 import LoopPreview from '@/components/ui/LoopPreview'
 import { searchItems, matchesAnyKeyword } from '@/lib/fuzzy-search'
 
@@ -57,8 +58,6 @@ export default function MobilityPage() {
     // Load mobility/stretching focused exercises
     // The loop columns may not exist on very old databases, so fall back to a
     // select without them rather than leaving the page blank.
-    const COLS_WITH_VIDEO = 'name_normalized, name_display, how, tip, breathing, core, video_url, video_source, loop_start_sec, loop_end_sec, youtube_start_sec, youtube_end_sec'
-    const COLS_FALLBACK   = 'name_normalized, name_display, how, tip, breathing, core'
     const areaFilter = [
         'name_normalized.ilike.%stretch%',
         'name_normalized.ilike.%mobility%',
@@ -86,13 +85,10 @@ export default function MobilityPage() {
       .order('name_display', { ascending: true })
       .limit(300)
 
-    run(COLS_WITH_VIDEO).then(async ({ data, error }) => {
-      if (error) {
-        const { data: fb } = await run(COLS_FALLBACK)
-        setExercises((fb ?? []) as unknown as Exercise[])
-      } else {
-        setExercises((data ?? []) as unknown as Exercise[])
-      }
+    // One query. The retry-with-fewer-columns fallback is gone: those columns
+    // exist, and a silent second attempt only hid real errors.
+    run(EXERCISE_DISPLAY_COLUMNS).then(({ data }) => {
+      setExercises((data ?? []) as unknown as Exercise[])
       setLoading(false)
     })
   }, [user])
