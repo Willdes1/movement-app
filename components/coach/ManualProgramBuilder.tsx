@@ -17,7 +17,13 @@ import LibraryPickerModal, { LibraryItem } from '@/components/coach/LibraryPicke
 
 interface Exercise {
   id: string   // local only — never persisted
+  /** Movement name only. The prescription lives in the fields below. */
   value: string
+  /** Per-program prescription. Two clients get different numbers off the same
+   *  library exercise, which is exactly why these are here and not there. */
+  sets_reps?: string
+  rest?: string
+  load?: string
 }
 
 interface ManualDay {
@@ -52,14 +58,19 @@ interface ExerciseSuggestion {
   name: string
   meta: string | null            // coach instructions snippet, or global tip
   source: 'library' | 'global'   // the coach's own library vs the global database
-  sets_reps?: string | null      // autofilled on select for library items
   hasVideo?: boolean
 }
 
-// Build the text inserted into a builder row — append the coach's saved sets×reps
-// for library items so "Incline DB Press" becomes "Incline DB Press 4×10".
+// The row now holds the movement name and nothing else. Sets, reps, rest and
+// load are typed per program, because the library is a catalogue of movements
+// and the prescription belongs to the client it was written for.
 function suggestionValue(s: ExerciseSuggestion): string {
-  return s.source === 'library' && s.sets_reps ? `${s.name} ${s.sets_reps}` : s.name
+  return s.name
+}
+
+/** What gets persisted into `movements`, unchanged in shape: "Bench Press 4x8". */
+function composeMovement(ex: Exercise): string {
+  return [ex.value.trim(), (ex.sets_reps ?? '').trim()].filter(Boolean).join(' ')
 }
 
 const DAYS: ManualDay['day'][] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -98,12 +109,13 @@ function buildWeeks(count: number, daysPerWeek: number): ManualWeek[] {
 // ── Sortable exercise row ─────────────────────────────────────────────────────
 
 function SortableExercise({
-  ex, onChange, onRemove, onKeyDown, inputRef, showRemove,
+  ex, onChange, onDetail, onRemove, onKeyDown, inputRef, showRemove,
   suggestions, onSelectSuggestion, showSuggestions, onFocus, onBlur,
   relevantNotes,
 }: {
   ex: Exercise
   onChange: (val: string) => void
+  onDetail: (field: 'sets_reps' | 'rest' | 'load', val: string) => void
   onRemove: () => void
   onKeyDown: (e: React.KeyboardEvent) => void
   inputRef?: React.RefObject<HTMLInputElement | null>
@@ -146,7 +158,7 @@ function SortableExercise({
             onKeyDown={onKeyDown}
             onFocus={onFocus}
             onBlur={onBlur}
-            placeholder="Exercise name + sets/reps (e.g. Bench Press 4x8)"
+            placeholder="Exercise name (e.g. Bench Press)"
             style={{
               width: '100%', padding: '7px 10px',
               background: 'var(--surface)', border: '1px solid var(--border)',
@@ -177,7 +189,6 @@ function SortableExercise({
                     <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{s.name}</span>
                     {s.source === 'library' && <span style={{ fontSize: 9, fontWeight: 800, color: 'var(--accent)', background: 'var(--accent-bg)', border: '1px solid var(--accent-border)', borderRadius: 4, padding: '0 5px', letterSpacing: '0.04em' }}>★ LIBRARY</span>}
                     {s.hasVideo && <span title="Has video" style={{ fontSize: 11 }}>🎥</span>}
-                    {s.source === 'library' && s.sets_reps && <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 600, marginLeft: 'auto' }}>{s.sets_reps}</span>}
                   </div>
                   {s.meta && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.meta}</div>}
                 </div>
@@ -196,6 +207,34 @@ function SortableExercise({
           </button>
         )}
       </div>
+
+      {/* The prescription. Deliberately per program: the same Bench Press is
+          3x12 for one client and 5x5 for another. */}
+      {ex.value.trim() && (
+        <div style={{ display: 'flex', gap: 6, marginTop: 5, marginLeft: 22 }}>
+          {([
+            ['sets_reps', 'Sets × reps', 'e.g. 4×8'],
+            ['rest', 'Rest', 'e.g. 90 sec'],
+            ['load', 'Load', 'e.g. 12-rep max'],
+          ] as const).map(([field, label, ph]) => (
+            <div key={field} style={{ flex: 1 }}>
+              <input
+                value={ex[field] ?? ''}
+                onChange={e => onDetail(field, e.target.value)}
+                placeholder={ph}
+                aria-label={label}
+                title={label}
+                style={{
+                  width: '100%', padding: '5px 8px',
+                  background: 'var(--surface2)', border: '1px solid var(--border)',
+                  borderRadius: 6, color: 'var(--text)', fontSize: 11,
+                  boxSizing: 'border-box', fontFamily: 'inherit',
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Client note reminder for this exercise */}
       {relevantNotes.length > 0 && (
@@ -248,11 +287,15 @@ function DayEditor({
     }
   }
 
+  function updateExerciseDetail(exId: string, field: 'sets_reps' | 'rest' | 'load', val: string) {
+    update({ exercises: day.exercises.map(e => e.id === exId ? { ...e, [field]: val } : e) })
+  }
+
   async function searchExercises(q: string) {
     // The coach's own library first, then the global database (de-duped by name).
     const [libRes, globRes] = await Promise.all([
       supabase.from('coach_exercise_library')
-        .select('name, sets_reps, instructions, video_type')
+        .select('name, instructions, video_type')
         .eq('coach_id', coachId)
         .ilike('name', `%${q}%`)
         .order('name').limit(6),
@@ -265,7 +308,6 @@ function DayEditor({
       name: r.name,
       meta: r.instructions ? String(r.instructions).slice(0, 70) : null,
       source: 'library' as const,
-      sets_reps: r.sets_reps,
       hasVideo: !!r.video_type,
     }))
     const libNames = new Set(lib.map(l => l.name.toLowerCase()))
@@ -283,7 +325,7 @@ function DayEditor({
   }
 
   function addFromLibrary(picks: LibraryItem[]) {
-    const newRows = picks.map(p => ({ id: makeId(), value: p.sets_reps ? `${p.name} ${p.sets_reps}` : p.name }))
+    const newRows = picks.map(p => ({ id: makeId(), value: p.name }))
     const kept = day.exercises.filter(e => e.value.trim())
     const merged = [...kept, ...newRows]
     update({ exercises: merged.length ? merged : [{ id: makeId(), value: '' }] })
@@ -394,6 +436,7 @@ function DayEditor({
                 key={ex.id}
                 ex={ex}
                 onChange={val => updateExercise(ex.id, val)}
+                onDetail={(field, val) => updateExerciseDetail(ex.id, field, val)}
                 onRemove={() => removeExercise(ex.id)}
                 onKeyDown={e => handleExKeyDown(e, ex.id, exIdx)}
                 inputRef={exIdx === day.exercises.length - 1 ? lastInputRef : undefined}
@@ -559,7 +602,16 @@ export default function ManualProgramBuilder({
         day: d.day,
         label: d.label || (d.type === 'rest' ? 'Rest Day' : 'Training'),
         type: d.type,
-        movements: d.exercises.map(e => e.value).filter(Boolean),
+        movements: d.exercises.map(composeMovement).filter(Boolean),
+        // Additive. Everything downstream still reads `movements`, which keeps
+        // the same "Name 4x8" shape it always had, so nothing had to be
+        // migrated. This carries the parts a name string cannot hold.
+        movement_details: d.exercises.filter(e => e.value.trim()).map(e => ({
+          name: e.value.trim(),
+          sets_reps: (e.sets_reps ?? '').trim() || null,
+          rest: (e.rest ?? '').trim() || null,
+          load: (e.load ?? '').trim() || null,
+        })),
         focus: d.focus,
         duration: d.duration,
         walkthrough_url: d.walkthrough_url || null,

@@ -298,8 +298,6 @@ export default function CoachLibraryPage() {
       name: form.name.trim(),
       name_normalized: normalizeName(form.name),
       instructions: form.instructions.trim() || null,
-      sets_reps: form.sets_reps.trim() || null,
-      rest_between_sets: form.rest_between_sets.trim() || null,
       notes: form.notes.trim() || null,
       how: form.how.trim() || null,
       breathing: form.breathing.trim() || null,
@@ -471,9 +469,9 @@ export default function CoachLibraryPage() {
                       )}
                     </div>
                     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                      {ex.sets_reps && <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{ex.sets_reps}</span>}
-                      {ex.rest_between_sets && <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>· {ex.rest_between_sets} rest</span>}
-                      {!ex.sets_reps && !ex.rest_between_sets && <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>No sets/rest configured</span>}
+                      <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                        {ex.how ? 'Instructions added' : 'No instructions yet'}
+                      </span>
                     </div>
                   </div>
 
@@ -558,17 +556,11 @@ export default function CoachLibraryPage() {
                 />
               </div>
 
-              {/* Sets + Rest row */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <Label>Sets × Reps</Label>
-                  <input value={form.sets_reps} onChange={e => setForm(f => ({ ...f, sets_reps: e.target.value }))} placeholder="e.g. 4×10" style={inputStyle} />
-                </div>
-                <div>
-                  <Label>Rest Between Sets</Label>
-                  <input value={form.rest_between_sets} onChange={e => setForm(f => ({ ...f, rest_between_sets: e.target.value }))} placeholder="e.g. 90 sec" style={inputStyle} />
-                </div>
-              </div>
+              {/* Sets, reps, rest and load deliberately do NOT live here. The
+                  library is a catalogue of movements: what the exercise is and
+                  how to perform it. The prescription is per client and per
+                  program, so it belongs in the builder, where a coach can give
+                  one client 3x12 and another 5x5 off the same exercise. */}
 
               {/* Coaching instructions — the standard fields the athlete sees */}
               <CoachInstructionFields

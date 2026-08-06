@@ -411,6 +411,12 @@ export default function CoachedSessionCard(
         {todayDay.movements.map((mv, i) => {
           const { name, scheme } = splitMovement(mv)
           const key = normalizeExName(mv)
+          // Rest and load are written per client in the builder and cannot fit
+          // in the movement string, so they ride alongside it. Matched by index
+          // first, then by name, because a coach can reorder a day.
+          const detail = todayDay.movement_details?.[i]?.name === name
+            ? todayDay.movement_details[i]
+            : todayDay.movement_details?.find(d => d.name === name)
           const isSpeaking = pendingKey === key || (activeKey === key && (speaking || ttsLoading))
           const last = lastLogs[key]
           const isOpen = openLog === i
@@ -429,6 +435,8 @@ export default function CoachedSessionCard(
                   <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', textTransform: 'capitalize' }}>{name}</span>
                   {media?.isCoach && <span title={`Coach ${coachFirst}'s own demo & cues`} style={{ fontSize: 10, color: 'var(--accent)', flexShrink: 0 }}>★</span>}
                   {scheme && <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 700, flexShrink: 0 }}>{scheme}</span>}
+                  {detail?.load && <span title="Load your coach prescribed" style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 700, flexShrink: 0 }}>@ {detail.load}</span>}
+                  {detail?.rest && <span title="Rest between sets" style={{ fontSize: 11, color: 'var(--text-dim)', flexShrink: 0 }}>· {detail.rest} rest</span>}
                 </button>
                 {loggedIdx.has(i) && <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 800, flexShrink: 0 }}>✓</span>}
                 <button onClick={() => speakExercise(mv)} style={{ background: 'none', border: 'none', padding: '2px 4px', cursor: 'pointer', fontSize: 13, lineHeight: 1, color: isSpeaking ? 'var(--accent)' : 'var(--text-dim)', flexShrink: 0 }}>
