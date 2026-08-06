@@ -19,9 +19,12 @@ const C = {
   text: '#e6edf3', textMid: '#b1bac4', textDim: '#6e7681',
 }
 
+type NearMatch = { libraryName: string; score: number; hasInstructions: boolean; hasTts: boolean; hasVideo: boolean }
+
 type Ex = {
   name: string
   inLibrary: boolean
+  nearMatch: NearMatch | null
   libraryName: string | null
   hasInstructions: boolean
   hasFullInstructions: boolean
@@ -37,6 +40,8 @@ type Scan = {
   with_full_instructions: number
   with_tts: number
   with_video: number
+  probably_renames: number
+  rename_candidates: { ours: string; library: string; score: number }[]
   needs_creating: string[]
   needs_instructions: string[]
   needs_tts: string[]
@@ -67,7 +72,7 @@ export default function StarterLibraryPanel() {
   }
 
   const complete = scan
-    && scan.missing_entirely === 0
+    && scan.needs_creating.length === 0
     && scan.needs_instructions.length === 0
     && scan.needs_tts.length === 0
 
@@ -119,7 +124,8 @@ export default function StarterLibraryPanel() {
             {[
               { n: scan.total, l: 'standard movements', c: C.textMid },
               { n: scan.in_library, l: 'already in library', c: C.green },
-              { n: scan.missing_entirely, l: 'not in library', c: scan.missing_entirely ? C.red : C.textDim },
+              { n: scan.needs_creating.length, l: 'genuinely missing', c: scan.needs_creating.length ? C.red : C.textDim },
+              { n: scan.probably_renames, l: 'named differently', c: scan.probably_renames ? C.green : C.textDim },
               { n: scan.with_instructions, l: 'have instructions', c: C.green },
               { n: scan.with_tts, l: 'have audio', c: scan.with_tts === scan.total ? C.green : C.amber },
               { n: scan.with_video, l: 'have video', c: C.accent },
@@ -138,8 +144,20 @@ export default function StarterLibraryPanel() {
           {(scan.needs_creating.length > 0 || scan.needs_instructions.length > 0 || scan.needs_tts.length > 0) && (
             <div style={{ background: 'rgba(245,158,11,0.07)', border: `1px solid ${C.amber}`, borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
               <p style={{ fontSize: 13, fontWeight: 800, color: C.text, marginBottom: 8 }}>The gaps, in the order they need filling</p>
+              {scan.rename_candidates.length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <p style={{ fontSize: 11, fontWeight: 800, color: C.green, marginBottom: 3 }}>
+                    {scan.rename_candidates.length} · Already in the library under a different name. Do NOT generate these.
+                  </p>
+                  {scan.rename_candidates.map(r => (
+                    <p key={r.ours} style={{ fontSize: 11.5, color: C.textMid, lineHeight: 1.7 }}>
+                      our list says <strong style={{ color: C.text }}>{r.ours}</strong>, the library calls it <strong style={{ color: C.green }}>{r.library}</strong>
+                    </p>
+                  ))}
+                </div>
+              )}
               {[
-                { l: 'Not in the library at all, must be created first', names: scan.needs_creating, c: C.red },
+                { l: 'Genuinely not in the library, nothing close either', names: scan.needs_creating, c: C.red },
                 { l: 'In the library but no written instructions', names: scan.needs_instructions, c: C.amber },
                 { l: 'Have instructions but no narration audio', names: scan.needs_tts, c: C.accent },
               ].filter(b => b.names.length).map(b => (
@@ -164,7 +182,9 @@ export default function StarterLibraryPanel() {
                       )}
                     </span>
                     {!e.inLibrary
-                      ? <span style={{ fontSize: 10, fontWeight: 800, color: C.red }}>NOT IN LIBRARY</span>
+                      ? e.nearMatch
+                        ? <span style={{ fontSize: 10, fontWeight: 800, color: C.green }}>IS &quot;{e.nearMatch.libraryName}&quot;</span>
+                        : <span style={{ fontSize: 10, fontWeight: 800, color: C.red }}>NOT IN LIBRARY</span>
                       : <>
                           <span title="written instructions" style={{ fontSize: 11, color: e.hasInstructions ? C.green : C.red }}>{e.hasInstructions ? '✓ cues' : '✗ cues'}</span>
                           <span title="narration audio" style={{ fontSize: 11, color: e.hasTts ? C.green : C.amber }}>{e.hasTts ? '✓ audio' : '✗ audio'}</span>

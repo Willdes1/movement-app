@@ -3,6 +3,7 @@ import {
   ALL_STARTER_EXERCISES, STARTER_EXERCISES, STARTER_WORKOUTS,
   normalizeExerciseName,
 } from '@/lib/coach-starter-library'
+import { scoreName } from '@/lib/fuzzy-search'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -45,6 +46,7 @@ export async function GET(req: Request) {
   // Page explicitly. PostgREST caps unbounded selects at 1,000 and the library
   // is larger than that, which is how Video Curation once went blind to half of it.
   const byKey = new Map<string, Row>()
+  const everyRow: Row[] = []
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await auth.supabase
       .from('exercise_library')
@@ -53,9 +55,32 @@ export async function GET(req: Request) {
     if (error) return Response.json({ error: error.message }, { status: 500 })
     if (!data?.length) break
     for (const r of data as Row[]) {
+      everyRow.push(r)
       if (wanted.has(r.name_normalized)) byKey.set(r.name_normalized, r)
     }
     if (data.length < PAGE) break
+  }
+
+  // An exact key miss usually is not a missing movement, it is a naming
+  // variant: plural, a word ordered differently, or an abbreviation we have
+  // since expanded. Generating those would create a duplicate of an exercise we
+  // already wrote and already paid for, which is the exact opposite of the
+  // point. So every miss gets a fuzzy pass before it is called a gap.
+  function nearestMatch(name: string) {
+    let best: { row: Row; score: number } | null = null
+    for (const row of everyRow) {
+      const { score } = scoreName(name, row.name_display)
+      if (score > 0 && (!best || score > best.score)) best = { row, score }
+    }
+    if (!best || best.score < 0.45) return null
+    return {
+      libraryName: best.row.name_display,
+      normalized: best.row.name_normalized,
+      score: Number(best.score.toFixed(2)),
+      hasInstructions: !!best.row.how,
+      hasTts: !!(best.row.tts_url_male || best.row.tts_url_female),
+      hasVideo: !!best.row.video_url,
+    }
   }
 
   const groups = STARTER_EXERCISES.map(g => ({
@@ -67,6 +92,8 @@ export async function GET(req: Request) {
         name,
         normalized: normalizeExerciseName(name),
         inLibrary: !!row,
+        // Only computed for misses, and only to stop us generating a duplicate.
+        nearMatch: row ? null : nearestMatch(name),
         // name_display can differ from what we asked for, which is useful to
         // see: it means the library calls this movement something else.
         libraryName: row?.name_display ?? null,
@@ -88,8 +115,13 @@ export async function GET(req: Request) {
     with_full_instructions: flat.filter(e => e.hasFullInstructions).length,
     with_tts: flat.filter(e => e.hasTts).length,
     with_video: flat.filter(e => e.hasVideo).length,
+    // Split the misses. Only the ones with no plausible match are real gaps;
+    // the rest just need our list renamed to match what the library calls them.
+    probably_renames: flat.filter(e => !e.inLibrary && e.nearMatch).length,
     // What a one-time fill would have to do, in priority order.
-    needs_creating: flat.filter(e => !e.inLibrary).map(e => e.name),
+    needs_creating: flat.filter(e => !e.inLibrary && !e.nearMatch).map(e => e.name),
+    rename_candidates: flat.filter(e => !e.inLibrary && e.nearMatch)
+      .map(e => ({ ours: e.name, library: e.nearMatch!.libraryName, score: e.nearMatch!.score })),
     needs_instructions: flat.filter(e => e.inLibrary && !e.hasInstructions).map(e => e.name),
     needs_tts: flat.filter(e => e.inLibrary && e.hasInstructions && !e.hasTts).map(e => e.name),
     groups,
