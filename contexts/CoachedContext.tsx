@@ -10,7 +10,7 @@ export type CoachDay = {
   movements: string[]
   /** Per-exercise prescription written in the builder for this client.
    *  Optional: programs saved before this existed only have `movements`. */
-  movement_details?: { name: string; sets_reps: string | null; rest: string | null; load: string | null }[]
+  movement_details?: { name: string; sets: string | null; reps: string | null; rest: string | null; load: string | null }[]
   focus: string
   duration: string
   walkthrough_url?: string | null

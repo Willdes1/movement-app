@@ -21,7 +21,8 @@ interface Exercise {
   value: string
   /** Per-program prescription. Two clients get different numbers off the same
    *  library exercise, which is exactly why these are here and not there. */
-  sets_reps?: string
+  sets?: string
+  reps?: string
   rest?: string
   load?: string
 }
@@ -70,7 +71,10 @@ function suggestionValue(s: ExerciseSuggestion): string {
 
 /** What gets persisted into `movements`, unchanged in shape: "Bench Press 4x8". */
 function composeMovement(ex: Exercise): string {
-  return [ex.value.trim(), (ex.sets_reps ?? '').trim()].filter(Boolean).join(' ')
+  const sets = (ex.sets ?? '').trim()
+  const reps = (ex.reps ?? '').trim()
+  const scheme = sets && reps ? `${sets}x${reps}` : sets ? `${sets} sets` : reps ? `${reps} reps` : ''
+  return [ex.value.trim(), scheme].filter(Boolean).join(' ')
 }
 
 const DAYS: ManualDay['day'][] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -115,7 +119,7 @@ function SortableExercise({
 }: {
   ex: Exercise
   onChange: (val: string) => void
-  onDetail: (field: 'sets_reps' | 'rest' | 'load', val: string) => void
+  onDetail: (field: 'sets' | 'reps' | 'rest' | 'load', val: string) => void
   onRemove: () => void
   onKeyDown: (e: React.KeyboardEvent) => void
   inputRef?: React.RefObject<HTMLInputElement | null>
@@ -211,23 +215,25 @@ function SortableExercise({
       {/* The prescription. Deliberately per program: the same Bench Press is
           3x12 for one client and 5x5 for another. */}
       {ex.value.trim() && (
-        <div style={{ display: 'flex', gap: 6, marginTop: 5, marginLeft: 22 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(96px, 1fr))', gap: 6, marginTop: 6, marginLeft: 22 }}>
           {([
-            ['sets_reps', 'Sets × reps', 'e.g. 4×8'],
-            ['rest', 'Rest', 'e.g. 90 sec'],
-            ['load', 'Load', 'e.g. 12-rep max'],
+            ['sets', 'How many sets', '4'],
+            ['reps', 'How many reps', '8'],
+            ['rest', 'Rest between sets', '90 sec'],
+            ['load', 'How much weight', '12-rep max'],
           ] as const).map(([field, label, ph]) => (
-            <div key={field} style={{ flex: 1 }}>
+            <div key={field}>
+              <label style={{ display: 'block', fontSize: 9.5, fontWeight: 800, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>
+                {label}
+              </label>
               <input
                 value={ex[field] ?? ''}
                 onChange={e => onDetail(field, e.target.value)}
                 placeholder={ph}
-                aria-label={label}
-                title={label}
                 style={{
-                  width: '100%', padding: '5px 8px',
+                  width: '100%', padding: '6px 8px',
                   background: 'var(--surface2)', border: '1px solid var(--border)',
-                  borderRadius: 6, color: 'var(--text)', fontSize: 11,
+                  borderRadius: 6, color: 'var(--text)', fontSize: 11.5,
                   boxSizing: 'border-box', fontFamily: 'inherit',
                 }}
               />
@@ -287,7 +293,7 @@ function DayEditor({
     }
   }
 
-  function updateExerciseDetail(exId: string, field: 'sets_reps' | 'rest' | 'load', val: string) {
+  function updateExerciseDetail(exId: string, field: 'sets' | 'reps' | 'rest' | 'load', val: string) {
     update({ exercises: day.exercises.map(e => e.id === exId ? { ...e, [field]: val } : e) })
   }
 
@@ -412,10 +418,20 @@ function DayEditor({
           {DURATIONS.map(d => <option key={d} value={d}>{d}</option>)}
         </select>
         <button
-          onClick={() => update({ type: 'rest', label: '', focus: '', duration: '—', exercises: [] })}
+          // This does not configure rest times, it turns the whole day into a
+          // rest day, and it wipes the exercises to do it. Labelled "Set rest"
+          // next to a duration dropdown, it read as "set the rest periods",
+          // which is a very expensive misunderstanding for a coach who has just
+          // typed out a session. Now says what it does, and asks first if there
+          // is anything to lose.
+          onClick={() => {
+            if (day.exercises.some(e => e.value.trim())
+              && !confirm('Make this a rest day? The exercises you have added to it will be removed.')) return
+            update({ type: 'rest', label: '', focus: '', duration: '—', exercises: [] })
+          }}
           style={{ fontSize: 10, color: 'var(--text-dim)', background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer', marginLeft: 'auto' }}
         >
-          Set rest
+          Make rest day
         </button>
       </div>
       <div style={{ padding: '6px 12px', borderBottom: '1px solid var(--border)' }}>
@@ -608,7 +624,8 @@ export default function ManualProgramBuilder({
         // migrated. This carries the parts a name string cannot hold.
         movement_details: d.exercises.filter(e => e.value.trim()).map(e => ({
           name: e.value.trim(),
-          sets_reps: (e.sets_reps ?? '').trim() || null,
+          sets: (e.sets ?? '').trim() || null,
+          reps: (e.reps ?? '').trim() || null,
           rest: (e.rest ?? '').trim() || null,
           load: (e.load ?? '').trim() || null,
         })),
