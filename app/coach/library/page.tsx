@@ -146,6 +146,8 @@ export default function CoachLibraryPage() {
 
   const [exercises, setExercises] = useState<CoachExercise[]>([])
   const [loading, setLoading] = useState(true)
+  const [seeding, setSeeding] = useState(false)
+  const [seededCount, setSeededCount] = useState(0)
   const [search, setSearch] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
@@ -206,9 +208,31 @@ export default function CoachLibraryPage() {
       .order('name', { ascending: true })
     setExercises((data ?? []) as CoachExercise[])
     setLoading(false)
+    return (data ?? []).length
   }, [user])
 
-  useEffect(() => { load() }, [load])
+  // A brand new coach should never meet an empty library. The standard
+  // movements are copied in from the exercise library we already have, with
+  // their coaching cues, at no token cost. Video is left blank on purpose:
+  // coaches choose their own demos.
+  const seedIfEmpty = useCallback(async () => {
+    if (!user) return
+    const count = await load()
+    if (count !== 0) return
+    setSeeding(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/coach/seed-library', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token ?? ''}`, 'Content-Type': 'application/json' },
+      })
+      const d = await res.json()
+      if (d.added) { setSeededCount(d.added); await load() }
+    } catch { /* an empty library is recoverable; a crashed page is not */ }
+    setSeeding(false)
+  }, [user, load])
+
+  useEffect(() => { seedIfEmpty() }, [seedIfEmpty])
 
   function openAdd() {
     setEditing(null)
@@ -352,6 +376,23 @@ export default function CoachLibraryPage() {
           <p style={{ fontSize: 13, color: 'var(--text-dim)' }}>
             Your personal exercise database — with videos, instructions, and coaching notes.
           </p>
+          {seeding && (
+            <p style={{ fontSize: 12, color: 'var(--accent)', marginTop: 8, fontWeight: 600 }}>
+              Setting up your starter library…
+            </p>
+          )}
+          {seededCount > 0 && (
+            <div style={{ marginTop: 10, padding: '10px 14px', background: 'var(--accent-bg)', border: '1px solid var(--accent-border)', borderRadius: 10, maxWidth: 620 }}>
+              <p style={{ fontSize: 12.5, color: 'var(--text)', fontWeight: 700, marginBottom: 3 }}>
+                We added {seededCount} standard exercises to get you started
+              </p>
+              <p style={{ fontSize: 11.5, color: 'var(--text-dim)', lineHeight: 1.6 }}>
+                They come with coaching instructions already written. Edit anything you disagree
+                with, or delete what you do not use. Videos are left blank on purpose so you can
+                add your own YouTube links or upload your own footage.
+              </p>
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
           <button
