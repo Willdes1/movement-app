@@ -182,14 +182,6 @@ export default function PlanPage() {
   const [dataLoading, setDataLoading] = useState(true)
   const [showRebuildBlockedModal, setShowRebuildBlockedModal] = useState(false)
 
-  const [exerciseLibrary, setExerciseLibrary] = useState<Record<string, ExerciseDetail>>({})
-  const [selectedExercise, setSelectedExercise] = useState<ExerciseDetail | null>(null)
-  const [lastLog, setLastLog] = useState<WorkoutLog | null>(null)
-  const [logWeight, setLogWeight] = useState('')
-  const [logSets, setLogSets] = useState('')
-  const [logReps, setLogReps] = useState('')
-  const [logSaving, setLogSaving] = useState(false)
-  const [logSaved, setLogSaved] = useState(false)
 
   const [completions, setCompletions] = useState<Set<string>>(new Set())
   const [showCompleteModal, setShowCompleteModal] = useState(false)
@@ -208,12 +200,6 @@ export default function PlanPage() {
     return data
   }, [user])
 
-  const loadLibraryForWeek = useCallback(async (plan: DayPlan[]) => {
-    const names = [...new Set(extractDisplayNames(plan).map(normalizeExerciseName))]
-    if (!names.length) return
-    const { data } = await supabase.from('exercise_library').select(EXERCISE_DISPLAY_COLUMNS).in('name_normalized', names)
-    if (data) setExerciseLibrary(prev => { const n = { ...prev }; (data as unknown as ExerciseDetail[]).forEach(e => { n[e.name_normalized] = e }); return n })
-  }, [])
 
   const populateLibrary = useCallback(async (plan: DayPlan[]) => {
     const displayNames = extractDisplayNames(plan)
@@ -238,8 +224,7 @@ export default function PlanPage() {
         }
       } catch { /* silent */ }
     }
-    await loadLibraryForWeek(plan)
-  }, [loadLibraryForWeek])
+  }, [])
 
   const generateWeek = useCallback(async (prog: Program, weekNum: number, silent = false, instructions = ''): Promise<DayPlan[] | null> => {
     if (!silent) { setGenerating(true); setError(null) }
@@ -351,21 +336,6 @@ export default function PlanPage() {
     window.addEventListener('focus', refetch)
     return () => window.removeEventListener('focus', refetch)
   }, [user, program])
-
-  useEffect(() => {
-    setLastLog(null); setLogWeight(''); setLogSets(''); setLogReps(''); setLogSaved(false)
-    if (!selectedExercise || !user) return
-    supabase.from('workout_logs').select('id, exercise_normalized, logged_at, sets, reps, weight, weight_unit').eq('user_id', userId).eq('exercise_normalized', selectedExercise.name_normalized).order('logged_at', { ascending: false }).limit(1).single().then(({ data }) => { if (data) setLastLog(data as WorkoutLog) })
-  }, [selectedExercise, user])
-
-  async function logSet() {
-    if (!user || !selectedExercise || logSaving || logSaved) return
-    setLogSaving(true)
-    await loggedInsert('workout_logs', { user_id: userId, exercise_normalized: selectedExercise.name_normalized, sets: logSets ? parseInt(logSets) : null, reps: logReps ? parseInt(logReps) : null, weight: logWeight ? parseFloat(logWeight) : null, weight_unit: 'lbs' })
-    const { data } = await supabase.from('workout_logs').select('id, exercise_normalized, logged_at, sets, reps, weight, weight_unit').eq('user_id', userId).eq('exercise_normalized', selectedExercise.name_normalized).order('logged_at', { ascending: false }).limit(1).single()
-    if (data) setLastLog(data as WorkoutLog)
-    setLogSaved(true); setLogSaving(false)
-  }
 
   async function doMarkComplete(weekNum: number, dayIdx: number) {
     if (!program || !user) return
@@ -944,38 +914,10 @@ export default function PlanPage() {
       </div>
 
       {/* Exercise detail modal */}
-      {/* The shared exercise sheet, the same one /calendar uses. This page used
-          to hand-roll its own copy with different section labels, no video and
-          no read-aloud, so the same exercise looked different depending on
-          which page you tapped it from. The Log Set form below is kept as-is
-          and passed through as the footer: it writes an aggregate row to
-          workout_logs, which is not the same thing as TrackWorkout's per-set
-          exercise_set_logs, so swapping it would have quietly changed what this
-          page records. */}
-      {selectedExercise && (
-        <ExerciseDetailModal
-          data={selectedExercise}
-          lastLog={lastLog}
-          userId={userId}
-          onClose={() => setSelectedExercise(null)}
-          footer={
-            <div style={{ padding: '14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)' }}>
-              <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--text-dim)', marginBottom: 10, textTransform: 'uppercase' }}>Log Set</p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
-                {[{ label: 'Weight (lbs)', value: logWeight, set: setLogWeight }, { label: 'Sets', value: logSets, set: setLogSets }, { label: 'Reps', value: logReps, set: setLogReps }].map(({ label, value, set }) => (
-                  <div key={label}>
-                    <p style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 4, letterSpacing: '0.04em' }}>{label}</p>
-                    <input type="number" inputMode="decimal" value={value} onChange={e => { set(e.target.value); setLogSaved(false) }} style={{ width: '100%', padding: '8px 6px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 15, fontWeight: 700, boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none', textAlign: 'center' }} />
-                  </div>
-                ))}
-              </div>
-              <button onClick={logSet} disabled={logSaving || logSaved} style={{ width: '100%', padding: '11px', borderRadius: 8, border: 'none', background: logSaved ? '#4ec97a' : 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: logSaving || logSaved ? 'default' : 'pointer', transition: 'background 0.2s' }}>
-                {logSaving ? 'Saving…' : logSaved ? '✓ Logged' : 'Log Set'}
-              </button>
-            </div>
-          }
-        />
-      )}
+      {/* The exercise sheet that used to live here has been removed. Nothing on
+          this page ever opened it: setSelectedExercise was only ever called with
+          null. It was unreachable code, and the week view already sends you to
+          the calendar day for the detail, which is where the real sheet is. */}
 
       {/* Missed days modal */}
       {showCompleteModal && (
