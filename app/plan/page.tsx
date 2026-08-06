@@ -7,7 +7,6 @@ import { supabase } from '@/lib/supabase'
 import { usePlanGeneration } from '@/components/PlanGenerationContext'
 import { usePlan } from '@/lib/usePlan'
 import UpgradeModal from '@/components/UpgradeModal'
-import ExerciseDetailModal from '@/components/ui/ExerciseDetailModal'
 import { EXERCISE_DISPLAY_COLUMNS, type ExerciseDisplayRow } from '@/lib/exercise-columns'
 import { isProgramElapsed, localDateKey, parseDateKey } from '@/lib/program-progress'
 import ProgramResumeActions from '@/components/ProgramResumeActions'
@@ -21,7 +20,6 @@ type Program = { id: string; startDate: string; totalWeeks: number; status: stri
 // Video and narration were previously absent from both, which is why this
 // page's exercise sheet could never show either.
 type ExerciseDetail = ExerciseDisplayRow
-type WorkoutLog = { id: string; exercise_normalized: string; logged_at: string; sets: number | null; reps: number | null; weight: number | null; weight_unit: string }
 type CompletionInsert = { user_id: string; program_id: string; week_number: number; day_index: number; skipped: boolean }
 
 function parseExerciseName(m: string) { return m.replace(/\s+\d+[×x]\d+.*$/i, '').replace(/\s+\d+\s+sets?.*$/i, '').trim() }
@@ -153,7 +151,7 @@ function AIIcon({ size = 22 }: { size?: number }) {
 }
 
 export default function PlanPage() {
-  const { user, loading: authLoading, isAdmin, role, effectiveUserId, loggedInsert } = useAuth()
+  const { user, loading: authLoading, isAdmin, role, effectiveUserId } = useAuth()
   const userId = effectiveUserId ?? user?.id ?? ''
   const isFF = !isAdmin && role === 'ff'
   const router = useRouter()
