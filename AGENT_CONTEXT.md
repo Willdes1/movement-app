@@ -99,8 +99,116 @@
 
 ---
 
-## 4. What Was Built This Session (2026-07-25 → 08-01)
+## 4. What Was Built This Session (2026-08-04 → 08-06)
 
+**34 commits, all deployed green. Curation queue Tasks 5 and 6 COMPLETE, so tasks 1 to 6
+are done. Plus a launch-blocking blank screen fixed, a whole program-lifecycle flow, and
+the coach starter library built end to end. NO new SQL migrations: everything this session
+was code only.**
+
+### 🔊 Task 5 — voice playback, DONE (all 5 spec items)
+- `contexts/TTSContext.tsx` replaced the per-component `useTTS` hook. **One audio element
+  for the whole app.** Fixed the three bugs from the roadmap: the toggle restarted instead
+  of stopping (`speak()` resolves when playback BEGINS, not ends), two clips could overlap,
+  and audio could start after you navigated away (no AbortController).
+- **Billing leak closed:** `/api/tts` regenerated and re-billed OpenAI even when the audio
+  already existed. Server read-through added, reported via `X-TTS-Cache`.
+- Per-section playback is a **seek into the existing MP3**, not a second generation, so
+  reading one section costs nothing. Section highlight is estimated from character position.
+- Global mini player (pause/resume/stop/seek/speed/voice). `lib/speech-text.ts` is now the
+  single narration builder; the three call sites had disagreed with each other AND with the
+  generator that produced the cached files.
+- Also fixed: a coach's overridden cues could be saved onto the shared `exercise_library`
+  row and served to every other athlete.
+
+### 🧩 Task 6 — library consolidation, DONE
+- **item 4 (unilateral):** library-wide audit + explicit-selection requeue
+  (`/api/admin/unilateral-audit`, `UnilateralAuditPanel`). Real count: **29 with video, 28
+  never trimmed**, out of 90 unilateral in 2,050. Will requeued all 29.
+- **item 1 (audit + consolidate):** `docs/library-render-audit.md`, then four commits.
+  `lib/exercise-columns.ts` is the single column list + row type. `/plan`'s hand-rolled
+  duplicate sheet deleted. Two-query fallbacks in `/exercises` and `/mobility` dropped.
+  `components/ui/ReadAloudButton.tsx` added read-aloud to `/browse`, `/exercises`, `/mobility`.
+- **A correction worth carrying:** `/plan`'s exercise sheet was **unreachable dead code**
+  (`setSelectedExercise` was only ever called with `null`). Swapping it for the shared modal
+  improved a screen no user can open. It is now deleted, along with a query that ran on
+  every plan load to fill it.
+- **A naming bug caught from a screenshot:** `/Alt\.?/` can never consume the trailing
+  dot, so "Alt. DB Curls" became "Alternating. Dumbbell Curls" and the narration read it as
+  a sentence break. Seven sibling rules had the same shape. Fixed + a repair pass.
+
+### 🚨 Program lifecycle — a launch blocker, fixed
+- Will's 13 weeks had elapsed. **Start Session, the main CTA, led to a blank page.** Home
+  and Calendar had two incompatible models of "what day is it": Home clamped to week 13 and
+  replayed it forever, Calendar mapped real dates and had nothing.
+- `lib/program-progress.ts` is now the single source. Home shows a completion state.
+  `/plan`'s Program Complete screen existed and was **unreachable** (gated on the viewing
+  week having no plan, so anyone who generated all 13 weeks never saw it).
+- **Free ways back:** `/api/user/program-restart`, modes `resume` (first unfinished week
+  moves onto today, keeps completions) and `fresh` (week 1 onto today, clears completions).
+  Both are a one-field `start_date` shift, no regeneration, no tokens. Gap prompt on Home
+  after 2+ weeks of drift. **Never auto-shifts dates.** See [[project_program_lifecycle]].
+- **Timezone off-by-one fixed:** `toISOString()` is UTC, so the calendar keyed a workout
+  under one date and looked it up by a different weekday. Home and Calendar showed different
+  workouts for the same day. All dates now local via `localDateKey`/`parseDateKey`.
+
+### 🏋️ Coach starter library — all 5 steps DONE
+- 52 standard movements (`lib/coach-starter-library.ts`) + 8 workout templates. Coverage
+  scan in Library Builder; Will generated the 31 missing audio files for ~65 cents.
+- **Seeding is live:** first time a coach opens an empty library, the 52 are copied in with
+  cues. Zero tokens, it is a copy. **Video deliberately blank** (Will's call: coaches pick
+  their own demos). `/api/coach/seed-library`.
+- **Prescription moved out of the library and into the builder:** sets, reps, rest and load
+  are per program, not per exercise, because two clients get different numbers off the same
+  Bench Press. Four labelled fields. `movements` keeps its "Bench Press 4x8" shape (three
+  consumers parse it), extras ride in `movement_details`.
+- **Coach library names cleaned** + the import path fixed so abbreviations stop recurring,
+  plus a dedup bug that would have inserted duplicates after any rename.
+- **Coached athletes no longer inherit our videos.** Hard separation, Will's decision.
+
+### 🪤 Two traps removed from the coach builder
+- **"Set rest"** did not set rest. It converted the day to a rest day AND deleted every
+  exercise on it. Renamed "Make rest day", now confirms first.
+- Prescription inputs had placeholders and no labels.
+
+### ▶️ NEXT SESSION — start here
+
+1. **Task 7, design token audit.** Will's spec: inventory every hardcoded primary colour,
+   accent, background, font family, font size, border radius, button height, card spacing,
+   shadow, logo path and icon size across the codebase; report centralised vs hardcoded;
+   consolidate into ONE semantic token layer (`--color-readiness-positive`, `--radius-card`,
+   semantic names not literal colours); apply across athlete, coach, admin AND the marketing
+   site; then a responsive audit at six widths.
+   **HARD RULE from the spec: no visual design changes. Same pixels, different plumbing, so
+   he can diff it and see nothing moved.** Start with the inventory report, same shape as
+   `docs/library-render-audit.md`, which proved its worth.
+2. **Tasks 8, 9, 10** after it. Will said "the rest of the tasks, I believe, is nine".
+3. **THEN, and only after the whole queue:** Shawn Stiffler (CEO), the admin "Ask me
+   anything" KB, Marketing Hub verification. **Will corrected me on this: those come after
+   tasks 1-10, NOT after task 6.**
+4. **Billing and pricing (Stripe + Apple) comes before Paul.**
+
+### 🔑 Magic phrases (see [[project_magic_phrases]])
+- **"It's time to onboard Paul."** → pause the roadmap, run `to-do/paul-onboarding.md`.
+- **"Let's see our onboarding process for the Coach Portal."** → `to-do/coach-onboarding-preview.md`.
+
+### 🧾 Open, non-blocking
+- **28 or 29 unilateral exercises now have NO video** and sit in the Video Curation backlog.
+  Will requeued all 29 (the recount read 0, so the one hand-trimmed video went too). They
+  need a curation pass; athletes see "video coming soon" until then.
+- **`supabase/checks/program-fk-check.sql`** is read-only and unrun. It answers whether
+  `ON DELETE CASCADE` is set on `training_programs`. The bad case is NO ACTION: the old
+  "Start a Fresh Plan" button does not check the delete for an error, so it would insert a
+  SECOND program row and `.single()` queries would start throwing. Orphan count came back 0,
+  which means nothing is broken today but says nothing about the next delete.
+- Task 6 items 2/3 leftovers: the naming convention was never written up as a document, and
+  the full reviewable old-to-new mapping file does not exist. Low value now.
+- `npm run build` cannot complete locally: `STRIPE_SECRET_KEY` is absent from `.env.local`
+  and `lib/stripe.ts` builds its client at module scope. Vercel has the key. Use
+  `npx tsc --noEmit` locally.
+
+
+## Previous Session (2026-07-25 → 08-01)
 **33 commits. Tasks 1, 2 and 3 of the curation queue COMPLETE, Task 4 mostly complete.
 Per-video curation cost went from 201 quota units to ~0. Six SQL migrations run by Will
 (ledger 46). All deployed green.**
