@@ -52,7 +52,7 @@ type Form = {
   gender: string
   sports: string[]
   customSport: string
-  goal: string
+  goals: string[]
   daysPerWeek: number
   sessionLength: string
   workoutLocation: string
@@ -65,7 +65,7 @@ type Form = {
 const DEFAULT: Form = {
   name: '', age: '', gender: '',
   sports: [], customSport: '',
-  goal: '', daysPerWeek: 4, sessionLength: '60 min',
+  goals: [], daysPerWeek: 4, sessionLength: '60 min',
   workoutLocation: '', homeEquipment: [],
   hasRestrictions: false, restrictionAreas: [], restrictionNotes: '',
 }
@@ -90,6 +90,28 @@ function Chip({ label, active, onClick }: { label: string; active: boolean; onCl
   )
 }
 
+// ─── "Why we ask" disclosure ─────────────────────────────────────────────────
+// Every question the AI uses should be able to explain itself. Collapsed by
+// default so the flow stays short for people who just want to get through it.
+function WhyWeAsk({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', padding: 0, textDecoration: 'underline' }}
+      >
+        {open ? '▲ Hide' : '▼ Why we ask'}
+      </button>
+      {open && (
+        <p style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.6, marginTop: 8, padding: '10px 12px', background: 'var(--surface2)', borderRadius: 8 }}>
+          {children}
+        </p>
+      )}
+    </div>
+  )
+}
+
 // ─── Step 1: You ─────────────────────────────────────────────────────────────
 function StepYou({ form, set }: { form: Form; set: (k: keyof Form, v: string) => void }) {
   const [showWhyGender, setShowWhyGender] = useState(false)
@@ -98,8 +120,11 @@ function StepYou({ form, set }: { form: Form; set: (k: keyof Form, v: string) =>
       <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--text)', marginBottom: 6, letterSpacing: '-0.02em' }}>
         Welcome to Atlas Prime.
       </div>
-      <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 28, lineHeight: 1.6 }}>
+      <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 12, lineHeight: 1.6 }}>
         Let's set up your profile so the AI can build a plan that actually fits your life. Takes about 2 minutes.
+      </p>
+      <p style={{ fontSize: 12.5, color: 'var(--text-dim)', marginBottom: 28, lineHeight: 1.6, padding: '10px 12px', background: 'var(--surface2)', borderRadius: 8 }}>
+        Every question here feeds the AI that writes your program, and each one explains itself if you tap “Why we ask”. None of it is required. You can hit <strong style={{ color: 'var(--text-mid)' }}>Skip all of this</strong> and fill it in later from your Profile whenever you want.
       </p>
 
       <Field label="First name">
@@ -151,9 +176,13 @@ function StepSport({ form, set, toggle }: { form: Form; set: (k: keyof Form, v: 
       <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--text)', marginBottom: 6, letterSpacing: '-0.02em' }}>
         What sports or activities do you do?
       </div>
-      <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 20, lineHeight: 1.6 }}>
-        Pick as many as apply. This shapes your training style, movement patterns, and recovery protocols.
+      <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 12, lineHeight: 1.6 }}>
+        Pick as many as apply.
       </p>
+
+      <WhyWeAsk>
+        Your sports decide which movement patterns your plan trains and which tight spots it works on. A snowboarder needs ankle and hip mobility a golfer does not, and a lifter who also skates needs knee and landing work built in. Pick everything you actually do and the plan accounts for all of it.
+      </WhyWeAsk>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
         {SPORTS.map(s => (
@@ -177,33 +206,40 @@ function StepSport({ form, set, toggle }: { form: Form; set: (k: keyof Form, v: 
 }
 
 // ─── Step 3: Goals + Training ────────────────────────────────────────────────
-function StepGoals({ form, set, setNum }: { form: Form; set: (k: keyof Form, v: string) => void; setNum: (k: keyof Form, v: number) => void }) {
+function StepGoals({ form, set, setNum, toggle }: { form: Form; set: (k: keyof Form, v: string) => void; setNum: (k: keyof Form, v: number) => void; toggle: (item: string) => void }) {
   return (
     <div>
       <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--text)', marginBottom: 6, letterSpacing: '-0.02em' }}>
-        What's your primary goal?
+        What are you training for?
       </div>
-      <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 20, lineHeight: 1.6 }}>
-        The AI will prioritize this when building your program.
+      <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 12, lineHeight: 1.6 }}>
+        Pick as many as apply.
       </p>
 
+      <WhyWeAsk>
+        Goals change how your plan is built, not just what it is called. Strength work uses heavier loads and longer rests; fat loss keeps rests short and volume higher; injury recovery drops the load and adds tissue work first. If you pick more than one, the plan balances them instead of guessing.
+      </WhyWeAsk>
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 28 }}>
-        {GOALS.map(g => (
-          <button
-            key={g}
-            onClick={() => set('goal', g)}
-            style={{
-              padding: '12px 16px', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
-              fontSize: 14, fontWeight: form.goal === g ? 700 : 500, textAlign: 'left',
-              border: `1.5px solid ${form.goal === g ? 'var(--accent)' : 'var(--border)'}`,
-              background: form.goal === g ? 'rgba(255,92,53,0.10)' : 'var(--surface2, #1a1f27)',
-              color: form.goal === g ? 'var(--accent)' : 'var(--text)',
-              transition: 'all 0.15s',
-            }}
-          >
-            {g}
-          </button>
-        ))}
+        {GOALS.map(g => {
+          const on = form.goals.includes(g)
+          return (
+            <button
+              key={g}
+              onClick={() => toggle(g)}
+              style={{
+                padding: '12px 16px', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
+                fontSize: 14, fontWeight: on ? 700 : 500, textAlign: 'left',
+                border: `1.5px solid ${on ? 'var(--accent)' : 'var(--border)'}`,
+                background: on ? 'rgba(255,92,53,0.10)' : 'var(--surface2, #1a1f27)',
+                color: on ? 'var(--accent)' : 'var(--text)',
+                transition: 'all 0.15s',
+              }}
+            >
+              {g}
+            </button>
+          )
+        })}
       </div>
 
       <Field label="Training days per week">
@@ -244,9 +280,13 @@ function StepEquipment({ form, set, toggle }: { form: Form; set: (k: keyof Form,
       <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--text)', marginBottom: 6, letterSpacing: '-0.02em' }}>
         Where do you train?
       </div>
-      <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 20, lineHeight: 1.6 }}>
+      <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 12, lineHeight: 1.6 }}>
         The AI uses this to select the right exercises for your environment.
       </p>
+
+      <WhyWeAsk>
+        There is no point being handed a cable-machine program if you train in a garage with two dumbbells. This tells the plan which equipment it is allowed to use, so every exercise you get is one you can actually do.
+      </WhyWeAsk>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 24 }}>
         {LOCATIONS.map(loc => (
@@ -422,6 +462,13 @@ export default function OnboardingModal() {
     }))
   }
 
+  function toggleGoal(item: string) {
+    setForm(f => ({
+      ...f,
+      goals: f.goals.includes(item) ? f.goals.filter(x => x !== item) : [...f.goals, item],
+    }))
+  }
+
   function toggleEquipment(item: string) {
     setForm(f => ({
       ...f,
@@ -453,7 +500,7 @@ export default function OnboardingModal() {
       age: form.age || null,
       gender: form.gender || null,
       sport: sportVal || null,
-      goal: form.goal || null,
+      goal: form.goals.join(', ') || null,
       days_per_week: form.daysPerWeek,
       session_length: form.sessionLength || null,
       workout_location: form.workoutLocation || null,
@@ -531,9 +578,13 @@ export default function OnboardingModal() {
           </span>
           <button
             onClick={skip}
-            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', padding: '4px 8px' }}
+            style={{
+              background: 'var(--surface2, #1a1f27)', border: '1px solid var(--border)', borderRadius: 8,
+              color: 'var(--text-mid)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              fontFamily: 'inherit', padding: '6px 12px',
+            }}
           >
-            Skip setup
+            Skip all of this
           </button>
         </div>
 
@@ -541,7 +592,7 @@ export default function OnboardingModal() {
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
           {step === 1 && <StepYou form={form} set={set} />}
           {step === 2 && <StepSport form={form} set={set} toggle={toggleSport} />}
-          {step === 3 && <StepGoals form={form} set={set} setNum={setNum} />}
+          {step === 3 && <StepGoals form={form} set={set} setNum={setNum} toggle={toggleGoal} />}
           {step === 4 && <StepEquipment form={form} set={set} toggle={toggleEquipment} />}
           {step === 5 && <StepRestrictions form={form} set={set} setB={() => {}} toggle={toggleRestriction} />}
         </div>

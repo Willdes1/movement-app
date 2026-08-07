@@ -132,7 +132,15 @@ export default function AuthPage() {
         validatedPromo = promo
       }
 
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password })
+      // signup_role rides on the auth user record itself, so the coach intent
+      // survives the confirmation link opening in a brand new tab. sessionStorage
+      // does not: it is per-tab, which is why coach signups were landing as
+      // athletes whenever email confirmation was on.
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        ...(asCoach ? { options: { data: { signup_role: 'coach' } } } : {}),
+      })
       if (signUpError) {
         setError(signUpError.message)
         setLoading(false)

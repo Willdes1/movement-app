@@ -84,7 +84,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   impersonatedUserIdRef.current = impersonatedUserId
   userRef.current = user
 
-  async function fetchUserStatus(userId: string) {
+  /**
+   * Someone who signed up through the coach path gets `signup_role: 'coach'`
+   * stamped on their auth user record at signup. We apply it here because this
+   * runs on every path into the app, including the email-confirmation link
+   * opening in a fresh tab, where the old sessionStorage flag was always gone.
+   *
+   * One-shot: the flag is cleared once applied, so a later deliberate role
+   * change is never silently undone. Metadata comes off the session we already
+   * hold, so this costs no extra round trip.
+   */
+  async function reconcileSignupRole(authUser: User, currentRole: string | null, admin: boolean): Promise<string | null> {
+    if (admin || currentRole === 'coach') return null
+    if (authUser.user_metadata?.signup_role !== 'coach') return null
+    const { error } = await supabase.from('profiles').update({ role: 'coach' }).eq('id', authUser.id)
+    if (error) return null
+    try { await supabase.auth.updateUser({ data: { signup_role: null } }) } catch { /* non-fatal — guard above stops a re-apply */ }
+    return 'coach'
+  }
+
+  async function fetchUserStatus(authUser: User) {
+    const userId = authUser.id
     const { data } = await supabase
       .from('profiles')
       .select('is_admin, is_owner, role')
@@ -94,7 +114,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const owner = admin || data?.is_owner === true
     setIsAdmin(admin)
     setIsOwner(owner)
-    setRole(data?.role ?? (admin ? 'admin' : 'free'))
+    const applied = await reconcileSignupRole(authUser, data?.role ?? null, admin)
+    setRole((applied ?? data?.role ?? (admin ? 'admin' : 'free')) as 'admin' | 'coach' | 'beta' | 'free' | 'ff')
 
     if (owner) {
       // Owner sees everything — no tab restriction.
@@ -168,7 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
-      if (session?.user) await fetchUserStatus(session.user.id)
+      if (session?.user) await fetchUserStatus(session.user)
       setLoading(false)
     })
 
@@ -176,7 +197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session)
       setUser(session?.user ?? null)
       if (session?.user) {
-        fetchUserStatus(session.user.id)
+        fetchUserStatus(session.user)
       } else {
         setIsAdmin(false)
         setIsOwner(false)

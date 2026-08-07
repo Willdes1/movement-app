@@ -21,14 +21,22 @@ export default function AuthCallbackPage() {
       }
 
       // Coach signup via /coaches → assign role and land in the Coach Portal.
+      // The metadata check is the one that survives a new tab; the sessionStorage
+      // flag only ever worked when the redirect came back to the original tab.
+      let coachIntent = data.user.user_metadata?.signup_role === 'coach'
       try {
-        if (sessionStorage.getItem('pendingCoach')) {
-          await supabase.from('profiles').upsert({ id: data.user.id, role: 'coach' })
-          sessionStorage.removeItem('pendingCoach')
-          router.replace('/coach/dashboard')
-          return
-        }
+        if (sessionStorage.getItem('pendingCoach')) coachIntent = true
       } catch { /* silent — session storage unavailable */ }
+
+      if (coachIntent) {
+        await supabase.from('profiles').upsert({ id: data.user.id, role: 'coach' })
+        try {
+          await supabase.auth.updateUser({ data: { signup_role: null } })
+          sessionStorage.removeItem('pendingCoach')
+        } catch { /* silent */ }
+        router.replace('/coach/dashboard')
+        return
+      }
 
       // Apply promo code stored before the OAuth redirect (signup flow)
       try {
