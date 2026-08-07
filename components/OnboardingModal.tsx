@@ -50,7 +50,7 @@ type Form = {
   name: string
   age: string
   gender: string
-  sport: string
+  sports: string[]
   customSport: string
   goal: string
   daysPerWeek: number
@@ -64,7 +64,7 @@ type Form = {
 
 const DEFAULT: Form = {
   name: '', age: '', gender: '',
-  sport: '', customSport: '',
+  sports: [], customSport: '',
   goal: '', daysPerWeek: 4, sessionLength: '60 min',
   workoutLocation: '', homeEquipment: [],
   hasRestrictions: false, restrictionAreas: [], restrictionNotes: '',
@@ -145,23 +145,23 @@ function StepYou({ form, set }: { form: Form; set: (k: keyof Form, v: string) =>
 }
 
 // ─── Step 2: Sport ───────────────────────────────────────────────────────────
-function StepSport({ form, set }: { form: Form; set: (k: keyof Form, v: string) => void }) {
+function StepSport({ form, set, toggle }: { form: Form; set: (k: keyof Form, v: string) => void; toggle: (item: string) => void }) {
   return (
     <div>
       <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--text)', marginBottom: 6, letterSpacing: '-0.02em' }}>
-        What's your primary sport or activity?
+        What sports or activities do you do?
       </div>
       <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 20, lineHeight: 1.6 }}>
-        This shapes your training style, movement patterns, and recovery protocols.
+        Pick as many as apply. This shapes your training style, movement patterns, and recovery protocols.
       </p>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
         {SPORTS.map(s => (
-          <Chip key={s} label={s} active={form.sport === s} onClick={() => set('sport', s)} />
+          <Chip key={s} label={s} active={form.sports.includes(s)} onClick={() => toggle(s)} />
         ))}
       </div>
 
-      {form.sport === 'Other' && (
+      {form.sports.includes('Other') && (
         <Field label="Tell us more">
           <input
             value={form.customSport}
@@ -411,6 +411,17 @@ export default function OnboardingModal() {
     setForm(f => ({ ...f, [k]: v }))
   }
 
+  function toggleSport(item: string) {
+    setForm(f => ({
+      ...f,
+      sports: f.sports.includes(item)
+        ? f.sports.filter(x => x !== item)
+        : [...f.sports, item],
+      // dropping "Other" clears the free-text box so it can't be saved invisibly
+      customSport: item === 'Other' && f.sports.includes(item) ? '' : f.customSport,
+    }))
+  }
+
   function toggleEquipment(item: string) {
     setForm(f => ({
       ...f,
@@ -430,7 +441,12 @@ export default function OnboardingModal() {
   }
 
   function buildUpsertPayload() {
-    const sportVal = form.sport === 'Other' ? form.customSport : form.sport
+    // Stored as a ", "-joined string, the same shape /profile writes and reads
+    // (parseList splits on ", "), and the plan generator prints as "Primary sport(s)".
+    const sportVal = [
+      ...form.sports.filter(s => s !== 'Other'),
+      ...(form.sports.includes('Other') && form.customSport.trim() ? [form.customSport.trim()] : []),
+    ].join(', ')
     return {
       id: user!.id,
       name: form.name || null,
@@ -524,7 +540,7 @@ export default function OnboardingModal() {
         {/* Scrollable content */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
           {step === 1 && <StepYou form={form} set={set} />}
-          {step === 2 && <StepSport form={form} set={set} />}
+          {step === 2 && <StepSport form={form} set={set} toggle={toggleSport} />}
           {step === 3 && <StepGoals form={form} set={set} setNum={setNum} />}
           {step === 4 && <StepEquipment form={form} set={set} toggle={toggleEquipment} />}
           {step === 5 && <StepRestrictions form={form} set={set} setB={() => {}} toggle={toggleRestriction} />}
