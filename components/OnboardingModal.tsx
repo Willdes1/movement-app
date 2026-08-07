@@ -3,17 +3,10 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
+import { SPORTS, joinSports } from '@/lib/sports'
 
 const ONBOARDING_KEY = (id: string) => `onboarding_v1_${id}`
 const WELCOME_KEY    = (id: string) => `movement_welcomed_${id}`
-
-const SPORTS = [
-  'Gym / Weight Training', 'Running', 'Cycling', 'Swimming',
-  'Basketball', 'Soccer / Football', 'Tennis / Pickleball', 'Golf',
-  'Skateboarding', 'Snowboarding / Skiing', 'Surfing',
-  'Martial Arts / Combat Sports', 'Yoga / Pilates',
-  'CrossFit / HIIT', 'Hiking / Trail', 'Other',
-]
 
 const GOALS = [
   'Build strength & muscle',
@@ -417,6 +410,7 @@ export default function OnboardingModal() {
   const [step, setStep]       = useState(1)
   const [form, setForm]       = useState<Form>(DEFAULT)
   const [saving, setSaving]   = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
     if (loading || !user) return
@@ -425,19 +419,36 @@ export default function OnboardingModal() {
       return
     }
     if (localStorage.getItem(ONBOARDING_KEY(user.id))) return
-    // Secondary check: if profile already has data they've onboarded on another device
-    supabase
-      .from('profiles')
-      .select('name, sport')
-      .eq('id', user.id)
-      .single()
-      .then(({ data }) => {
-        if (data?.name || data?.sport) {
-          localStorage.setItem(ONBOARDING_KEY(user.id), '1')
-        } else {
-          setShow(true)
-        }
-      })
+
+    // Whether someone has been through this lives in the database, not just in
+    // localStorage, which is per browser and per device. Reading the durable
+    // flag is what stops the questionnaire coming back on a second device or
+    // after site data is cleared.
+    void (async () => {
+      let res = await supabase
+        .from('profiles')
+        .select('name, sport, onboarding_status')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      // Safe to deploy before 20260807_onboarding_status.sql is run: if the
+      // column is not there yet, fall back to the older heuristic.
+      if (res.error && /onboarding_status/.test(res.error.message)) {
+        res = await supabase.from('profiles').select('name, sport').eq('id', user.id).maybeSingle()
+      }
+
+      const data = res.data as { name?: string | null; sport?: string | null; onboarding_status?: string | null } | null
+      const alreadyHandled =
+        data?.onboarding_status === 'completed' ||
+        data?.onboarding_status === 'skipped' ||
+        !!(data?.name || data?.sport)
+
+      if (alreadyHandled) {
+        localStorage.setItem(ONBOARDING_KEY(user.id), '1')
+        return
+      }
+      setShow(true)
+    })()
   }, [user, loading, isAdmin, role])
 
   function set(k: keyof Form, v: string) {
@@ -488,12 +499,7 @@ export default function OnboardingModal() {
   }
 
   function buildUpsertPayload() {
-    // Stored as a ", "-joined string, the same shape /profile writes and reads
-    // (parseList splits on ", "), and the plan generator prints as "Primary sport(s)".
-    const sportVal = [
-      ...form.sports.filter(s => s !== 'Other'),
-      ...(form.sports.includes('Other') && form.customSport.trim() ? [form.customSport.trim()] : []),
-    ].join(', ')
+    const sportVal = joinSports(form.sports, form.customSport)
     return {
       id: user!.id,
       name: form.name || null,
@@ -512,20 +518,44 @@ export default function OnboardingModal() {
     }
   }
 
+  /**
+   * Writes the answers, and optionally the durable onboarding flag.
+   *
+   * supabase-js reports failures on the returned `error`, it does not throw, so
+   * the old try/catch here caught nothing and every failed write was invisible.
+   * That is how the questionnaire could be filled in properly and still come
+   * back: nothing was ever saved, and nobody was told.
+   */
+  async function persist(status?: 'completed' | 'skipped'): Promise<string | null> {
+    if (!user) return null
+    const payload = buildUpsertPayload()
+    const withStatus = status
+      ? { ...payload, onboarding_status: status, onboarding_updated_at: new Date().toISOString() }
+      : payload
+
+    let { error } = await supabase.from('profiles').upsert(withStatus, { onConflict: 'id' })
+
+    // Migration not run yet — still save the answers rather than losing them.
+    if (error && /onboarding_status|onboarding_updated_at/.test(error.message)) {
+      ({ error } = await supabase.from('profiles').upsert(payload, { onConflict: 'id' }))
+    }
+    return error ? error.message : null
+  }
+
   async function saveAndNext() {
     if (!user) return
     setSaving(true)
-    try {
-      await supabase.from('profiles').upsert(buildUpsertPayload(), { onConflict: 'id' })
-    } catch { /* silent — data saved again on next step */ } finally {
-      setSaving(false)
-    }
+    setSaveError(null)
+    const last = step === TOTAL
+    const err = await persist(last ? 'completed' : undefined)
+    setSaving(false)
 
-    if (step < TOTAL) {
-      setStep(s => s + 1)
-    } else {
-      finish()
-    }
+    // Do not advance past a failed write. Advancing would throw the answers
+    // away and land them back here on the next login with no explanation.
+    if (err) { setSaveError(err); return }
+
+    if (last) finish()
+    else setStep(s => s + 1)
   }
 
   function finish() {
@@ -541,7 +571,10 @@ export default function OnboardingModal() {
     localStorage.setItem(ONBOARDING_KEY(user.id), '1')
     localStorage.setItem(WELCOME_KEY(user.id), '1')
     setShow(false)
-    try { await supabase.from('profiles').upsert(buildUpsertPayload(), { onConflict: 'id' }) } catch { /* silent */ }
+    // 'skipped' is recorded deliberately: it keeps the modal away on every
+    // device while still marking them as someone to prompt later, who can fill
+    // this in from Profile whenever they want.
+    await persist('skipped')
   }
 
   if (!show) return null
@@ -596,6 +629,18 @@ export default function OnboardingModal() {
           {step === 4 && <StepEquipment form={form} set={set} toggle={toggleEquipment} />}
           {step === 5 && <StepRestrictions form={form} set={set} setB={() => {}} toggle={toggleRestriction} />}
         </div>
+
+        {/* Save failure — visible, because a silent one meant answers vanished */}
+        {saveError && (
+          <div style={{ padding: '12px 24px', borderTop: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', flexShrink: 0 }}>
+            <p style={{ fontSize: 12.5, color: '#ef4444', lineHeight: 1.5, fontWeight: 600, marginBottom: 2 }}>
+              Your answers could not be saved.
+            </p>
+            <p style={{ fontSize: 11.5, color: 'var(--text-dim)', lineHeight: 1.5, fontFamily: 'monospace' }}>
+              {saveError}
+            </p>
+          </div>
+        )}
 
         {/* Footer */}
         <div style={{

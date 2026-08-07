@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { SPORTS, joinSports } from '@/lib/sports'
 
 const STORAGE_KEY = (id: string) => `coach_onboarded_${id}`
 
@@ -11,11 +12,24 @@ export default function OnboardingOverlay() {
   const router   = useRouter()
 
   const [visible, setVisible]     = useState(false)
-  const [step, setStep]           = useState(1)        // 1 welcome · 2 invite · 3 done
+  const [step, setStep]           = useState(1)        // 1 welcome · 2 self-training · 3 invite · 4 done
   const [name, setName]           = useState('')
   const [inviteCode, setInviteCode] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
   const [copied, setCopied]       = useState(false)
+
+  // Coach self-training. A coaching account also comes with the athlete app, so
+  // we ask once whether they train themselves. Answering yes lets APIE build
+  // THEM a real program instead of guessing from an empty profile. Saying no is
+  // a real answer, recorded, so we stop asking.
+  const [selfTrains, setSelfTrains] = useState<boolean | null>(null)
+  const [sports, setSports]         = useState<string[]>([])
+  const [customSport, setCustomSport] = useState('')
+  const [savingSelf, setSavingSelf] = useState(false)
+  const [selfError, setSelfError]   = useState<string | null>(null)
+
+  const toggleSport = (s: string) =>
+    setSports(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])
 
   useEffect(() => {
     if (!user) return
@@ -59,9 +73,48 @@ export default function OnboardingOverlay() {
     router.push('/coach/builder')
   }
 
+  /**
+   * Saves the coach's own training answers, then moves on.
+   *
+   * Writes profiles.sport in the same ", "-joined shape the athlete
+   * questionnaire uses, so the plan generator and the sport-specialist agent
+   * read it identically for a coach and for a client.
+   *
+   * onboarding_status records that we asked, so a coach who says "no" is not
+   * asked again on their next device. Tolerates the column not existing yet, so
+   * this ships safely before 20260807_onboarding_status.sql is run.
+   */
+  async function saveSelfTraining(next: number) {
+    if (!user) return
+    setSavingSelf(true)
+    setSelfError(null)
+
+    const base: Record<string, unknown> = { id: user.id, updated_at: new Date().toISOString() }
+    if (selfTrains) {
+      const joined = joinSports(sports, customSport)
+      if (joined) base.sport = joined
+    }
+    const withStatus = {
+      ...base,
+      onboarding_status: selfTrains ? 'completed' : 'skipped',
+      onboarding_updated_at: new Date().toISOString(),
+    }
+
+    let { error } = await supabase.from('profiles').upsert(withStatus, { onConflict: 'id' })
+    if (error && /onboarding_status|onboarding_updated_at/.test(error.message)) {
+      ({ error } = await supabase.from('profiles').upsert(base, { onConflict: 'id' }))
+    }
+    setSavingSelf(false)
+
+    // Surfaced rather than swallowed: a silent failure here is how the athlete
+    // questionnaire ended up asking the same person the same things forever.
+    if (error) { setSelfError(error.message); return }
+    setStep(next)
+  }
+
   if (!visible) return null
 
-  const totalSteps = 3
+  const totalSteps = 4
 
   return (
     <>
@@ -109,7 +162,7 @@ export default function OnboardingOverlay() {
               Welcome, {name}!
             </h2>
             <p style={{ fontSize: 14, color: 'var(--text-dim)', lineHeight: 1.7, marginBottom: 32, maxWidth: 380, margin: '0 auto 32px' }}>
-              Your Coach Portal is ready. In two quick steps you'll generate your client invite code and build your first program. Takes about 2 minutes.
+              Your Coach Portal is ready. In three quick steps we'll set up your own training, generate your client invite code, and build your first program. Takes about 2 minutes.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -130,11 +183,120 @@ export default function OnboardingOverlay() {
           </div>
         )}
 
-        {/* ── STEP 2: INVITE CODE ───────────────────────────────────────────── */}
+        {/* ── STEP 2: DO YOU TRAIN YOURSELF? ────────────────────────────────── */}
         {step === 2 && (
           <div>
             <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>
-              Step 1 of 2
+              Step 1 of 3
+            </div>
+            <h2 style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em', marginBottom: 10 }}>
+              Do you train yourself too?
+            </h2>
+            <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, marginBottom: 8 }}>
+              Your coaching account includes the full athlete app, so you can run your own training here alongside your clients.
+            </p>
+            <p style={{ fontSize: 12.5, color: 'var(--text-dim)', lineHeight: 1.6, marginBottom: 20, padding: '10px 12px', background: 'var(--surface2)', borderRadius: 8 }}>
+              <strong style={{ color: 'var(--text-mid)' }}>Why we ask:</strong> you are the professional here, so this is not a fitness quiz. It is the only thing the AI needs in order to write <em>you</em> a real program instead of a generic one. Two ways to train yourself, and you can use either: let the AI build it from your sports below, or build a program by hand in the builder and assign it to yourself. Nothing here affects your clients.
+            </p>
+
+            <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+              {[
+                { val: true,  label: 'Yes, I train too', sub: 'Set up my own plan' },
+                { val: false, label: 'No, clients only', sub: 'Skip this' },
+              ].map(opt => (
+                <button
+                  key={String(opt.val)}
+                  onClick={() => { setSelfTrains(opt.val); setSelfError(null) }}
+                  style={{
+                    flex: 1, padding: '14px 16px', borderRadius: 12, cursor: 'pointer',
+                    fontFamily: 'inherit', textAlign: 'left',
+                    border: `1.5px solid ${selfTrains === opt.val ? 'var(--accent)' : 'var(--border)'}`,
+                    background: selfTrains === opt.val ? 'rgba(255,92,53,0.10)' : 'var(--surface2)',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  <div style={{ fontSize: 14, fontWeight: 700, color: selfTrains === opt.val ? 'var(--accent)' : 'var(--text)', marginBottom: 2 }}>{opt.label}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{opt.sub}</div>
+                </button>
+              ))}
+            </div>
+
+            {selfTrains === true && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 8 }}>
+                  What do you train for? Pick as many as apply
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                  {SPORTS.map(s => {
+                    const on = sports.includes(s)
+                    return (
+                      <button
+                        key={s}
+                        onClick={() => toggleSport(s)}
+                        style={{
+                          padding: '8px 14px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit',
+                          fontSize: 13, fontWeight: on ? 700 : 500, transition: 'all 0.15s',
+                          border: `1.5px solid ${on ? 'var(--accent)' : 'var(--border)'}`,
+                          background: on ? 'rgba(255,92,53,0.12)' : 'var(--surface2)',
+                          color: on ? 'var(--accent)' : 'var(--text-mid)',
+                        }}
+                      >
+                        {s}
+                      </button>
+                    )
+                  })}
+                </div>
+                {sports.includes('Other') && (
+                  <input
+                    value={customSport}
+                    onChange={e => setCustomSport(e.target.value)}
+                    placeholder="e.g. Powerlifting, Rock climbing…"
+                    style={{
+                      width: '100%', padding: '10px 14px', borderRadius: 10,
+                      border: '1px solid var(--border)', background: 'var(--surface2)',
+                      color: 'var(--text)', fontSize: 16, outline: 'none',
+                      fontFamily: 'inherit', boxSizing: 'border-box',
+                    }}
+                  />
+                )}
+                <p style={{ fontSize: 11.5, color: 'var(--text-dim)', lineHeight: 1.6, marginTop: 12 }}>
+                  You can add height, weight, injuries and training history anytime in your Profile. The more it knows, the better your own programming gets.
+                </p>
+              </div>
+            )}
+
+            {selfError && (
+              <p style={{ fontSize: 12, color: '#ef4444', lineHeight: 1.5, marginBottom: 14, fontFamily: 'monospace' }}>
+                Could not save: {selfError}
+              </p>
+            )}
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => setStep(1)}
+                style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-dim)', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                ← Back
+              </button>
+              <button
+                onClick={() => selfTrains === null ? setStep(3) : saveSelfTraining(3)}
+                disabled={savingSelf}
+                style={{ flex: 2, padding: '12px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: savingSelf ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: savingSelf ? 0.7 : 1 }}
+              >
+                {savingSelf ? 'Saving…' : selfTrains === null ? 'Skip for now →' : 'Continue →'}
+              </button>
+            </div>
+            <button onClick={dismiss} style={{ fontSize: 11, color: 'var(--text-dim)', background: 'none', border: 'none', cursor: 'pointer', padding: '12px 0 0', width: '100%' }}>
+              Skip setup
+            </button>
+          </div>
+        )}
+
+        {/* ── STEP 3: INVITE CODE ───────────────────────────────────────────── */}
+        {step === 3 && (
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>
+              Step 2 of 3
             </div>
             <h2 style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em', marginBottom: 10 }}>
               Your client invite code
@@ -192,13 +354,13 @@ export default function OnboardingOverlay() {
 
             <div style={{ display: 'flex', gap: 10 }}>
               <button
-                onClick={() => setStep(1)}
+                onClick={() => setStep(2)}
                 style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-dim)', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}
               >
                 ← Back
               </button>
               <button
-                onClick={() => setStep(3)}
+                onClick={() => setStep(4)}
                 style={{ flex: 2, padding: '12px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}
               >
                 {inviteCode ? 'Continue →' : 'Skip for now →'}
@@ -210,8 +372,8 @@ export default function OnboardingOverlay() {
           </div>
         )}
 
-        {/* ── STEP 3: BUILD FIRST PROGRAM ───────────────────────────────────── */}
-        {step === 3 && (
+        {/* ── STEP 4: BUILD FIRST PROGRAM ───────────────────────────────────── */}
+        {step === 4 && (
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 48, marginBottom: 20 }}>✅</div>
             <h2 style={{ fontSize: 24, fontWeight: 900, letterSpacing: '-0.02em', marginBottom: 12 }}>
@@ -223,9 +385,14 @@ export default function OnboardingOverlay() {
                 : ''}
               Now build your first program so you're ready to assign it the moment a client joins.
             </p>
-            <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 32, lineHeight: 1.6 }}>
-              The AI builder can generate a full periodized program in 30 seconds. Or you can build one manually — your choice.
+            <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: selfTrains ? 12 : 32, lineHeight: 1.6 }}>
+              The AI builder can generate a full periodized program in 30 seconds. Or you can build one manually, your choice.
             </p>
+            {selfTrains && (
+              <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 32, lineHeight: 1.6, padding: '10px 12px', background: 'var(--surface2)', borderRadius: 8 }}>
+                Training yourself works the same way: build a program here and pick <strong style={{ color: 'var(--text-mid)' }}>yourself</strong> when you assign it. It shows up in your own app under My Coach. Or let the AI write you one from the sports you just picked.
+              </p>
+            )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <button
