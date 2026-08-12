@@ -1,6 +1,6 @@
 # Agent Context — Atlas Prime
 > Full briefing for a new agent to continue this project without any prior conversation history.
-> Last updated: 2026-07-15 | Current branch: master | 395 commits
+> Last updated: 2026-08-08 | Current branch: master | 486 commits
 
 ---
 
@@ -99,7 +99,126 @@
 
 ---
 
-## 4. What Was Built This Session (2026-08-04 → 08-06)
+## 4. What Was Built This Session (2026-08-07 → 08-08)
+
+**4 commits, all deployed green. The roadmap was interrupted by the magic phrase "It's time to
+onboard Paul", and onboarding a single real coach exposed three live bugs, one of which had been
+silently breaking the most common coach signup path since it shipped. Task 7 was NOT started.**
+
+### 🎩 Paul onboarding (magic phrase, `to-do/paul-onboarding.md`)
+- Steps 2 and 4 were already built and needed nothing. Step 1 needs no code. **Paul is not
+  yet provisioned**: see the blocker at the end of this section.
+- **Will narrowed the grant.** Paul gets `trimming` + `media` ONLY. Not `video`, not `tts`, not
+  channel discovery, and explicitly **not `ceo`** (that is Shawn's, and Paul will not be CEO).
+  Will will ask for more sections as he thinks of them. His words: "please, please, please be
+  careful and only give access to Paul. Don't make it an open source for anyone that is a coach."
+- Verified the Video Trimming tab is exactly the job Will described and nothing more: it lists
+  only exercises that ALREADY have a live video, supports paste-a-replacement-URL (which
+  correctly voids the old trim window), records `trimmed_by`, and **makes zero API calls**, so
+  Paul cannot spend YouTube quota or Claude tokens.
+
+### 🐛 Coach signup was losing the coach role (the big one)
+- Paul chose "I'm a coach", got created as an **athlete**, and was then shown the athlete
+  fitness questionnaire. That questionnaire is correctly skipped for `role === 'coach'`
+  ([OnboardingModal.tsx](components/OnboardingModal.tsx)), so it was never meant to reach him.
+  **Will's instinct that coaches should not be asked those questions was already the design.**
+- Root cause: the entire coach-role assignment hung on a **`sessionStorage` flag, which is
+  per tab**. The normal flow (sign up → confirm via the email link → lands in a NEW tab) loses
+  it, so neither the `/auth` login path nor `/auth/callback` ever applied the role. OAuth
+  usually returns to the same tab, which is why this survived unnoticed.
+- Fix: the intent now rides on the auth user record as `signup_role` metadata and is reconciled
+  in `AuthContext.fetchUserStatus`, the one choke point every entry path passes through.
+  One-shot, cleared after it applies. Costs no extra round trip (metadata is on the session
+  already held).
+
+### 🔁 The questionnaire kept coming back after being filled in
+- **Two separate faults.** First, `supabase-js` reports failures on the returned `error` and
+  does NOT throw, so the `try/catch` around the upsert caught nothing: every failed write was
+  swallowed twice. Answers could be typed into all five steps, saved nowhere, and the next
+  login would correctly conclude the athlete had never onboarded. Errors are now shown, and a
+  failed write no longer advances the step (advancing discarded the answers).
+- Second, completion lived only in `localStorage` + a guess that read `profiles.name/sport`.
+  A second device or cleared site data meant starting over. Now durable in
+  `profiles.onboarding_status`.
+- **`skipped` is a deliberate state, not an absence** (Will's ask): a skipper is not ambushed
+  on every login, but can still be prompted later and fill it in from Profile.
+
+### 🎛️ Onboarding UX, all from Will's live notes
+- **Sports AND goals now accept multiple answers.** Both were single-select; a lifter who
+  snowboards and skates could record one. Stored as `", "`-joined strings, matching what
+  `/profile` parses and what `generate-plan` already prints as "Primary sport(s)" / "Goal(s)",
+  so nothing downstream changed.
+- **"Why we ask" on sport, goals and location.** Reused the disclosure pattern the gender field
+  already had. Will's rule: if we ask, we disclose why.
+- **Skip was real but invisible** (12px dim text in a corner). Now a proper button reading
+  "Skip all of this", plus step 1 states outright that nothing is required.
+
+### 🏋️ NEW SURFACE: coaches asked about their own training
+- A coaching account includes the athlete app, but nothing ever asked the coach about
+  themselves, so APIE could only write them something generic. New step 2 in
+  `components/coach/OnboardingOverlay.tsx` (now welcome → self-training → invite → build).
+- Asks once, explains that this is not a fitness quiz and they are the professional. Yes →
+  pick sports. No → recorded, never asked again (reuses `onboarding_status`).
+- **Will was explicit: do not lose the self-assign path.** Untouched, and now pointed at
+  directly: build a program by hand and assign it to yourself, or let the AI write one. Either.
+- `lib/sports.ts` is now the single sport list for both flows (they both write `profiles.sport`,
+  so two vocabularies would mean the plan generator matching two strings for one sport).
+
+### ⚠️ PENDING SQL MIGRATION (surface immediately)
+`supabase/migrations/20260807_onboarding_status.sql` — **NOT applied.** Adds
+`profiles.onboarding_status` + `onboarding_updated_at`. **Every read and write degrades
+gracefully without it**, which is why the code shipped first. Backfills anyone with a sport or
+goal already set, and only ever marks people as done.
+
+### 🚧 BLOCKER — Paul is still not provisioned
+Will asked me to do it rather than clicking through admin, and **I cannot: there is no
+`SUPABASE_SERVICE_ROLE_KEY` in `.env.local`**, only the anon key, which cannot change another
+user's role.
+- Built `scripts/provision-partner.js` for it: sets role + grants sections in one command,
+  reads back and prints every person with admin access. Refuses a non-email, refuses multiple
+  matches, refuses to touch an owner/admin, and **hard-refuses every sensitive tab and
+  `access`**. Verified all three refusal paths.
+- **Will tried to copy the key from Vercel and could not.** It is flagged **Sensitive** there,
+  which is write-only by design: unreadable via dashboard, CLI or API, forever. The
+  `eyJhbGci…` in the box is placeholder text. He was warned NOT to save that edit form, since
+  writing an empty value over it would break every admin/AI route in production.
+- **Next session starts here:** get the key from **Supabase → Project Settings → API Keys →
+  Legacy API keys → `service_role`** (always readable), add it to `.env.local` (gitignored,
+  never pasted in chat), then run the dry run, the real run, and the RLS check below.
+
+### 🔎 Still open, carried forward
+- **`supabase/checks/curation-rls-check.sql`** (written, read-only, unrun). Decides whether
+  Paul's trims will actually save. Granting the section shows the TAB; it does not grant
+  database access. The Trimming tab writes `exercise_library` from the browser with the anon
+  key. Neither that table nor `exercise_video_candidates` has policies anywhere in the repo.
+  **The dangerous failure is quiet:** RLS filters rows rather than erroring, so Paul would open
+  the tab, see an EMPTY queue, and conclude there is no work to do.
+- **Ten admin API routes have NO auth at all.** Unauthenticated POST straight through to the
+  service-role client: `curate-videos` (Claude Haiku per exercise + YouTube quota),
+  `discover-channels` (**500 quota units a run**), `generate-tts` (OpenAI per character),
+  `ceo-brief` + `ceo-ask` (Sonnet 4.6, and `ceo-brief` **exposes business data**),
+  `curate-knowledge`, `seed-knowledge`, `review-knowledge`, `knowledge-search`,
+  `youtube-etag-test`. Fix is one `verifyAdmin(req, tab)` line each, matching the twelve
+  sibling `youtube-*` routes. `ceo-brief` is the urgent one.
+- **Possible self-promotion hole:** the client sets its own `profiles.role` in the browser
+  (this is how coach signup and promo codes work). If profile self-updates are permitted by
+  RLS, any athlete could make themselves a coach and take coach features for free. The RLS
+  check above will confirm. Flagged, not fixed.
+
+### ▶️ NEXT SESSION — start here
+1. **Finish Paul** (above): service-role key → `provision-partner.js` dry run → real run →
+   RLS check. Then step 5, walking him through coach onboarding, and step 6, his feedback.
+2. **Run `20260807_onboarding_status.sql`.**
+3. **Then Task 7, the design token audit** (see the previous session's block for Will's full
+   spec). Will approved the approach: **read-only inventory doc first, same shape as
+   `docs/library-render-audit.md`, then PAUSE for him to read it before any styling changes.**
+   His hard rule stands: no visual design changes, same pixels, different plumbing.
+4. Tasks 8, 9, 10. Then Shawn (CEO), Ask Me Anything KB, Marketing Hub verification.
+5. Billing and pricing (Stripe + Apple) comes before Paul's partnership decision.
+
+---
+
+## Previous Session (2026-08-04 → 08-06)
 
 **34 commits, all deployed green. Curation queue Tasks 5 and 6 COMPLETE, so tasks 1 to 6
 are done. Plus a launch-blocking blank screen fixed, a whole program-lifecycle flow, and
