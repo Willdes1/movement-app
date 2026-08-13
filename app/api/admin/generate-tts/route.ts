@@ -4,6 +4,7 @@ export const runtime = 'nodejs'
 import OpenAI from 'openai'
 import { logTokens } from '@/lib/log-tokens'
 import { ttsCostUsd } from '@/lib/ai-costs'
+import { verifyAdmin } from '@/lib/admin-auth'
 
 // BILLING CORRECTNESS (2026-08-12)
 // --------------------------------
@@ -46,17 +47,8 @@ function getOpenAI() {
   return _openai
 }
 
-let _supabase: ReturnType<typeof import('@supabase/supabase-js').createClient> | null = null
-function getSupabase() {
-  if (!_supabase) {
-    const { createClient } = require('@supabase/supabase-js')
-    _supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabase!
-}
+// The service-role client now comes from verifyAdmin, so the route cannot run
+// at all without first proving the caller is allowed to spend money here.
 
 // Timing. Vercel's wall is 60s; everything below is measured against a single
 // round deadline so no individual call can push us past it.
@@ -185,7 +177,13 @@ async function generateAndUpload(
 
 export async function POST(request: Request) {
   try {
-    const supabase = getSupabase() as any
+    // This route spends real OpenAI money on every call. It was reachable by
+    // anyone who knew the URL, so an unauthenticated POST loop could drain the
+    // account. Owners pass any tab; a partner needs the `tts` grant explicitly.
+    const auth = await verifyAdmin(request, 'tts')
+    if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
+
+    const supabase = auth.supabase as any
     const BATCH = 24            // max candidates fetched per round
     const CONCURRENCY = 6       // exercises processed in parallel
     const roundStart = Date.now()

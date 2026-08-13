@@ -19,6 +19,16 @@ type LibRow = {
   tts_url_female: string | null
 }
 
+// /api/admin/generate-tts spends OpenAI money, so it is admin-gated. Every call
+// from here has to carry the caller's JWT or the route answers 401.
+async function authHeaders() {
+  const { data: { session } } = await supabase.auth.getSession()
+  return {
+    Authorization: `Bearer ${session?.access_token ?? ''}`,
+    'Content-Type': 'application/json',
+  }
+}
+
 export default function TTSCurationTab() {
   const [view, setView] = useState<'generate' | 'library'>('generate')
 
@@ -66,7 +76,7 @@ export default function TTSCurationTab() {
     try {
       await fetch('/api/admin/generate-tts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await authHeaders(),
         body: JSON.stringify({ targets: [name_normalized] }),
       })
       // Re-fetch just this row so Play buttons appear immediately
@@ -106,7 +116,11 @@ export default function TTSCurationTab() {
     setGenerating(true)
     setResult(null)
     try {
-      const res = await fetch('/api/admin/generate-tts', { method: 'POST' })
+      const res = await fetch('/api/admin/generate-tts', {
+        method: 'POST',
+        headers: await authHeaders(),
+        body: JSON.stringify({}),
+      })
       if (!res.ok) { setResult(`Error ${res.status}: ${res.statusText}`); return }
       const data = await res.json()
       setResult(data.message ?? data.error ?? 'Done')
