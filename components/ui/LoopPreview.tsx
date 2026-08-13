@@ -5,6 +5,7 @@ import {
   acquirePlayerSlot, releasePlayerSlot, onPlayerSlotAvailable,
   type YTPlayer,
 } from '@/lib/youtube-iframe'
+import { authedFetch } from '@/lib/api-fetch'
 
 /**
  * User-facing exercise video. When the admin has defined a loop window
@@ -31,7 +32,7 @@ function reportDeadVideo(videoId: string, code: number, exerciseName: string, co
   if (reportedDeadVideos.has(key)) return
   reportedDeadVideos.add(key)
   // Fire and forget. Telemetry must never interrupt the athlete.
-  fetch('/api/video-health/report', {
+  authedFetch('/api/video-health/report', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ videoId, code, exerciseName, context }),

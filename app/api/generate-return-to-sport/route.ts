@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { logTokens } from '@/lib/log-tokens'
+import { verifyUser } from '@/lib/admin-auth'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -28,6 +29,9 @@ RULES:
 
 export async function POST(request: Request) {
   try {
+    const auth = await verifyUser(request)
+    if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
+
     const body = await request.json()
     const { sport, restrictions = [], injuryArea = '' } = body
 

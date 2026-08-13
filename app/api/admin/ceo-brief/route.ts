@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { logTokens } from '@/lib/log-tokens'
+import { verifyAdmin } from '@/lib/admin-auth'
 
 export const runtime = 'nodejs'
 export const maxDuration = 120
@@ -166,6 +167,9 @@ function parseArticleJson(text: string): Record<string, string> {
 
 export async function POST(request: Request) {
   try {
+    const auth = await verifyAdmin(request, 'ceo')
+    if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
+
     const body = await request.json().catch(() => ({}))
     const excludeTypes: string[] = body.excludeTypes ?? []
     const userId: string | null = body.userId ?? null

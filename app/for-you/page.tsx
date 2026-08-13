@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
+import { authedFetch } from '@/lib/api-fetch'
 
 type FeedCard = {
   type: 'tip' | 'mindset'
@@ -92,7 +93,7 @@ export default function ForYouPage() {
     setGenerating(true)
     setError(null)
     try {
-      const res = await fetch('/api/generate-feed', {
+      const res = await authedFetch('/api/generate-feed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ profile }),

@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import type { PlanTier } from '@/lib/usePlan'
+import { authedFetch } from '@/lib/api-fetch'
 
 const TIERS: {
   id: PlanTier
@@ -81,12 +82,9 @@ export default function UpgradeModal({ onClose, highlightPlan = 'pro' }: Props) 
     setLoading(planId)
     setError('')
     try {
-      const res = await fetch('/api/stripe/checkout', {
+      const res = await authedFetch('/api/stripe/checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: user.id,
-          userEmail: user.email,
           plan: planId,
           returnUrl: window.location.href,
         }),

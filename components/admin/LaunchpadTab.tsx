@@ -2,6 +2,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import GIT_STATS from '@/lib/git-stats.json'
+import { authedFetch } from '@/lib/api-fetch'
 
 // ─── PALETTE (matches admin portal) ──────────────────────────────────────────
 const C = {
@@ -1072,7 +1073,7 @@ function AIGenerateSection() {
     setDocTitle(p.slice(0, 60) + (p.length > 60 ? '…' : ''))
 
     try {
-      const res = await fetch('/api/launchpad-generate', {
+      const res = await authedFetch('/api/launchpad-generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: p }),

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { verifyUser } from '@/lib/admin-auth'
 
 export const runtime = 'nodejs'
 
@@ -9,6 +10,9 @@ const supabaseAdmin = createClient(
 
 export async function POST(request: Request) {
   try {
+    const auth = await verifyUser(request)
+    if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
+
     const { exerciseNames } = await request.json().catch(() => ({}))
     if (!Array.isArray(exerciseNames) || exerciseNames.length === 0) {
       return Response.json({ queued: 0 })

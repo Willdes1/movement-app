@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { COACH_PLANS, planFor, type CoachPlan, type PlanKey } from '@/lib/coach-plans'
 import { BILLING_LIVE } from '@/lib/flags'
 import { isNativeApp } from '@/lib/platform'
+import { authedFetch } from '@/lib/api-fetch'
 
 type Status = {
   planKey: PlanKey
@@ -47,10 +48,10 @@ function BillingInner() {
     if (!user || !tier.stripePlan) return
     setBusy(tier.key)
     try {
-      const res = await fetch('/api/stripe/checkout', {
+      // Identity comes from the JWT; the route ignores any body-supplied id.
+      const res = await authedFetch('/api/stripe/checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, userEmail: user.email, plan: tier.stripePlan, returnUrl: window.location.origin + '/coach/billing' }),
+        body: JSON.stringify({ plan: tier.stripePlan, returnUrl: window.location.origin + '/coach/billing' }),
       })
       const d = await res.json().catch(() => null)
       if (d?.url) window.location.href = d.url
@@ -62,10 +63,9 @@ function BillingInner() {
     if (!user) return
     setBusy('manage')
     try {
-      const res = await fetch('/api/stripe/portal', {
+      const res = await authedFetch('/api/stripe/portal', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, returnUrl: window.location.origin + '/coach/billing' }),
+        body: JSON.stringify({ returnUrl: window.location.origin + '/coach/billing' }),
       })
       const d = await res.json().catch(() => null)
       if (d?.url) window.location.href = d.url

@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { logTokens } from '@/lib/log-tokens'
+import { verifyUser } from '@/lib/admin-auth'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -35,6 +36,9 @@ Return nothing but the raw JSON array of exactly 6 cards.`
 
 export async function POST(request: Request) {
   try {
+    const auth = await verifyUser(request)
+    if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
+
     const { profile } = await request.json().catch(() => ({}))
 
     if (!profile) return Response.json({ error: 'Profile is required' }, { status: 400 })

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { supabase } from '@/lib/supabase'
+import { authedFetch } from '@/lib/api-fetch'
 
 type DailyBlock = {
   label: string
@@ -219,7 +220,7 @@ export default function ReturnToSportPage() {
       }
 
       if (!phases) {
-        const res = await fetch('/api/generate-recovery-plan', {
+        const res = await authedFetch('/api/generate-recovery-plan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ injury: intake.injury, doctorVisit: intake.doctorVisit, doctorRecommendations: intake.doctorRecs, sport, age, gender, userId }),

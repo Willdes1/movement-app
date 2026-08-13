@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { logTokens } from '@/lib/log-tokens'
 import { retrieveKnowledge, formatKnowledgeContext } from '@/lib/knowledge-retrieval'
+import { verifyUser } from '@/lib/admin-auth'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -281,6 +282,9 @@ function buildPrompt(profile: Record<string, unknown>, weekNumber: number, phase
 
 export async function POST(request: Request) {
   try {
+    const auth = await verifyUser(request)
+    if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
+
     const body = await request.json().catch(() => ({}))
     const { profile, weekNumber = 1, phaseLabel = 'Foundation Phase', intensity = 'RPE 6-7. Build base fitness and movement quality.', instructions = '' } = body
 

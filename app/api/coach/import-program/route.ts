@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { logTokens } from '@/lib/log-tokens'
+import { verifyUser } from '@/lib/admin-auth'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -50,6 +51,9 @@ const MIN_TEXT_LENGTH = 80
 
 export async function POST(request: Request) {
   try {
+    const auth = await verifyUser(request)
+    if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
+
     const formData = await request.formData()
     const file = formData.get('file') as File | null
     const coachId = formData.get('coachId') as string | null

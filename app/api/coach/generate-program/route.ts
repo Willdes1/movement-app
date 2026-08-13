@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { logTokens } from '@/lib/log-tokens'
+import { verifyUser } from '@/lib/admin-auth'
 
 export const runtime = 'nodejs'
 export const maxDuration = 120
@@ -80,6 +81,9 @@ export interface CoachBrief {
 
 export async function POST(request: Request) {
   try {
+    const auth = await verifyUser(request)
+    if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
+
     const brief: CoachBrief = await request.json()
 
     const equipmentStr = brief.equipment.length > 0

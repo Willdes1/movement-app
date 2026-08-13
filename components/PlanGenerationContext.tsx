@@ -2,6 +2,7 @@
 import { createContext, useContext, useRef, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { trackEvent } from '@/lib/track'
+import { authedFetch } from '@/lib/api-fetch'
 
 type DayPlan = { day: string; label: string; type: string; movements: string[]; duration: string; focus?: string; coaching?: string }
 type Program = { id: string; startDate: string; totalWeeks: number; status: string }
@@ -69,7 +70,7 @@ async function saveExerciseDetails(
   for (let i = 0; i < missing.length; i += BATCH) {
     const batch = missing.slice(i, i + BATCH)
     try {
-      const res = await fetch('/api/generate-exercise-details', {
+      const res = await authedFetch('/api/generate-exercise-details', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ exercises: batch }),
@@ -121,7 +122,7 @@ export function PlanGenerationProvider({ children }: { children: React.ReactNode
       setProgress({ current: w, total: config.numWeeks })
       const { phase, label, intensity } = getPhaseInfo(w)
       try {
-        const res = await fetch('/api/generate-plan', {
+        const res = await authedFetch('/api/generate-plan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ profile: config.profile, weekNumber: w, phaseLabel: label, intensity, instructions: '' }),
@@ -144,7 +145,7 @@ export function PlanGenerationProvider({ children }: { children: React.ReactNode
         }
         // Queue exercises that have no video yet — admin reviews these in the Video Curation tab
         const normalizedWeekNames = weekNames.map(normalizeExerciseName)
-        fetch('/api/queue-exercise-videos', {
+        authedFetch('/api/queue-exercise-videos', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ exerciseNames: normalizedWeekNames }),

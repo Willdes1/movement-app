@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import YouTubeLoopTrimmer from './YouTubeLoopTrimmer'
 import InstructionCuratePanel from './InstructionCuratePanel'
+import { authedFetch } from '@/lib/api-fetch'
 
 const C = {
   bg: '#0d1117', surface: '#161b22', surface2: '#21262d', border: '#30363d',
@@ -250,7 +251,7 @@ export default function VideoCurationTab() {
     setDiscovering(true)
     setDiscoverLog(['Searching YouTube for certified fitness channels…'])
     try {
-      const res = await fetch('/api/admin/discover-channels', { method: 'POST' })
+      const res = await authedFetch('/api/admin/discover-channels', { method: 'POST' })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setDiscoverLog([
@@ -549,7 +550,7 @@ export default function VideoCurationTab() {
     setRunning(true)
     setRunLog(['Starting curation pipeline…'])
     try {
-      const res = await fetch('/api/admin/curate-videos', {
+      const res = await authedFetch('/api/admin/curate-videos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ batchSize }),
@@ -574,7 +575,7 @@ export default function VideoCurationTab() {
         : laneId === 'backlog'
           ? { batchSize: n, lane: 'backlog' }
           : { exerciseIds: exerciseIds.slice(0, n), batchSize: n }
-      const res = await fetch('/api/admin/curate-videos', {
+      const res = await authedFetch('/api/admin/curate-videos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -593,7 +594,7 @@ export default function VideoCurationTab() {
   async function runSingle(exerciseId: string, regenerate = false) {
     setActing(exerciseId)
     try {
-      await fetch('/api/admin/curate-videos', {
+      await authedFetch('/api/admin/curate-videos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ exerciseId, regenerate }),
@@ -707,7 +708,7 @@ export default function VideoCurationTab() {
       .update({ status: 'superseded' })
       .eq('exercise_id', exerciseId)
     try {
-      await fetch('/api/admin/curate-videos', {
+      await authedFetch('/api/admin/curate-videos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ exerciseId, regenerate: true }),

@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { authedFetch } from '@/lib/api-fetch'
 
 const C = {
   bg: '#0d1117', surface: '#161b22', surface2: '#21262d', border: '#30363d',
@@ -324,7 +325,7 @@ function DailyBriefTab({ userId }: { userId?: string }) {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/admin/ceo-brief', {
+      const res = await authedFetch('/api/admin/ceo-brief', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ excludeTypes: currentSeen, userId }),
@@ -533,7 +534,7 @@ function AskMeAnythingTab({ userId }: { userId?: string }) {
         role: m.role,
         content: m.role === 'user' ? (m.question ?? '') : JSON.stringify(m.response ?? ''),
       }))
-      const res = await fetch('/api/admin/ceo-ask', {
+      const res = await authedFetch('/api/admin/ceo-ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: q, history, userId }),

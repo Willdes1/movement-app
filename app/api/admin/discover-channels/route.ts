@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
 import { ytFetch, beginYtBatch } from '@/lib/youtube'
+import { verifyAdmin } from '@/lib/admin-auth'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -97,8 +98,11 @@ Score 0.0–1.0. Include only channels with score >= 0.65. Rank by quality and c
   }
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
+    const auth = await verifyAdmin(request, 'video')
+    if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
+
     const batchId = beginYtBatch()
 
     // Run all search queries and collect unique channel IDs

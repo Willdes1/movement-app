@@ -1,4 +1,5 @@
 import { logHarnessEvent } from '@/lib/harness-events'
+import { verifyUser } from '@/lib/admin-auth'
 
 export const runtime = 'nodejs'
 
@@ -32,6 +33,9 @@ const FATAL_CODES: Record<number, string> = {
 
 export async function POST(req: Request) {
   try {
+    const auth = await verifyUser(req)
+    if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
+
     const body = await req.json().catch(() => ({}))
     const code = Number(body.code)
     const videoId = String(body.videoId ?? '').slice(0, 32)

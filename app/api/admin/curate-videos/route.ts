@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
 import { ytFetch, getVideosBatched, beginYtBatch } from '@/lib/youtube'
 import { buildMatchQuery, rankCandidates, CachedVideo } from '@/lib/video-matching'
+import { verifyAdmin } from '@/lib/admin-auth'
 
 // Match confidence required before a cached video is proposed without paying
 // for a search. Overridable per request from the curation tab.
@@ -113,6 +114,9 @@ Return ONLY valid JSON array, no markdown:
 // ─── Main handler ─────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   try {
+    const auth = await verifyAdmin(request, 'video')
+    if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
+
     const {
       exerciseId, exerciseIds, batchSize = 10, regenerate = false, lane = 'all',
       matchThreshold, fallbackDailyCap,

@@ -12,6 +12,7 @@ import StreakBadge from '@/components/StreakBadge'
 import ContactSupportModal from '@/components/account/ContactSupportModal'
 import { displayName, avatarInitials } from '@/lib/name'
 import DeleteAccountModal from '@/components/account/DeleteAccountModal'
+import { authedFetch } from '@/lib/api-fetch'
 
 type Activity = { name: string; level: string }
 const LEVELS = ['beginner', 'intermediate', 'expert', 'elite', 'pro'] as const
@@ -84,10 +85,11 @@ function AccountPageInner() {
     if (!user) return
     setBillingLoading(true)
     try {
-      const res = await fetch('/api/stripe/portal', {
+      // userId is no longer sent: the route derives it from the JWT so nobody
+      // can open another person's billing portal by passing their id.
+      const res = await authedFetch('/api/stripe/portal', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, returnUrl: window.location.href }),
+        body: JSON.stringify({ returnUrl: window.location.href }),
       })
       const data = await res.json()
       if (data.url) window.location.href = data.url
@@ -176,7 +178,7 @@ function AccountPageInner() {
     setCoachError('')
     setCoachMsg('')
     try {
-      const res = await fetch('/api/coach/redeem-invite', {
+      const res = await authedFetch('/api/coach/redeem-invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: coachCode.trim().toUpperCase(), userId: user.id }),

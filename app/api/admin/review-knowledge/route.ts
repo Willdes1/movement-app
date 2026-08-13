@@ -1,4 +1,5 @@
 import { embedText } from '@/lib/knowledge-retrieval'
+import { verifyAdmin } from '@/lib/admin-auth'
 
 let _supabaseAdmin: ReturnType<typeof import('@supabase/supabase-js').createClient> | null = null
 function getSupabaseAdmin() {
@@ -16,6 +17,9 @@ function getSupabaseAdmin() {
 // body: { id: string, action: 'accept' | 'dismiss', custom_content?: string }
 export async function PATCH(request: Request) {
   try {
+    const auth = await verifyAdmin(request, 'mie')
+    if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
+
     const { id, action, custom_content } = await request.json()
     if (!id || !action) return Response.json({ error: 'id and action required' }, { status: 400 })
 

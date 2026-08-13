@@ -11,6 +11,7 @@ import { EXERCISE_DISPLAY_COLUMNS, type ExerciseDisplayRow } from '@/lib/exercis
 import { isProgramElapsed, localDateKey, parseDateKey } from '@/lib/program-progress'
 import ProgramResumeActions from '@/components/ProgramResumeActions'
 import { updateStreak } from '@/lib/useStreak'
+import { authedFetch } from '@/lib/api-fetch'
 
 type DailyBlock = { label: string; duration: string; exercises: string[]; tip?: string }
 type DailySession = { morning?: DailyBlock; warmup?: DailyBlock; workout?: DailyBlock; abs?: DailyBlock; cooldown?: DailyBlock; evening?: DailyBlock }
@@ -211,7 +212,7 @@ export default function PlanPage() {
     for (let i = 0; i < missing.length; i += BATCH) {
       const batch = missing.slice(i, i + BATCH)
       try {
-        const res = await fetch('/api/generate-exercise-details', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ exercises: batch }) })
+        const res = await authedFetch('/api/generate-exercise-details', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ exercises: batch }) })
         if (res.ok) {
           const { details, usage } = await res.json()
           if (Array.isArray(details) && details.length > 0) await supabase.from('exercise_library').upsert(details, { onConflict: 'name_normalized' })
@@ -233,7 +234,7 @@ export default function PlanPage() {
     }
     const { phase, label, intensity } = getPhaseInfo(weekNum)
     try {
-      const res = await fetch('/api/generate-plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profile, weekNumber: weekNum, phaseLabel: label, intensity, instructions }) })
+      const res = await authedFetch('/api/generate-plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profile, weekNumber: weekNum, phaseLabel: label, intensity, instructions }) })
       if (!res.ok) throw new Error('failed')
       const { plan, usage } = await res.json()
       await supabase.from('weekly_plans').upsert({ program_id: prog.id, user_id: userId, week_number: weekNum, phase, plan })

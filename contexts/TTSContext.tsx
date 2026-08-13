@@ -1,6 +1,7 @@
 'use client'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
+import { authedFetch } from '@/lib/api-fetch'
 
 // One audio element for the whole app.
 //
@@ -265,7 +266,7 @@ export function TTSProvider({ children }: { children: React.ReactNode }) {
     const controller = new AbortController()
     abortRef.current = controller
 
-    const res = await fetch('/api/tts', {
+    const res = await authedFetch('/api/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: item.text, voice, name_normalized: item.nameNormalized }),

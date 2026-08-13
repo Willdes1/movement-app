@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { authedFetch } from '@/lib/api-fetch'
 
 const C = {
   bg: '#0d1117', surface: '#161b22', surface2: '#21262d', border: '#30363d',
@@ -238,7 +239,7 @@ export default function KnowledgeBaseTab() {
     setSearchError('')
     setSearchResult(null)
     try {
-      const res = await fetch('/api/admin/knowledge-search', {
+      const res = await authedFetch('/api/admin/knowledge-search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: q, userId: user?.id }),

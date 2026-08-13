@@ -1,6 +1,7 @@
 'use client'
 import { useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import { authedFetch } from '@/lib/api-fetch'
 
 const C = {
   bg: '#0d1117', surface: '#161b22', surface2: '#21262d', border: '#30363d',
@@ -315,9 +316,12 @@ export default function HealthTab() {
 
       const t0 = Date.now()
       try {
-        const res = await fetch(def.path, {
+        // Authed: these routes are gated now, so an anonymous probe would only
+        // ever prove the gate works. Sending the admin's token makes the check
+        // exercise the real path again. The deliberately-invalid body still
+        // makes them reject early, so a scan never spends tokens.
+        const res = await authedFetch(def.path, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ healthcheck: true }),
           signal: AbortSignal.timeout(12000),
         })

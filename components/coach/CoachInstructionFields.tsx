@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { authedFetch } from '@/lib/api-fetch'
 
 // Shared instruction editor — the 4 standard fields (auto-fillable free from the
 // global library or AI-generated) + the coach's own custom fields. Used by the
@@ -96,7 +97,7 @@ export default function CoachInstructionFields({ value, onChange, exerciseName }
     if (!exerciseName.trim()) { setNote('Enter the exercise name first.'); return }
     setGenerating(true); setNote('')
     try {
-      const res = await fetch('/api/generate-exercise-details', {
+      const res = await authedFetch('/api/generate-exercise-details', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ exercises: [exerciseName.trim()] }),

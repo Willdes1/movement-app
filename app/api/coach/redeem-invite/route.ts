@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { createClient as createAnonClient } from '@supabase/supabase-js'
+import { resolveActingUser } from '@/lib/admin-auth'
 
 export const runtime = 'nodejs'
 
@@ -12,8 +13,14 @@ function getServiceClient() {
 
 export async function POST(request: Request) {
   try {
-    const { code, userId } = await request.json()
-    if (!code || !userId) return Response.json({ error: 'Missing code or userId' }, { status: 400 })
+    const { code, userId: bodyUserId } = await request.json()
+    if (!code) return Response.json({ error: 'Missing code' }, { status: 400 })
+
+    // The joining user comes from the JWT. Trusting the body let anyone add any
+    // account to a coach's roster. Admins may still pass an id (Zoom In).
+    const auth = await resolveActingUser(request, bodyUserId)
+    if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
+    const userId = auth.userId
 
     const supabase = getServiceClient()
 

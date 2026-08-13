@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { logTokens } from '@/lib/log-tokens'
+import { verifyAdmin } from '@/lib/admin-auth'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -96,6 +97,9 @@ interface Message {
 
 export async function POST(request: Request) {
   try {
+    const auth = await verifyAdmin(request, 'ceo')
+    if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
+
     const { question, history = [], userId }: { question: string; history: Message[]; userId?: string } = await request.json()
 
     if (!question?.trim()) {

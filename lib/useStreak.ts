@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
+import { authedFetch } from '@/lib/api-fetch'
 
 export type StreakData = {
   currentStreak: number
@@ -44,7 +45,7 @@ export function useStreak(): StreakData & { refresh: () => void } {
 }
 
 export async function updateStreak(userId: string): Promise<{ currentStreak: number; longestStreak: number; isNewRecord: boolean }> {
-  const res = await fetch('/api/streaks/update', {
+  const res = await authedFetch('/api/streaks/update', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId }),

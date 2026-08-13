@@ -29,6 +29,7 @@ import ConversionsTab from '@/components/admin/ConversionsTab'
 import TTSCurationTab from '@/components/admin/TTSCurationTab'
 import LibrarySeedTab from '@/components/admin/LibrarySeedTab'
 import Logo from '@/components/ui/Logo'
+import { authedFetch } from '@/lib/api-fetch'
 
 // ─── PALETTE ─────────────────────────────────────────────────────────────────
 const C = {
@@ -1351,7 +1352,7 @@ function LibraryBackfillCard() {
         const batchNum = Math.floor(i / BATCH) + 1
         addLog(`Batch ${batchNum}/${totalBatches}: ${batch.slice(0, 3).join(', ')}${batch.length > 3 ? '…' : ''}`)
         try {
-          const res = await fetch('/api/generate-exercise-details', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ exercises: batch }) })
+          const res = await authedFetch('/api/generate-exercise-details', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ exercises: batch }) })
           if (!res.ok) {
             const errBody = await res.text().catch(() => '')
             addLog(`  ✗ API error ${res.status}: ${errBody.slice(0, 120)}`)

@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { verifyAdmin } from '@/lib/admin-auth'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -114,6 +115,9 @@ When asked to generate a document:
 
 export async function POST(req: Request) {
   try {
+    const auth = await verifyAdmin(req, 'launchpad')
+    if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
+
     const { prompt } = await req.json()
     if (!prompt?.trim()) return Response.json({ error: 'No prompt provided' }, { status: 400 })
 

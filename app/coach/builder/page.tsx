@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { trackEvent } from '@/lib/track'
 import { useAuth } from '@/contexts/AuthContext'
 import ManualProgramBuilder from '@/components/coach/ManualProgramBuilder'
+import { authedFetch } from '@/lib/api-fetch'
 
 type Step = 'pick' | 'brief' | 'generating-ai' | 'uploading' | 'preview' | 'saving' | 'saved' | 'manual'
 type GenerationSource = 'import' | 'ai'
@@ -127,7 +128,7 @@ export default function CoachBuilderPage() {
     if (user?.id) formData.append('coachId', user.id)
 
     try {
-      const res = await fetch('/api/coach/import-program', { method: 'POST', body: formData })
+      const res = await authedFetch('/api/coach/import-program', { method: 'POST', body: formData })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Parse failed')
       setProgram(data.program)
@@ -169,7 +170,7 @@ export default function CoachBuilderPage() {
     setStep('generating-ai')
 
     try {
-      const res = await fetch('/api/coach/generate-program', {
+      const res = await authedFetch('/api/coach/generate-program', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...brief, coachId: user?.id }),

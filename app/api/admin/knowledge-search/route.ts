@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { verifyAdmin } from '@/lib/admin-auth'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
@@ -52,6 +53,9 @@ Return ONLY valid JSON, no markdown wrapper:
 
 export async function POST(request: Request) {
   try {
+    const auth = await verifyAdmin(request, 'kb')
+    if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
+
     const { query, userId } = await request.json()
     if (!query?.trim()) return Response.json({ error: 'No query provided' }, { status: 400 })
 

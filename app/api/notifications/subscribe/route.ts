@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { resolveActingUser } from '@/lib/admin-auth'
 
 function getAdmin() {
   return createClient(
@@ -9,9 +10,14 @@ function getAdmin() {
 
 export async function POST(request: Request) {
   try {
-    const { userId, subscription, unsubscribe } = await request.json()
-    if (!userId || !subscription?.endpoint) {
-      return Response.json({ error: 'Missing userId or subscription' }, { status: 400 })
+    const { userId: bodyUserId, subscription, unsubscribe } = await request.json()
+
+    const auth = await resolveActingUser(request, bodyUserId)
+    if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
+    const userId = auth.userId
+
+    if (!subscription?.endpoint) {
+      return Response.json({ error: 'Missing subscription' }, { status: 400 })
     }
 
     const supabaseAdmin = getAdmin()

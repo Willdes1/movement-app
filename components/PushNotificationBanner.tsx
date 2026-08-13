@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { authedFetch } from '@/lib/api-fetch'
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4)
@@ -49,7 +50,7 @@ export default function PushNotificationBanner() {
         ),
       })
 
-      await fetch('/api/notifications/subscribe', {
+      await authedFetch('/api/notifications/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.id, subscription: sub.toJSON() }),

@@ -7,6 +7,7 @@ import { usePlan } from '@/lib/usePlan'
 import UpgradeModal from '@/components/UpgradeModal'
 import { loadProfile } from '@/lib/storage'
 import type { UserProfile } from '@/lib/types'
+import { authedFetch } from '@/lib/api-fetch'
 
 const DIETARY_OPTIONS = ['Omnivore', 'Vegetarian', 'Vegan', 'Pescatarian', 'Keto', 'Paleo']
 const MEALS_OPTIONS = [3, 4, 5, 6]
@@ -174,7 +175,7 @@ export default function NutritionPage() {
 
       const mergedProfile = { ...profile, ...dbProfile, id: userId }
 
-      const res = await fetch('/api/generate-nutrition', {
+      const res = await authedFetch('/api/generate-nutrition', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { verifyUser } from '@/lib/admin-auth'
 
 export const maxDuration = 60
 
@@ -22,6 +23,9 @@ Every field must be specific to the named exercise. Never use generic filler. Ge
 
 export async function POST(request: Request) {
   try {
+    const auth = await verifyUser(request)
+    if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
+
     const { exercises } = await request.json()
     if (!Array.isArray(exercises) || exercises.length === 0) {
       return Response.json({ details: [] })

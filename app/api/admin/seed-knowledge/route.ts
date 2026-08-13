@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { embedBatch } from '@/lib/knowledge-retrieval'
 import { logTokens } from '@/lib/log-tokens'
+import { verifyAdmin } from '@/lib/admin-auth'
 
 let _admin: SupabaseClient | null = null
 function getSupabaseAdmin(): SupabaseClient {
@@ -180,7 +181,10 @@ type SeedItem = {
 
 // ─── Route ─────────────────────────────────────────────────────────────────────
 
-export async function POST() {
+export async function POST(request: Request) {
+  const auth = await verifyAdmin(request, 'mie')
+  if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
+
   const results = { seeded: 0, skipped: 0, errors: [] as string[] }
 
   try {

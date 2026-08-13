@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { logTokens } from '@/lib/log-tokens'
+import { verifyAdmin } from '@/lib/admin-auth'
 
 let _supabaseAdmin: ReturnType<typeof import('@supabase/supabase-js').createClient> | null = null
 function getSupabaseAdmin() {
@@ -36,8 +37,11 @@ Format: [{"id": "uuid", "flag_reason": "...", "suggested_content": "..."}]`
 type FlagResult = { id: string; flag_reason: string; suggested_content: string }
 type KnowledgeRow = { id: string; category: string; title: string; content: string }
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
+    const auth = await verifyAdmin(request, 'mie')
+    if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = getSupabaseAdmin() as any
 

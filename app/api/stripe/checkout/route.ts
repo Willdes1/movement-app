@@ -1,22 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { stripe, PRICE_IDS } from '@/lib/stripe'
+import { verifyUser } from '@/lib/admin-auth'
 
-function getAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
+// The user id and email come from the VERIFIED JWT, never from the body.
+//
+// This route used to take `userId` and `userEmail` straight out of the request
+// with no auth at all, so any caller could create a Stripe customer bound to
+// somebody else's profile and write `stripe_customer_id` onto their row. Both
+// fields are now derived from the session and the body copies are ignored.
 
 export async function POST(req: NextRequest) {
-  const { userId, userEmail, plan, returnUrl } = await req.json()
+  const auth = await verifyUser(req)
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  const { supabase: supabaseAdmin, userId, email } = auth
 
-  if (!userId || !plan || !PRICE_IDS[plan]) {
+  const { plan, returnUrl } = await req.json()
+
+  if (!plan || !PRICE_IDS[plan]) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  const supabaseAdmin = getAdmin()
+  // `profiles` has no email column; the address comes from the verified auth
+  // record, which is also the only copy we can trust.
   const { data: profile } = await supabaseAdmin
     .from('profiles')
     .select('stripe_customer_id')
@@ -27,14 +32,21 @@ export async function POST(req: NextRequest) {
 
   if (!customerId) {
     const customer = await stripe.customers.create({
-      email: userEmail,
+      email: email ?? undefined,
       metadata: { supabase_user_id: userId },
     })
     customerId = customer.id
-    await supabaseAdmin
+    const { error: updErr } = await supabaseAdmin
       .from('profiles')
       .update({ stripe_customer_id: customerId })
       .eq('id', userId)
+    // Checked: an unrecorded customer id means the next checkout creates a
+    // SECOND Stripe customer for the same person and their subscription history
+    // splits across two records.
+    if (updErr) {
+      console.error('[STRIPE] failed to record stripe_customer_id for', userId, updErr)
+      return NextResponse.json({ error: 'Could not start checkout' }, { status: 500 })
+    }
   }
 
   const session = await stripe.checkout.sessions.create({

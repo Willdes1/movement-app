@@ -4,6 +4,7 @@ export const runtime = 'nodejs'
 import OpenAI from 'openai'
 import { logTokens } from '@/lib/log-tokens'
 import { ttsCostUsd } from '@/lib/ai-costs'
+import { verifyUser } from '@/lib/admin-auth'
 
 let _openai: OpenAI | null = null
 function getOpenAI() {
@@ -54,6 +55,9 @@ async function cachedAudio(name_normalized: string, voice: string): Promise<Arra
 
 export async function POST(request: Request) {
   try {
+    const auth = await verifyUser(request)
+    if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
+
     const { text, voice = 'onyx', name_normalized } = await request.json()
     if (!text?.trim()) return Response.json({ error: 'text required' }, { status: 400 })
     if (!ALLOWED_VOICES.includes(voice)) return Response.json({ error: 'invalid voice' }, { status: 400 })

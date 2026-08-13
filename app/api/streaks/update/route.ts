@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { resolveActingUser } from '@/lib/admin-auth'
 
 function getAdmin() {
   return createClient(
@@ -9,8 +10,13 @@ function getAdmin() {
 }
 
 export async function POST(req: NextRequest) {
-  const { userId } = await req.json()
-  if (!userId) return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
+  const { userId: bodyUserId } = await req.json()
+
+  // Identity from the JWT, not the body. Admins may still pass an id so Zoom In
+  // keeps updating the impersonated athlete's streak rather than the admin's.
+  const auth = await resolveActingUser(req, bodyUserId)
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  const userId = auth.userId
 
   const supabaseAdmin = getAdmin()
   const today = new Date().toISOString().split('T')[0]

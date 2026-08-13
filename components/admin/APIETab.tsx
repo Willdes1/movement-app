@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { authedFetch } from '@/lib/api-fetch'
 
 type KnowledgeStat = { category: string; count: number }
 type FlaggedItem = {
@@ -72,7 +73,7 @@ export default function APIETab() {
     setSeeding(true)
     setSeedResult(null)
     try {
-      const res = await fetch('/api/admin/seed-knowledge', { method: 'POST' })
+      const res = await authedFetch('/api/admin/seed-knowledge', { method: 'POST' })
       const data = await res.json()
       setSeedResult(data.message ?? data.error ?? 'Done')
       await loadStats()
@@ -87,7 +88,7 @@ export default function APIETab() {
     setCurating(true)
     setCurateResult(null)
     try {
-      const res = await fetch('/api/admin/curate-knowledge', { method: 'POST' })
+      const res = await authedFetch('/api/admin/curate-knowledge', { method: 'POST' })
       const data = await res.json()
       setCurateResult(data.message ?? data.error ?? 'Done')
       await loadFlagged()
@@ -103,7 +104,7 @@ export default function APIETab() {
     try {
       const body: Record<string, string> = { id, action }
       if (action === 'accept' && editContent[id]) body.custom_content = editContent[id]
-      await fetch('/api/admin/review-knowledge', {
+      await authedFetch('/api/admin/review-knowledge', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
