@@ -1,5 +1,33 @@
 # API route auth audit
 
+## STATUS: RESOLVED 2026-08-12
+
+All 25 open routes are gated and verified against production: every one answers
+**401** to an unauthenticated POST. Re-running the scan reports **73 of 73
+mutating routes gated, 0 open**. Commits `c9bb52a`, `9f67df3`, `9209429`.
+
+How it was fixed:
+- **`lib/api-fetch.ts`** — `authedFetch`, the single place the browser attaches
+  its token. 30 client call sites moved onto it.
+- **`verifyUser`** in `lib/admin-auth.ts` — signed-in-user gate.
+- **`resolveActingUser`** — for routes that write on a user's behalf. Uses the
+  JWT id unless the caller is an admin passing an explicit id, which is what
+  Zoom In impersonation legitimately does. A non-admin asking for another id
+  gets 403. This is why `streaks/update` still works while impersonating.
+
+Two things worth remembering from the fix:
+- The first version of the Stripe fix selected `profiles.email`. **That column
+  does not exist** and it would have 400'd every checkout. The email comes from
+  the verified auth record instead.
+- `HealthTab`'s API scan now sends the admin token. Without it, its six checks
+  would only have proved the gate rejects anonymous callers rather than
+  exercising the real routes.
+
+**Adding a new route?** Gate it in the same commit and add `authedFetch` at the
+call site. The original findings are kept below as the record.
+
+---
+
 Generated 2026-08-12, after closing `/api/admin/generate-tts`.
 
 Method: scanned all 83 files under `app/api`. 73 export a mutating handler
