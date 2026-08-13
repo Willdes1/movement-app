@@ -1,3 +1,6 @@
+export const maxDuration = 60
+export const runtime = 'nodejs'
+
 import OpenAI from 'openai'
 import { logTokens } from '@/lib/log-tokens'
 import { ttsCostUsd } from '@/lib/ai-costs'
@@ -72,12 +75,15 @@ export async function POST(request: Request) {
 
     // Generate audio
     const sent = text.slice(0, 4096)
+    // maxRetries 0: the SDK retries twice by default, and OpenAI bills each
+    // synthesis, so one logical request could be charged three times with only
+    // one line landing in `token_usage`. One attempt, one charge, one log.
     const response = await getOpenAI().audio.speech.create({
       model: 'tts-1',
       voice: voice as 'onyx' | 'nova' | 'alloy' | 'echo' | 'fable' | 'shimmer',
       input: sent,
       speed: 0.92,
-    })
+    }, { maxRetries: 0 })
 
     const buffer = Buffer.from(await response.arrayBuffer())
 
@@ -102,12 +108,21 @@ export async function POST(request: Request) {
           .from('exercise-tts')
           .upload(path, buffer, { contentType: 'audio/mpeg', upsert: true })
 
-        if (!uploadErr) {
+        if (uploadErr) {
+          console.warn(`[TTS] upload failed for ${name_normalized} (${voice}):`, uploadErr)
+        } else {
           const { data: urlData } = supabase.storage.from('exercise-tts').getPublicUrl(path)
-          await supabase
+          // CHECKED. supabase-js returns errors instead of throwing, so this
+          // used to fail silently: the audio was paid for and uploaded, the URL
+          // never landed, and every later tap on that exercise re-billed the
+          // whole narration because the read-through cache still saw null.
+          const { error: updErr } = await supabase
             .from('exercise_library')
             .update({ [col]: urlData.publicUrl })
             .eq('name_normalized', name_normalized)
+          if (updErr) {
+            console.error(`[TTS] PAID AND ORPHANED: ${path} uploaded but exercise_library.${col} not set:`, updErr)
+          }
         }
       } catch (saveErr) {
         console.warn('TTS auto-save failed (audio still returned):', saveErr)
