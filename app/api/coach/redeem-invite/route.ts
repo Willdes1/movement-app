@@ -14,13 +14,16 @@ function getServiceClient() {
 export async function POST(request: Request) {
   try {
     const { code, userId: bodyUserId } = await request.json()
-    if (!code) return Response.json({ error: 'Missing code' }, { status: 400 })
 
-    // The joining user comes from the JWT. Trusting the body let anyone add any
-    // account to a coach's roster. Admins may still pass an id (Zoom In).
+    // Auth before input validation, so an anonymous caller learns nothing about
+    // what this route expects. The joining user comes from the JWT: trusting the
+    // body let anyone add any account to a coach's roster. Admins may still pass
+    // an id, which is how Zoom In works.
     const auth = await resolveActingUser(request, bodyUserId)
     if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
     const userId = auth.userId
+
+    if (!code) return Response.json({ error: 'Missing code' }, { status: 400 })
 
     const supabase = getServiceClient()
 
