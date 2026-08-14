@@ -64,11 +64,40 @@ export async function POST(req: Request) {
   await supabase.from('coach_messages').delete().eq('client_id', userId)
   await supabase.from('coach_messages').delete().eq('sender_id', userId)
 
-  // 4. Delete the profile (cascades anything FK'd to profiles(id)).
+  // 4. COACH-OWNED rows. Everything above keys off the user as a CLIENT, so a
+  //    deleted coach used to leave their whole practice behind: programs,
+  //    roster, library, voice clone. The dangerous leftover is
+  //    coach_invite_codes — an orphaned code stays redeemable, so a new athlete
+  //    could join the roster of a coach who no longer exists.
+  const { data: coachPrograms } = await supabase.from('coach_programs').select('id').eq('coach_id', userId)
+  const coachProgramIds = (coachPrograms ?? []).map(p => p.id)
+  if (coachProgramIds.length) {
+    await supabase.from('coach_program_weeks').delete().in('program_id', coachProgramIds)
+  }
+  const coachDeletions = [
+    'coach_program_assignments',
+    'coach_programs',
+    'coach_clients',
+    'coach_client_notes',
+    'coach_pending_clients',
+    'coach_invite_codes',
+    'coach_exercise_audio',
+    'coach_exercise_library',
+    'coach_voices',
+    'coach_usage',
+  ]
+  for (const table of coachDeletions) {
+    await supabase.from(table).delete().eq('coach_id', userId)
+  }
+  await supabase.from('coach_messages').delete().eq('coach_id', userId)
+
+  // 5. Delete the profile (cascades anything FK'd to profiles(id)).
   await supabase.from('profiles').delete().eq('id', userId)
 
-  // 5. Finally remove the auth user. This is the step that actually closes the
-  //    account; if it fails, surface the error so the client doesn't show success.
+  // 6. Finally remove the auth user. This is the step that actually closes the
+  //    account AND releases the email address, so the same person can sign up
+  //    again from scratch. If it fails, surface the error so the client doesn't
+  //    show success over a half-deleted account.
   const { error } = await supabase.auth.admin.deleteUser(userId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
